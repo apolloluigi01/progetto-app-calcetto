@@ -106,12 +106,14 @@ export default function Statistiche() {
             </>
           )}
 
-          <Link
-            to="/statistiche/elenco"
-            className="mt-4 inline-block rounded-lg bg-field-green px-4 py-2 text-center text-sm font-medium text-white hover:bg-field-green-dark"
-          >
-            Visualizza tutte le statistiche
-          </Link>
+          <div className="mt-8 flex justify-center">
+            <Link
+              to="/statistiche/elenco"
+              className="inline-block rounded-lg bg-field-green px-4 py-2 text-center text-sm font-medium text-white hover:bg-field-green-dark"
+            >
+              Visualizza tutte le statistiche
+            </Link>
+          </div>
         </>
       )}
 

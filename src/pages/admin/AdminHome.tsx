@@ -24,8 +24,7 @@ export default function AdminHome() {
       )}
 
       <p className="mt-4 text-sm text-gray-500">
-        La gestione partite si trova nella sezione "Partite". Qui arriveranno le configurazioni
-        future: gestione stagioni e pesi del rating.
+        Qui arriveranno le configurazioni future: gestione stagioni e pesi del rating.
       </p>
 
       <Link
@@ -33,6 +32,13 @@ export default function AdminHome() {
         className="mt-4 block w-full rounded-lg bg-field-green px-4 py-2 text-center text-sm font-medium text-white hover:bg-field-green-dark"
       >
         Modifica anagrafica giocatori
+      </Link>
+
+      <Link
+        to="/admin/partite"
+        className="mt-2 block w-full rounded-lg bg-field-green px-4 py-2 text-center text-sm font-medium text-white hover:bg-field-green-dark"
+      >
+        Modifica partite
       </Link>
 
       <button

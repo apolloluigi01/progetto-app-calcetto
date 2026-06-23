@@ -16,6 +16,8 @@ import Impostazioni from './pages/Impostazioni'
 import AdminHome from './pages/admin/AdminHome'
 import GiocatoriAdmin from './pages/admin/GiocatoriAdmin'
 import GiocatoreEdit from './pages/admin/GiocatoreEdit'
+import PartiteAdmin from './pages/admin/PartiteAdmin'
+import MatchEdit from './pages/admin/MatchEdit'
 
 function App() {
   return (
@@ -40,6 +42,8 @@ function App() {
                 <Route path="/admin" element={<AdminHome />} />
                 <Route path="/admin/giocatori" element={<GiocatoriAdmin />} />
                 <Route path="/admin/giocatori/:id" element={<GiocatoreEdit />} />
+                <Route path="/admin/partite" element={<PartiteAdmin />} />
+                <Route path="/admin/partite/:id" element={<MatchEdit />} />
                 <Route path="/partite/nuova" element={<PartitaForm />} />
               </Route>
             </Route>
