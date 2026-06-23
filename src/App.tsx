@@ -12,7 +12,7 @@ import MatchDetail from './pages/MatchDetail'
 import Statistiche from './pages/Statistiche'
 import StatisticheElenco from './pages/StatisticheElenco'
 import StatisticaDettaglio from './pages/StatisticaDettaglio'
-import Profilo from './pages/Profilo'
+import Impostazioni from './pages/Impostazioni'
 import AdminHome from './pages/admin/AdminHome'
 
 function App() {
@@ -32,7 +32,7 @@ function App() {
               <Route path="/statistiche" element={<Statistiche />} />
               <Route path="/statistiche/elenco" element={<StatisticheElenco />} />
               <Route path="/statistiche/:key" element={<StatisticaDettaglio />} />
-              <Route path="/profilo" element={<Profilo />} />
+              <Route path="/impostazioni" element={<Impostazioni />} />
 
               <Route element={<AdminRoute />}>
                 <Route path="/admin" element={<AdminHome />} />

@@ -81,10 +81,10 @@ export default function Home() {
             {!lastMatch && <p className="p-4 text-sm text-gray-500">Nessuna partita completata.</p>}
             {lastMatch && (
               <Link to={`/partite/${lastMatch.match.id}`} className="block">
-                <div className="flex items-center justify-between px-4 py-3">
-                  <p className="text-sm text-gray-500">{formatDate(lastMatch.match.match_date)}</p>
+                <div className="px-4 py-4 text-center">
+                  <p className="text-xs text-gray-500">{formatDate(lastMatch.match.match_date)}</p>
                   {lastMatch.result && (
-                    <p className="text-xl font-bold text-field-green-dark">
+                    <p className="mt-1 text-4xl font-extrabold text-field-green-dark">
                       {lastMatch.result.score_a} - {lastMatch.result.score_b}
                     </p>
                   )}

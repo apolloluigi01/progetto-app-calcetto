@@ -6,12 +6,14 @@ const navItems = [
   { to: '/giocatori', label: 'Giocatori', icon: '🧑‍🤝‍🧑' },
   { to: '/partite', label: 'Partite', icon: '⚽' },
   { to: '/statistiche', label: 'Statistiche', icon: '📊' },
-  { to: '/profilo', label: 'Profilo', icon: '👤' },
 ]
 
 export default function Layout() {
   const { isAdmin } = useAuth()
-  const items = isAdmin ? [...navItems, { to: '/admin', label: 'Admin', icon: '⚙️' }] : navItems
+  const lastItem = isAdmin
+    ? { to: '/admin', label: 'Admin', icon: '👤' }
+    : { to: '/impostazioni', label: 'Impostazioni', icon: '⚙️' }
+  const items = [...navItems, lastItem]
 
   return (
     <div className="flex min-h-svh flex-col bg-gray-50">

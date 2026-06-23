@@ -1,4 +1,4 @@
-import { useAuth } from '../../contexts/AuthContext'
+import { useAuth } from '../contexts/AuthContext'
 
 const roleLabels: Record<string, string> = {
   superadmin: 'Superadmin',
@@ -6,12 +6,12 @@ const roleLabels: Record<string, string> = {
   player: 'Player',
 }
 
-export default function AdminHome() {
+export default function Impostazioni() {
   const { player, session, signOut } = useAuth()
 
   return (
     <div className="p-4">
-      <h1 className="text-xl font-semibold text-field-green-dark">Admin</h1>
+      <h1 className="text-xl font-semibold text-field-green-dark">Impostazioni</h1>
 
       {player && (
         <div className="mt-4 rounded-xl bg-white p-4 shadow">
@@ -21,11 +21,6 @@ export default function AdminHome() {
           <p className="mt-2 text-xs uppercase text-field-green">{roleLabels[player.role] ?? player.role}</p>
         </div>
       )}
-
-      <p className="mt-4 text-sm text-gray-500">
-        La gestione giocatori e partite si trova ora nelle rispettive sezioni "Giocatori" e
-        "Partite". Qui arriveranno le configurazioni future: gestione stagioni e pesi del rating.
-      </p>
 
       <button
         onClick={signOut}
