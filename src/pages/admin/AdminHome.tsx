@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 
 const roleLabels: Record<string, string> = {
@@ -23,9 +24,16 @@ export default function AdminHome() {
       )}
 
       <p className="mt-4 text-sm text-gray-500">
-        La gestione giocatori e partite si trova ora nelle rispettive sezioni "Giocatori" e
-        "Partite". Qui arriveranno le configurazioni future: gestione stagioni e pesi del rating.
+        La gestione partite si trova nella sezione "Partite". Qui arriveranno le configurazioni
+        future: gestione stagioni e pesi del rating.
       </p>
+
+      <Link
+        to="/admin/giocatori"
+        className="mt-4 block w-full rounded-lg bg-field-green px-4 py-2 text-center text-sm font-medium text-white hover:bg-field-green-dark"
+      >
+        Modifica anagrafica giocatori
+      </Link>
 
       <button
         onClick={signOut}

@@ -14,6 +14,8 @@ import StatisticheElenco from './pages/StatisticheElenco'
 import StatisticaDettaglio from './pages/StatisticaDettaglio'
 import Impostazioni from './pages/Impostazioni'
 import AdminHome from './pages/admin/AdminHome'
+import GiocatoriAdmin from './pages/admin/GiocatoriAdmin'
+import GiocatoreEdit from './pages/admin/GiocatoreEdit'
 
 function App() {
   return (
@@ -36,6 +38,8 @@ function App() {
 
               <Route element={<AdminRoute />}>
                 <Route path="/admin" element={<AdminHome />} />
+                <Route path="/admin/giocatori" element={<GiocatoriAdmin />} />
+                <Route path="/admin/giocatori/:id" element={<GiocatoreEdit />} />
                 <Route path="/partite/nuova" element={<PartitaForm />} />
               </Route>
             </Route>
