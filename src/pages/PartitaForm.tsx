@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { getOrCreateCurrentSeason } from '../lib/seasons'
+import { getKnownFields } from '../lib/fields'
 import type { Player, Team } from '../types/database'
 
 export default function PartitaForm() {
   const navigate = useNavigate()
   const [players, setPlayers] = useState<Player[]>([])
+  const [knownFields, setKnownFields] = useState<string[]>([])
   const [matchDate, setMatchDate] = useState('')
   const [matchTime, setMatchTime] = useState('')
   const [field, setField] = useState('')
@@ -21,6 +23,7 @@ export default function PartitaForm() {
       .select('*')
       .order('name')
       .then(({ data }) => setPlayers((data ?? []) as Player[]))
+    getKnownFields().then(setKnownFields)
   }, [])
 
   function toggleSelected(playerId: string) {
@@ -116,8 +119,15 @@ export default function PartitaForm() {
           <input
             value={field}
             onChange={(e) => setField(e.target.value)}
+            list="campi-noti"
+            placeholder="Es. Centro Sportivo Comunale"
             className="w-full rounded-lg border border-gray-300 px-3 py-2"
           />
+          <datalist id="campi-noti">
+            {knownFields.map((f) => (
+              <option key={f} value={f} />
+            ))}
+          </datalist>
         </div>
       </div>
 

@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useMatchDetail } from '../hooks/useMatchDetail'
+import { getKnownFields } from '../lib/fields'
 import type { Team } from '../types/database'
 
 interface PagellaDraft {
@@ -21,6 +22,13 @@ export default function MatchDetail() {
   const [scoreB, setScoreB] = useState('')
   const [savingResult, setSavingResult] = useState(false)
 
+  const [editingInfo, setEditingInfo] = useState(false)
+  const [matchDate, setMatchDate] = useState('')
+  const [matchTime, setMatchTime] = useState('')
+  const [field, setField] = useState('')
+  const [knownFields, setKnownFields] = useState<string[]>([])
+  const [savingInfo, setSavingInfo] = useState(false)
+
   const [newGoalPlayer, setNewGoalPlayer] = useState<Record<Team, string>>({ A: '', B: '' })
   const [ownGoal, setOwnGoal] = useState<Record<Team, boolean>>({ A: false, B: false })
 
@@ -29,9 +37,17 @@ export default function MatchDetail() {
   const [publishing, setPublishing] = useState(false)
 
   useEffect(() => {
+    if (!isAdmin) return
+    getKnownFields().then(setKnownFields)
+  }, [isAdmin])
+
+  useEffect(() => {
     if (!data) return
     setScoreA(data.result ? String(data.result.score_a) : '')
     setScoreB(data.result ? String(data.result.score_b) : '')
+    setMatchDate(data.match.match_date)
+    setMatchTime(data.match.match_time ?? '')
+    setField(data.match.field ?? '')
 
     const initial: Record<string, PagellaDraft> = {}
     for (const mp of data.matchPlayers) {
@@ -62,6 +78,18 @@ export default function MatchDetail() {
       .upsert({ match_id: id, score_a: Number(scoreA) || 0, score_b: Number(scoreB) || 0 }, { onConflict: 'match_id' })
     await supabase.from('matches').update({ status: 'completed' }).eq('id', id)
     setSavingResult(false)
+    refetch()
+  }
+
+  async function handleSaveInfo() {
+    if (!id) return
+    setSavingInfo(true)
+    await supabase
+      .from('matches')
+      .update({ match_date: matchDate, match_time: matchTime || null, field: field || null })
+      .eq('id', id)
+    setSavingInfo(false)
+    setEditingInfo(false)
     refetch()
   }
 
@@ -156,7 +184,77 @@ export default function MatchDetail() {
           )}
         </div>
       </div>
-      {match.field && <p className="text-sm text-gray-500">{match.field}</p>}
+
+      {!editingInfo && (
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-gray-500">
+            {match.match_time && `${match.match_time.slice(0, 5)} · `}
+            {match.field || 'Campo non specificato'}
+          </p>
+          {isAdmin && (
+            <button
+              onClick={() => setEditingInfo(true)}
+              className="text-xs text-field-green underline"
+            >
+              Modifica
+            </button>
+          )}
+        </div>
+      )}
+
+      {isAdmin && editingInfo && (
+        <div className="mt-2 space-y-2 rounded-xl bg-white p-3 shadow">
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-700">Data</label>
+              <input
+                type="date"
+                value={matchDate}
+                onChange={(e) => setMatchDate(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-700">Ora</label>
+              <input
+                type="time"
+                value={matchTime}
+                onChange={(e) => setMatchTime(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-700">Campo</label>
+            <input
+              value={field}
+              onChange={(e) => setField(e.target.value)}
+              list="campi-noti"
+              className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
+            />
+            <datalist id="campi-noti">
+              {knownFields.map((f) => (
+                <option key={f} value={f} />
+              ))}
+            </datalist>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setEditingInfo(false)}
+              className="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-600"
+            >
+              Annulla
+            </button>
+            <button
+              onClick={handleSaveInfo}
+              disabled={savingInfo || !matchDate}
+              className="flex-1 rounded-lg bg-field-green px-3 py-1.5 text-sm font-medium text-white hover:bg-field-green-dark disabled:opacity-50"
+            >
+              {savingInfo ? 'Salvataggio...' : 'Salva'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {result && (
         <p className="mt-3 text-center text-3xl font-bold text-field-green-dark">

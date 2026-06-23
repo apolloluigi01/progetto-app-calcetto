@@ -25,7 +25,6 @@ export default function Statistiche() {
             const config = STAT_CONFIG[key]
             const ranking = getRanking(stats, key).slice(0, 10)
             const isGreen = config.color === 'green'
-            const headerBg = isGreen ? 'bg-field-green' : 'bg-red-600'
             const valueColor = isGreen ? 'text-field-green-dark' : 'text-red-600'
             const valueBg = isGreen ? 'bg-field-green/10' : 'bg-red-50'
 
@@ -33,29 +32,26 @@ export default function Statistiche() {
               <Link
                 key={key}
                 to={`/statistiche/${key}`}
-                className="block overflow-hidden rounded-xl bg-white shadow transition hover:shadow-md"
+                className="block overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition hover:shadow-md"
               >
-                <h2 className={`px-3 py-2 text-sm font-semibold text-white ${headerBg}`}>
+                <h2 className="border-b border-gray-200 px-4 py-3 text-sm font-semibold text-field-green-dark">
                   {config.title}
                 </h2>
                 <table className="w-full text-sm">
                   <tbody>
                     {ranking.length === 0 && (
                       <tr>
-                        <td className="px-3 py-2 text-gray-400">Nessun dato</td>
+                        <td className="px-4 py-3 text-gray-400">Nessun dato</td>
                       </tr>
                     )}
                     {ranking.map((entry, i) => (
-                      <tr
-                        key={entry.stats.player.id}
-                        className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}
-                      >
-                        <td className="py-1.5 pl-3 pr-1 text-gray-400">{i + 1}</td>
-                        <td className="py-1.5 pr-2 font-medium text-gray-700">
+                      <tr key={entry.stats.player.id} className="border-t border-gray-100 first:border-t-0">
+                        <td className="py-2 pl-4 pr-1 text-gray-400">{i + 1}</td>
+                        <td className="py-2 pr-2 font-medium text-gray-700">
                           {entry.stats.player.name}
                         </td>
-                        <td className="py-1.5 pr-3 text-right">
-                          <span className={`rounded-md px-2 py-0.5 font-semibold ${valueColor} ${valueBg}`}>
+                        <td className="py-2 pr-4 text-right">
+                          <span className={`inline-flex items-center rounded-full px-2.5 py-1 font-semibold ${valueColor} ${valueBg}`}>
                             {config.formatValue(entry.value)}
                           </span>
                         </td>

@@ -34,7 +34,6 @@ export default function StatisticaDettaglio() {
   if (error) return <div className="p-4 text-sm text-red-600">{error}</div>
 
   const isGreen = config.color === 'green'
-  const headerBg = isGreen ? 'bg-field-green' : 'bg-red-600'
   const valueColor = isGreen ? 'text-field-green-dark' : 'text-red-600'
   const valueBg = isGreen ? 'bg-field-green/10' : 'bg-red-50'
 
@@ -60,24 +59,32 @@ export default function StatisticaDettaglio() {
       <h1 className={`mt-2 text-xl font-semibold ${valueColor}`}>{config.title}</h1>
       <p className="text-sm text-gray-500">{config.description}</p>
 
-      <div className="mt-4 overflow-hidden rounded-xl bg-white shadow">
-        <table className="w-full text-base">
+      <div className="mt-4 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+        <table className="w-full text-sm">
           <thead>
-            <tr className={`text-left text-sm font-semibold text-white ${headerBg}`}>
-              <th className="px-3 py-2">#</th>
-              <th className="px-3 py-2 cursor-pointer select-none" onClick={() => handleSort('name')}>
+            <tr className="bg-gray-50">
+              <th className="w-10 px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                #
+              </th>
+              <th
+                className="cursor-pointer select-none px-2 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500"
+                onClick={() => handleSort('name')}
+              >
                 Giocatore{arrow('name')}
               </th>
               {config.extraColumn && (
                 <th
-                  className="px-3 py-2 text-right cursor-pointer select-none"
+                  className="cursor-pointer select-none px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wide text-gray-500"
                   onClick={() => handleSort('extra')}
                 >
                   {config.extraColumn.label}
                   {arrow('extra')}
                 </th>
               )}
-              <th className="px-3 py-2 text-right cursor-pointer select-none" onClick={() => handleSort('value')}>
+              <th
+                className="cursor-pointer select-none px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wide text-gray-500"
+                onClick={() => handleSort('value')}
+              >
                 Valore{arrow('value')}
               </th>
             </tr>
@@ -85,22 +92,22 @@ export default function StatisticaDettaglio() {
           <tbody>
             {sorted.length === 0 && (
               <tr>
-                <td colSpan={config.extraColumn ? 4 : 3} className="px-3 py-3 text-gray-400">
+                <td colSpan={config.extraColumn ? 4 : 3} className="px-4 py-3 text-gray-400">
                   Nessun dato disponibile.
                 </td>
               </tr>
             )}
             {sorted.map((entry, i) => (
-              <tr key={entry.stats.player.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                <td className="px-3 py-2 text-gray-400">{i + 1}</td>
-                <td className="px-3 py-2 font-medium text-gray-700">{entry.stats.player.name}</td>
+              <tr key={entry.stats.player.id} className="border-t border-gray-100 hover:bg-gray-50">
+                <td className="px-4 py-2.5 text-gray-400">{i + 1}</td>
+                <td className="px-2 py-2.5 font-medium text-gray-700">{entry.stats.player.name}</td>
                 {config.extraColumn && (
-                  <td className="px-3 py-2 text-right text-gray-500">
+                  <td className="px-4 py-2.5 text-right text-gray-500">
                     {config.extraColumn.getValue(entry.stats)}
                   </td>
                 )}
-                <td className="px-3 py-2 text-right">
-                  <span className={`rounded-md px-2 py-1 font-semibold ${valueColor} ${valueBg}`}>
+                <td className="px-4 py-2.5 text-right">
+                  <span className={`inline-flex items-center rounded-full px-2.5 py-1 font-semibold ${valueColor} ${valueBg}`}>
                     {config.formatValue(entry.value)}
                   </span>
                 </td>
