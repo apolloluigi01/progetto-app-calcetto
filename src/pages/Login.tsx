@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Navigate, useLocation } from 'react-router-dom'
+import { Link, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 
 const EMAIL_NOT_CONFIRMED = 'Email non confermata. Controlla la tua casella di posta (anche lo spam) e clicca sul link di conferma prima di accedere.'
@@ -77,6 +77,10 @@ export default function Login() {
             {submitting ? 'Accesso in corso...' : 'Accedi'}
           </button>
         </form>
+
+        <Link to="/password-dimenticata" className="mt-4 block text-center text-sm text-gray-500 hover:underline">
+          Password dimenticata?
+        </Link>
       </div>
     </div>
   )

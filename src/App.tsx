@@ -3,6 +3,9 @@ import { AuthProvider } from './contexts/AuthContext'
 import { ProtectedRoute, AdminRoute } from './components/ProtectedRoute'
 import Layout from './components/Layout'
 import Login from './pages/Login'
+import PasswordDimenticata from './pages/PasswordDimenticata'
+import ResetPassword from './pages/ResetPassword'
+import ImpostaPassword from './pages/ImpostaPassword'
 import Home from './pages/Home'
 import Giocatori from './pages/Giocatori'
 import GiocatoreDetail from './pages/GiocatoreDetail'
@@ -25,8 +28,12 @@ function App() {
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/password-dimenticata" element={<PasswordDimenticata />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
 
           <Route element={<ProtectedRoute />}>
+            <Route path="/imposta-password" element={<ImpostaPassword />} />
+
             <Route element={<Layout />}>
               <Route path="/" element={<Home />} />
               <Route path="/giocatori" element={<Giocatori />} />

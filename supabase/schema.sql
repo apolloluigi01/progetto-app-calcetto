@@ -10,7 +10,8 @@ create table if not exists players (
   name text not null,
   nickname text,
   avatar_url text,
-  role text not null default 'player' check (role in ('admin', 'player')),
+  role text not null default 'player' check (role in ('admin', 'player', 'superadmin')),
+  must_change_password boolean not null default true,
   created_at timestamptz not null default now()
 );
 
@@ -98,9 +99,21 @@ security definer
 stable
 as $$
   select exists (
-    select 1 from players where id = auth.uid() and role = 'admin'
+    select 1 from players where id = auth.uid() and role in ('admin', 'superadmin')
   );
 $$;
+
+-- RPC che l'utente autenticato chiama per confermare che ha impostato una password conforme
+create or replace function clear_must_change_password()
+returns void
+language sql
+security definer
+set search_path = public
+as $$
+  update players set must_change_password = false where id = auth.uid();
+$$;
+
+grant execute on function clear_must_change_password() to authenticated;
 
 -- =========================================================
 -- ROW LEVEL SECURITY

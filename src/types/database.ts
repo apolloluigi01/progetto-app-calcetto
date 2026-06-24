@@ -9,6 +9,7 @@ export interface Player {
   nickname: string | null
   avatar_url: string | null
   role: PlayerRole
+  must_change_password: boolean
   created_at: string
 }
 
