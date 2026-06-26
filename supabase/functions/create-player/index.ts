@@ -136,6 +136,7 @@ Deno.serve(async (req: Request) => {
   try {
     await sendConfirmationEmail(email, name, linkData.properties.action_link);
   } catch (emailErr) {
+    console.error("Invio email di conferma fallito:", emailErr);
     return json({ id: linkData.user.id, email_warning: String(emailErr) });
   }
 
