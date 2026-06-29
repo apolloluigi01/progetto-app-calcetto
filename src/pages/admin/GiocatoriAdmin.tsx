@@ -90,6 +90,9 @@ export default function GiocatoriAdmin() {
         )}
       </div>
 
+      {error && !showForm && <p className="mt-4 text-sm text-red-600">{error}</p>}
+      {success && !showForm && <p className="mt-4 text-sm text-field-green-dark">{success}</p>}
+
       {showForm && (
         <form onSubmit={handleCreate} className="mt-4 space-y-3 rounded-xl bg-white p-4 shadow">
           <div className="flex items-center justify-between">
