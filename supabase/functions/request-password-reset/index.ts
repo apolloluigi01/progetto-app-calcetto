@@ -33,7 +33,13 @@ async function sendEmail(to: string, subject: string, html: string) {
   try {
     await client.send({ from: `Calcetto App <${gmailUser}>`, to, subject, content: "text/html", html });
   } finally {
-    await client.close();
+    // denomailer puo' lanciare un TypeError interno su close() se la connessione non si e' mai
+    // stabilita (es. credenziali errate): non deve mascherare l'errore originale di send().
+    try {
+      await client.close();
+    } catch (closeErr) {
+      console.error("Errore chiusura client SMTP:", closeErr);
+    }
   }
 }
 

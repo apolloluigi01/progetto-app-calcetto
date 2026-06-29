@@ -46,10 +46,9 @@ export default function GiocatoriAdmin() {
     setSuccess(null)
     setSubmitting(true)
 
-    const { data: fnData, error: fnError } = await supabase.functions.invoke<{ email_warning?: string }>(
-      'create-player',
-      { body: { email, password, name, nickname: nickname || undefined, role } }
-    )
+    const { error: fnError } = await supabase.functions.invoke<{ id: string }>('create-player', {
+      body: { email, password, name, nickname: nickname || undefined, role },
+    })
 
     setSubmitting(false)
 
@@ -58,15 +57,7 @@ export default function GiocatoriAdmin() {
       return
     }
 
-    if (fnData?.email_warning) {
-      setError(
-        `Giocatore creato, ma l'invio della mail di conferma a ${email} è fallito: ${fnData.email_warning}`
-      )
-    } else {
-      setSuccess(
-        `Giocatore creato. È stata inviata una mail di conferma a ${email}: l'account resta in attesa fino a quando non viene confermata.`
-      )
-    }
+    setSuccess(`Giocatore creato. Puo' accedere subito con l'email ${email} e la password impostata.`)
     setName('')
     setNickname('')
     setEmail('')
