@@ -2,7 +2,9 @@ import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 
-const navItems = [
+type NavItem = { to: string; label: string; end?: boolean }
+
+const navItems: NavItem[] = [
   { to: '/', label: 'Home', end: true },
   { to: '/giocatori', label: 'Giocatori' },
   { to: '/partite', label: 'Partite' },
@@ -13,7 +15,7 @@ export default function Layout() {
   const { isAdmin } = useAuth()
   const [menuOpen, setMenuOpen] = useState(false)
 
-  const lastItem = isAdmin
+  const lastItem: NavItem = isAdmin
     ? { to: '/admin', label: 'Admin' }
     : { to: '/impostazioni', label: 'Impostazioni' }
   const items = [...navItems, lastItem]
@@ -42,7 +44,7 @@ export default function Layout() {
             <NavLink
               key={item.to}
               to={item.to}
-              end={'end' in item ? item.end : false}
+              end={item.end ?? false}
               className={({ isActive }) =>
                 `px-3 py-2.5 text-sm uppercase tracking-widest font-semibold transition-colors duration-150 ${
                   isActive
@@ -95,7 +97,7 @@ export default function Layout() {
             <NavLink
               key={item.to}
               to={item.to}
-              end={'end' in item ? item.end : false}
+              end={item.end ?? false}
               onClick={() => setMenuOpen(false)}
               className={({ isActive }) =>
                 `px-6 py-3 text-sm uppercase tracking-widest font-semibold ${
