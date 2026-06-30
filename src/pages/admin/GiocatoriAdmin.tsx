@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { getFunctionErrorMessage } from '../../lib/functionErrors'
+import { logActivity } from '../../lib/activityLog'
 import type { Player, PlayerRole } from '../../types/database'
 
 type PlayerWithStatus = Player & { email?: string | null; email_confirmed?: boolean }
@@ -58,6 +59,7 @@ export default function GiocatoriAdmin() {
     }
 
     setSuccess(`Giocatore creato. Puo' accedere subito con l'email ${email} e la password impostata.`)
+    logActivity('giocatore_creato', { nome: name, email, ruolo: role })
     setName('')
     setNickname('')
     setEmail('')

@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { getFunctionErrorMessage } from '../../lib/functionErrors'
+import { logActivity } from '../../lib/activityLog'
 import type { Player, PlayerRole } from '../../types/database'
 
 type PlayerWithStatus = Player & { email?: string | null; email_confirmed?: boolean }
@@ -73,6 +74,7 @@ export default function GiocatoreEdit() {
       setError(error.message)
       return
     }
+    logActivity('giocatore_modificato', { nome: name, nickname: nickname || null, ruolo: isSuperAdmin ? role : undefined, playerId: id })
     load()
   }
 
@@ -98,6 +100,7 @@ export default function GiocatoreEdit() {
     setNewPassword('')
     setShowResetPassword(false)
     setResetSuccess(true)
+    logActivity('password_reimpostata', { nome: player?.name, playerId: id })
   }
 
   async function handleDelete() {
@@ -109,6 +112,7 @@ export default function GiocatoreEdit() {
       setError(await getFunctionErrorMessage(error, "Errore nell'eliminazione del giocatore"))
       return
     }
+    await logActivity('giocatore_eliminato', { nome: player?.name, playerId: id })
     navigate('/admin/giocatori')
   }
 

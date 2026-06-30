@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { getOrCreateCurrentSeason } from '../lib/seasons'
 import { getKnownFields } from '../lib/fields'
+import { logActivity } from '../lib/activityLog'
 import type { Player, Team } from '../types/database'
 
 export default function PartitaForm() {
@@ -83,6 +84,7 @@ export default function PartitaForm() {
       const { error: playersError } = await supabase.from('match_players').insert(rows)
       if (playersError) throw new Error(playersError.message)
 
+      logActivity('partita_creata', { matchId: match.id, data: matchDate, campo: field || null })
       navigate(`/partite/${match.id}`)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Errore imprevisto')

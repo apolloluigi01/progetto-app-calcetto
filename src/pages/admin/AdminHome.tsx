@@ -41,6 +41,13 @@ export default function AdminHome() {
         Modifica partite
       </Link>
 
+      <Link
+        to="/registro-attivita"
+        className="mt-2 block w-full rounded-lg border border-gray-300 px-4 py-2 text-center text-sm font-medium text-gray-700 hover:bg-gray-50"
+      >
+        Registro attività admin
+      </Link>
+
       <button
         onClick={signOut}
         className="mt-6 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"

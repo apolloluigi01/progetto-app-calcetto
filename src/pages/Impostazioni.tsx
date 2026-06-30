@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { validatePassword } from '../lib/passwordPolicy'
@@ -130,9 +131,16 @@ export default function Impostazioni() {
         )}
       </div>
 
+      <Link
+        to="/registro-attivita"
+        className="mt-4 block rounded-lg border border-gray-300 px-4 py-2 text-center text-sm text-gray-700 hover:bg-gray-50"
+      >
+        Registro attività admin
+      </Link>
+
       <button
         onClick={signOut}
-        className="mt-6 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+        className="mt-3 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
       >
         Esci
       </button>

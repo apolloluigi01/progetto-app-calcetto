@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useMatchDetail } from '../../hooks/useMatchDetail'
 import { getKnownFields } from '../../lib/fields'
+import { logActivity } from '../../lib/activityLog'
 import type { Team } from '../../types/database'
 
 interface PagellaDraft {
@@ -77,6 +78,7 @@ export default function MatchEdit() {
       .upsert({ match_id: id, score_a: Number(scoreA) || 0, score_b: Number(scoreB) || 0 }, { onConflict: 'match_id' })
     await supabase.from('matches').update({ status: 'completed' }).eq('id', id)
     setSavingResult(false)
+    logActivity('risultato_salvato', { matchId: id, data: match.match_date, scoreA: Number(scoreA) || 0, scoreB: Number(scoreB) || 0 })
     refetch()
   }
 
@@ -88,6 +90,7 @@ export default function MatchEdit() {
       .update({ match_date: matchDate, match_time: matchTime || null, field: field || null })
       .eq('id', id)
     setSavingInfo(false)
+    logActivity('partita_modificata', { matchId: id, data: matchDate, ora: matchTime || null, campo: field || null })
     refetch()
   }
 
@@ -96,13 +99,17 @@ export default function MatchEdit() {
     await supabase
       .from('goals')
       .insert({ match_id: id, player_id: newGoalPlayer[team], team, is_own_goal: ownGoal[team] })
+    const playerName = matchPlayers.find(p => p.player_id === newGoalPlayer[team])?.name
+    logActivity('gol_aggiunto', { matchId: id, data: match.match_date, squadra: team, giocatore: playerName, autogol: ownGoal[team] })
     setNewGoalPlayer((prev) => ({ ...prev, [team]: '' }))
     setOwnGoal((prev) => ({ ...prev, [team]: false }))
     refetch()
   }
 
   async function handleRemoveGoal(goalId: string) {
+    const goal = goals.find(g => g.id === goalId)
     await supabase.from('goals').delete().eq('id', goalId)
+    logActivity('gol_rimosso', { matchId: id, data: match.match_date, giocatore: goal?.name })
     refetch()
   }
 
@@ -136,6 +143,7 @@ export default function MatchEdit() {
     setSavingPagelle(true)
     await supabase.from('pagelle').upsert(buildPagelleRows(false), { onConflict: 'match_id,player_id' })
     setSavingPagelle(false)
+    logActivity('pagelle_bozza', { matchId: id, data: match.match_date })
     refetch()
   }
 
@@ -149,6 +157,7 @@ export default function MatchEdit() {
     setPublishing(true)
     await supabase.from('pagelle').upsert(buildPagelleRows(true), { onConflict: 'match_id,player_id' })
     await supabase.functions.invoke('notify-match-published', { body: { matchId: id } })
+    logActivity('pagelle_pubblicate', { matchId: id, data: match.match_date })
     setPublishing(false)
     refetch()
   }
@@ -163,6 +172,7 @@ export default function MatchEdit() {
       alert(error.message)
       return
     }
+    await logActivity('partita_eliminata', { matchId: id, data: match.match_date })
     navigate('/admin/partite')
   }
 
