@@ -1,11 +1,12 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 
-const supabaseUrl     = Deno.env.get("SUPABASE_URL")!;
-const serviceRoleKey  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const resendApiKey    = Deno.env.get("RESEND_API_KEY") ?? "";
-const resendFrom      = Deno.env.get("RESEND_FROM") ?? "Pavone League <noreply@resend.dev>";
-const appUrl          = Deno.env.get("APP_URL") ?? "https://progetto-app-calcetto.vercel.app";
+const supabaseUrl    = Deno.env.get("SUPABASE_URL")!;
+const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const gmailUser      = Deno.env.get("GMAIL_USER")!;
+const gmailPassword  = Deno.env.get("GMAIL_APP_PASSWORD")!;
+const appUrl         = Deno.env.get("APP_URL") ?? "https://progetto-app-calcetto.vercel.app";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -51,25 +52,24 @@ async function sendWelcomeEmail(
   password: string,
   confirmLink: string,
 ): Promise<void> {
-  if (!resendApiKey) {
-    console.warn("RESEND_API_KEY non configurata — email non inviata");
-    return;
-  }
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${resendApiKey}`,
-      "Content-Type": "application/json",
+  const client = new SMTPClient({
+    connection: {
+      hostname: "smtp.gmail.com",
+      port: 465,
+      tls: true,
+      auth: { username: gmailUser, password: gmailPassword },
     },
-    body: JSON.stringify({
-      from: resendFrom,
+  });
+  try {
+    await client.send({
+      from: `Pavone League <${gmailUser}>`,
       to,
       subject: `Benvenuto in Pavone League, ${name}!`,
+      content: "text/html",
       html: welcomeHtml(name, to, password, confirmLink),
-    }),
-  });
-  if (!res.ok) {
-    console.error("Resend error:", await res.text());
+    });
+  } finally {
+    try { await client.close(); } catch (e) { console.error("SMTP close error:", e); }
   }
 }
 
@@ -114,7 +114,6 @@ Deno.serve(async (req: Request) => {
 
   const effectiveRole = callerRole === "superadmin" ? (role ?? "player") : "player";
 
-  // email_confirm: false → l'utente deve confermare l'email prima di accedere
   const { data: createData, error: createError } = await adminClient.auth.admin.createUser({
     email,
     password,
@@ -138,7 +137,6 @@ Deno.serve(async (req: Request) => {
     return json({ error: insertError.message }, 400);
   }
 
-  // Genera il link di conferma email: quando cliccato, conferma la mail e reindirizza all'app
   const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
     type: "signup",
     email,
@@ -150,7 +148,11 @@ Deno.serve(async (req: Request) => {
     return json({ id: createData.user.id, warning: "Utente creato ma email di benvenuto non inviata" });
   }
 
-  await sendWelcomeEmail(email, name, password, linkData.properties.action_link);
+  try {
+    await sendWelcomeEmail(email, name, password, linkData.properties.action_link);
+  } catch (e) {
+    console.error("Errore invio email:", e);
+  }
 
   return json({ id: createData.user.id });
 });
