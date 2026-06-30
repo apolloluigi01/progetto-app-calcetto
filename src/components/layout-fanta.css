@@ -1,0 +1,33 @@
+.fanta-label {
+  display: inline-block;
+  font-size: 0.875rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  background: linear-gradient(
+    110deg,
+    #b8860b 0%,
+    #f9a825 30%,
+    #ffe082 50%,
+    #f9a825 70%,
+    #b8860b 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: fanta-shimmer 3s linear infinite;
+  filter: drop-shadow(0 0 6px rgba(249, 168, 37, 0.45));
+  transition: filter 0.2s ease;
+}
+
+.fanta-label:hover,
+.fanta-label--active {
+  filter: drop-shadow(0 0 10px rgba(249, 168, 37, 0.75));
+  animation-duration: 1.5s;
+}
+
+@keyframes fanta-shimmer {
+  0% { background-position: 200% center; }
+  100% { background-position: -200% center; }
+}

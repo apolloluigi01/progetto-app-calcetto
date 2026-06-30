@@ -21,6 +21,7 @@ import GiocatoriAdmin from './pages/admin/GiocatoriAdmin'
 import GiocatoreEdit from './pages/admin/GiocatoreEdit'
 import PartiteAdmin from './pages/admin/PartiteAdmin'
 import MatchEdit from './pages/admin/MatchEdit'
+import Fantacalcetto from './pages/Fantacalcetto'
 
 function App() {
   return (
@@ -44,6 +45,7 @@ function App() {
               <Route path="/statistiche/elenco" element={<StatisticheElenco />} />
               <Route path="/statistiche/:key" element={<StatisticaDettaglio />} />
               <Route path="/impostazioni" element={<Impostazioni />} />
+              <Route path="/fantacalcetto" element={<Fantacalcetto />} />
 
               <Route element={<AdminRoute />}>
                 <Route path="/admin" element={<AdminHome />} />

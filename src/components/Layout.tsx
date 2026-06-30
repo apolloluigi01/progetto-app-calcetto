@@ -1,15 +1,28 @@
 import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import './layout-fanta.css'
 
-type NavItem = { to: string; label: string; end?: boolean }
+type NavItem = { to: string; label: string; end?: boolean; fanta?: boolean }
 
 const navItems: NavItem[] = [
   { to: '/', label: 'Home', end: true },
   { to: '/giocatori', label: 'Giocatori' },
   { to: '/partite', label: 'Partite' },
   { to: '/statistiche', label: 'Statistiche' },
+  { to: '/fantacalcetto', label: 'Fantacalcetto', fanta: true },
 ]
+
+function NavLabel({ item, isActive }: { item: NavItem; isActive: boolean }) {
+  if (item.fanta) {
+    return (
+      <span className={`fanta-label ${isActive ? 'fanta-label--active' : ''}`}>
+        {item.label}
+      </span>
+    )
+  }
+  return <>{item.label}</>
+}
 
 export default function Layout() {
   const { isAdmin } = useAuth()
@@ -46,14 +59,14 @@ export default function Layout() {
               to={item.to}
               end={item.end ?? false}
               className={({ isActive }) =>
-                `px-3 py-2.5 text-sm uppercase tracking-widest font-semibold transition-colors duration-150 ${
-                  isActive
-                    ? 'text-white'
-                    : 'text-white/40 hover:text-white/70'
-                }`
+                item.fanta
+                  ? 'px-3 py-2.5'
+                  : `px-3 py-2.5 text-sm uppercase tracking-widest font-semibold transition-colors duration-150 ${
+                      isActive ? 'text-white' : 'text-white/40 hover:text-white/70'
+                    }`
               }
             >
-              {item.label}
+              {({ isActive }) => <NavLabel item={item} isActive={isActive} />}
             </NavLink>
           ))}
         </nav>
@@ -74,7 +87,7 @@ export default function Layout() {
         >
           <span
             className={`block h-0.5 rounded transition-all duration-200 ${menuOpen ? 'rotate-45 translate-y-2' : ''}`}
-            style={{ background: 'white', width: menuOpen ? '22px' : '22px' }}
+            style={{ background: 'white', width: '22px' }}
           />
           <span
             className={`block h-0.5 rounded transition-all duration-200 ${menuOpen ? 'opacity-0' : ''}`}
@@ -99,13 +112,21 @@ export default function Layout() {
               to={item.to}
               end={item.end ?? false}
               onClick={() => setMenuOpen(false)}
-              className={({ isActive }) =>
-                `px-6 py-3 text-sm uppercase tracking-widest font-semibold ${
-                  isActive ? 'text-white' : 'text-white/50'
-                }`
-              }
+              className={item.fanta ? 'px-6 py-3' : undefined}
             >
-              {item.label}
+              {({ isActive }) =>
+                item.fanta ? (
+                  <NavLabel item={item} isActive={isActive} />
+                ) : (
+                  <span
+                    className={`text-sm uppercase tracking-widest font-semibold ${
+                      isActive ? 'text-white' : 'text-white/50'
+                    }`}
+                  >
+                    {item.label}
+                  </span>
+                )
+              }
             </NavLink>
           ))}
         </div>
