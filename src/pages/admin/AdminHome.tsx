@@ -12,7 +12,7 @@ export default function AdminHome() {
 
   return (
     <div className="p-4">
-      <h1 className="text-xl font-semibold text-field-green-dark">Admin</h1>
+      <h1 className="text-xl font-semibold text-field-green-dark">CDA Pavone</h1>
 
       {player && (
         <div className="mt-4 rounded-xl bg-white p-4 shadow">
@@ -23,30 +23,51 @@ export default function AdminHome() {
         </div>
       )}
 
-      <p className="mt-4 text-sm text-gray-500">
-        Qui arriveranno le configurazioni future: gestione stagioni e pesi del rating.
-      </p>
+      <div className="mt-4 space-y-2">
+        <Link
+          to="/admin/stagioni"
+          className="flex items-center gap-3 rounded-xl bg-field-green px-4 py-3 text-sm font-medium text-white hover:bg-field-green-dark"
+        >
+          <span className="text-lg">🏆</span>
+          <div>
+            <p className="font-semibold">Gestione stagioni</p>
+            <p className="text-xs opacity-80">Crea e gestisci le stagioni del campionato</p>
+          </div>
+        </Link>
 
-      <Link
-        to="/admin/giocatori"
-        className="mt-4 block w-full rounded-lg bg-field-green px-4 py-2 text-center text-sm font-medium text-white hover:bg-field-green-dark"
-      >
-        Modifica anagrafica giocatori
-      </Link>
+        <Link
+          to="/admin/partite"
+          className="flex items-center gap-3 rounded-xl bg-field-green px-4 py-3 text-sm font-medium text-white hover:bg-field-green-dark"
+        >
+          <span className="text-lg">⚽</span>
+          <div>
+            <p className="font-semibold">Gestione partite</p>
+            <p className="text-xs opacity-80">Crea, modifica e gestisci le partite</p>
+          </div>
+        </Link>
 
-      <Link
-        to="/admin/partite"
-        className="mt-2 block w-full rounded-lg bg-field-green px-4 py-2 text-center text-sm font-medium text-white hover:bg-field-green-dark"
-      >
-        Modifica partite
-      </Link>
+        <Link
+          to="/admin/giocatori"
+          className="flex items-center gap-3 rounded-xl bg-field-green px-4 py-3 text-sm font-medium text-white hover:bg-field-green-dark"
+        >
+          <span className="text-lg">👥</span>
+          <div>
+            <p className="font-semibold">Anagrafica giocatori</p>
+            <p className="text-xs opacity-80">Modifica dati, ruoli e overall iniziale</p>
+          </div>
+        </Link>
 
-      <Link
-        to="/registro-attivita"
-        className="mt-2 block w-full rounded-lg border border-gray-300 px-4 py-2 text-center text-sm font-medium text-gray-700 hover:bg-gray-50"
-      >
-        Registro attività admin
-      </Link>
+        <Link
+          to="/registro-attivita"
+          className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50"
+        >
+          <span className="text-lg">📋</span>
+          <div>
+            <p className="font-semibold">Registro attività</p>
+            <p className="text-xs text-gray-500">Storico di tutte le azioni admin</p>
+          </div>
+        </Link>
+      </div>
 
       <button
         onClick={signOut}

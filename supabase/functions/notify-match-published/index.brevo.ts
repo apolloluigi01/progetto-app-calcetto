@@ -74,7 +74,7 @@ Deno.serve(async (req: Request) => {
   const [matchRes, resultRes, goalsRes, pagelleRes, matchPlayersRes] = await Promise.all([
     adminClient.from("matches").select("match_date, field").eq("id", matchId).single(),
     adminClient.from("match_results").select("score_a, score_b").eq("match_id", matchId).maybeSingle(),
-    adminClient.from("goals").select("team, players(name)").eq("match_id", matchId),
+    adminClient.from("goals").select("team, is_own_goal, players(name)").eq("match_id", matchId),
     adminClient
       .from("pagelle")
       .select("voto, titolo, descrizione, is_mvp, players(name)")
@@ -86,7 +86,7 @@ Deno.serve(async (req: Request) => {
   if (matchRes.error || !matchRes.data) return json({ error: "Partita non trovata" }, 404);
 
   type Named = { players: { name: string } | null };
-  const goals   = (goalsRes.data ?? []) as unknown as (Named & { team: string })[];
+  const goals   = (goalsRes.data ?? []) as unknown as (Named & { team: string; is_own_goal: boolean })[];
   const pagelle = (pagelleRes.data ?? []) as unknown as (Named & {
     voto: string;
     titolo: string | null;
@@ -108,12 +108,33 @@ Deno.serve(async (req: Request) => {
     ? `<p style="text-align:center;color:#666;margin:0 0 16px;">📍 ${matchRes.data.field}</p>`
     : "";
 
+  const goalsA = goals.filter((g) => g.team === "A");
+  const goalsB = goals.filter((g) => g.team === "B");
+
+  function goalRow(g: Named & { team: string; is_own_goal: boolean }) {
+    const name = g.players?.name ?? "?";
+    return `<p style="margin:3px 0;font-size:14px;color:#374151;">⚽ ${name}${g.is_own_goal ? ' <span style="color:#dc2626;font-size:12px;">(autogol)</span>' : ""}</p>`;
+  }
+
   const goalsHtml = goals.length
     ? `<div style="margin:16px 0;">
-         <h3 style="color:#2e7d32;margin:0 0 8px;">Marcatori</h3>
-         <ul style="margin:0;padding-left:20px;">
-           ${goals.map((g) => `<li>⚽ ${g.players?.name ?? "?"} — Squadra ${g.team}</li>`).join("")}
-         </ul>
+         <h3 style="color:#2e7d32;margin:0 0 10px;font-size:15px;">Marcatori</h3>
+         <table style="width:100%;border-collapse:collapse;">
+           <tr>
+             <td style="vertical-align:top;width:50%;padding-right:8px;">
+               <div style="background:#f0f9f0;border-radius:8px;padding:10px 12px;">
+                 <p style="margin:0 0 6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#2e7d32;">Squadra A</p>
+                 ${goalsA.length ? goalsA.map(goalRow).join("") : '<p style="margin:0;font-size:13px;color:#9ca3af;">—</p>'}
+               </div>
+             </td>
+             <td style="vertical-align:top;width:50%;padding-left:8px;">
+               <div style="background:#fff8f0;border-radius:8px;padding:10px 12px;">
+                 <p style="margin:0 0 6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#e65100;">Squadra B</p>
+                 ${goalsB.length ? goalsB.map(goalRow).join("") : '<p style="margin:0;font-size:13px;color:#9ca3af;">—</p>'}
+               </div>
+             </td>
+           </tr>
+         </table>
        </div>`
     : "";
 

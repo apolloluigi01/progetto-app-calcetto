@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useMatchDetail } from '../hooks/useMatchDetail'
@@ -10,7 +10,7 @@ const MAX_PLAYERS = 10
 
 export default function MatchDetail() {
   const { id } = useParams<{ id: string }>()
-  const { player } = useAuth()
+  const { player, isAdmin } = useAuth()
   const { data, loading, error } = useMatchDetail(id)
   const {
     bookings,
@@ -51,7 +51,7 @@ export default function MatchDetail() {
   return (
     <div className="p-4 pb-12">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between gap-2">
         <h1 className="text-xl font-semibold text-field-green-dark">
           {new Date(match.match_date).toLocaleDateString('it-IT', {
             day: 'numeric',
@@ -59,7 +59,15 @@ export default function MatchDetail() {
             year: 'numeric',
           })}
         </h1>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {isAdmin && (
+            <Link
+              to={`/admin/partite/${id}`}
+              className="rounded-lg border border-field-green px-3 py-1 text-sm font-medium text-field-green-dark hover:bg-field-green/10"
+            >
+              ✏️ Modifica
+            </Link>
+          )}
           {match.booking_open && (
             <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700">
               Sondaggio aperto

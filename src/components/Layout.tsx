@@ -29,7 +29,7 @@ export default function Layout() {
   const [menuOpen, setMenuOpen] = useState(false)
 
   const lastItem: NavItem = isAdmin
-    ? { to: '/admin', label: 'Admin' }
+    ? { to: '/admin', label: 'CDA Pavone' }
     : { to: '/impostazioni', label: 'Impostazioni' }
   const items = [...navItems, lastItem]
 
@@ -40,16 +40,19 @@ export default function Layout() {
         className="hidden md:flex flex-col fixed inset-y-0 left-0 z-40 w-52"
         style={{ background: 'rgba(0,0,0,0.55)' }}
       >
-        <div className="px-6 pt-8 pb-6">
+        <div className="px-5 pt-7 pb-5 flex flex-col items-center gap-2">
+          <img
+            src="/icons/pavone_logo.png"
+            alt="Pavone League"
+            className="h-14 w-14 rounded-2xl object-cover shadow-lg"
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+          />
           <span
-            className="text-2xl font-black tracking-tight"
-            style={{ color: '#a8d5a2', fontStyle: 'italic', letterSpacing: '-0.03em' }}
+            className="text-lg font-black tracking-tight text-center leading-tight"
+            style={{ color: '#a8d5a2', letterSpacing: '-0.02em' }}
           >
-            CALCETTO
+            PAVONE<br />LEAGUE
           </span>
-          <div className="mt-0.5 text-[10px] uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.35)' }}>
-            La tua squadra
-          </div>
         </div>
 
         <nav className="flex flex-col gap-1 px-4 mt-2">
@@ -77,9 +80,17 @@ export default function Layout() {
         className="md:hidden fixed inset-x-0 top-0 z-40 flex items-center justify-between px-4 h-12"
         style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)' }}
       >
-        <span className="text-base font-black italic tracking-tight" style={{ color: '#a8d5a2' }}>
-          CALCETTO
-        </span>
+        <div className="flex items-center gap-2">
+          <img
+            src="/icons/pavone_logo.png"
+            alt=""
+            className="h-7 w-7 rounded-lg object-cover"
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+          />
+          <span className="text-sm font-black tracking-tight" style={{ color: '#a8d5a2', letterSpacing: '-0.01em' }}>
+            PAVONE LEAGUE
+          </span>
+        </div>
         <button
           onClick={() => setMenuOpen(!menuOpen)}
           className="flex flex-col justify-center gap-1.5 w-7 h-7 focus:outline-none"

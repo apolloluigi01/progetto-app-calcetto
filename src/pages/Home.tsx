@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useHomeDashboard } from '../hooks/useHomeDashboard'
+import { useCurrentSeason } from '../hooks/useCurrentSeason'
 import { useStatistiche } from '../hooks/useStatistiche'
 import { getRanking } from '../lib/statistiche'
 import { describeWeatherCode, getMatchWeather, type WeatherForecast } from '../lib/weather'
@@ -63,12 +64,20 @@ function WeatherCard({ field, matchDate }: { field: string | null; matchDate: st
 
 export default function Home() {
   const { lastMatch, nextMatch, loading } = useHomeDashboard()
+  const { season } = useCurrentSeason()
   const { stats, loading: statsLoading } = useStatistiche()
   const marcatori = getRanking(stats, 'marcatori').slice(0, 5)
 
   return (
     <div className="p-4 pb-8">
-      <h1 className="text-xl font-semibold text-field-green-dark">Dashboard</h1>
+      <div className="flex items-baseline gap-3">
+        <h1 className="text-xl font-semibold text-field-green-dark">Dashboard</h1>
+        {season && (
+          <span className="rounded-full bg-field-green/10 px-2.5 py-0.5 text-xs font-semibold text-field-green-dark">
+            🏆 {season.name}
+          </span>
+        )}
+      </div>
 
       {loading && <p className="mt-4 text-sm text-gray-500">Caricamento...</p>}
 
@@ -89,40 +98,44 @@ export default function Home() {
                     </p>
                   )}
                 </div>
-                {lastMatch.goals.length > 0 && (
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-gray-50">
-                        <th className="px-4 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                          Marcatore
-                        </th>
-                        <th className="px-4 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                          Squadra
-                        </th>
-                        <th className="px-4 py-2 text-right text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                          Esito
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {lastMatch.goals.map((g, i) => (
-                        <tr key={i} className="border-t border-gray-100">
-                          <td className="px-4 py-2 font-medium text-gray-700">{g.name}</td>
-                          <td className="px-4 py-2 text-gray-500">Squadra {g.team}</td>
-                          <td className="px-4 py-2 text-right">
-                            <span
-                              className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${
-                                g.is_own_goal ? 'bg-red-50 text-red-600' : 'bg-field-green/10 text-field-green-dark'
-                              }`}
-                            >
-                              {g.is_own_goal ? 'Autogol' : 'Gol'}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
+                {lastMatch.goals.length > 0 && (() => {
+                  const goalsA = lastMatch.goals.filter((g) => g.team === 'A')
+                  const goalsB = lastMatch.goals.filter((g) => g.team === 'B')
+                  return (
+                    <div className="grid grid-cols-2 gap-x-3 border-t border-gray-100 px-4 pb-4 pt-3">
+                      <div>
+                        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-field-green-dark">
+                          Squadra A
+                        </p>
+                        {goalsA.length === 0 ? (
+                          <p className="text-sm text-gray-400">—</p>
+                        ) : (
+                          goalsA.map((g, i) => (
+                            <p key={i} className="text-sm text-gray-700">
+                              ⚽ {g.name}
+                              {g.is_own_goal && <span className="text-xs text-red-500"> (ag)</span>}
+                            </p>
+                          ))
+                        )}
+                      </div>
+                      <div>
+                        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-field-orange">
+                          Squadra B
+                        </p>
+                        {goalsB.length === 0 ? (
+                          <p className="text-sm text-gray-400">—</p>
+                        ) : (
+                          goalsB.map((g, i) => (
+                            <p key={i} className="text-sm text-gray-700">
+                              ⚽ {g.name}
+                              {g.is_own_goal && <span className="text-xs text-red-500"> (ag)</span>}
+                            </p>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )
+                })()}
               </Link>
             )}
           </div>
