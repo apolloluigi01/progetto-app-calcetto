@@ -11,7 +11,7 @@ const MAX_PLAYERS = 10
 export default function MatchDetail() {
   const { id } = useParams<{ id: string }>()
   const { player } = useAuth()
-  const { data, loading, error, refetch } = useMatchDetail(id)
+  const { data, loading, error } = useMatchDetail(id)
   const {
     bookings,
     loading: bookingsLoading,

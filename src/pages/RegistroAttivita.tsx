@@ -11,18 +11,23 @@ interface LogEntry {
 }
 
 const actionColors: Record<ActivityAction, string> = {
-  giocatore_creato:    'bg-field-green/10 text-field-green-dark',
-  giocatore_modificato:'bg-blue-50 text-blue-700',
-  giocatore_eliminato: 'bg-red-50 text-red-700',
-  password_reimpostata:'bg-field-yellow/20 text-field-orange',
-  partita_creata:      'bg-field-green/10 text-field-green-dark',
-  partita_modificata:  'bg-blue-50 text-blue-700',
-  risultato_salvato:   'bg-blue-50 text-blue-700',
-  gol_aggiunto:        'bg-field-green/10 text-field-green-dark',
-  gol_rimosso:         'bg-red-50 text-red-600',
-  pagelle_bozza:       'bg-field-yellow/20 text-field-orange',
-  pagelle_pubblicate:  'bg-field-orange/10 text-field-orange',
-  partita_eliminata:   'bg-red-50 text-red-700',
+  giocatore_creato:      'bg-field-green/10 text-field-green-dark',
+  giocatore_modificato:  'bg-blue-50 text-blue-700',
+  giocatore_eliminato:   'bg-red-50 text-red-700',
+  password_reimpostata:  'bg-field-yellow/20 text-field-orange',
+  partita_creata:        'bg-field-green/10 text-field-green-dark',
+  partita_modificata:    'bg-blue-50 text-blue-700',
+  risultato_salvato:     'bg-blue-50 text-blue-700',
+  gol_aggiunto:          'bg-field-green/10 text-field-green-dark',
+  gol_rimosso:           'bg-red-50 text-red-600',
+  pagelle_bozza:         'bg-field-yellow/20 text-field-orange',
+  pagelle_pubblicate:    'bg-field-orange/10 text-field-orange',
+  partita_eliminata:     'bg-red-50 text-red-700',
+  sondaggio_aperto:      'bg-blue-50 text-blue-700',
+  sondaggio_chiuso:      'bg-blue-50 text-blue-700',
+  squadre_generate:      'bg-field-green/10 text-field-green-dark',
+  prenotazione_aggiunta: 'bg-field-green/10 text-field-green-dark',
+  prenotazione_rimossa:  'bg-red-50 text-red-600',
 }
 
 function formatDetails(action: ActivityAction, details: Record<string, unknown>): string {
