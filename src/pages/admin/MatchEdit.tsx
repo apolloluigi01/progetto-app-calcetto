@@ -3,11 +3,13 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useMatchDetail } from '../../hooks/useMatchDetail'
 import { useMatchBookings } from '../../hooks/useMatchBookings'
+import { useMatchVoting } from '../../hooks/useMatchVoting'
 import { getKnownFields } from '../../lib/fields'
 import { logActivity } from '../../lib/activityLog'
 import { computeStatistiche } from '../../lib/statistiche'
 import { computeOverall, generateBalancedTeams } from '../../lib/teamGeneration'
 import { getCurrentSeasonId } from '../../lib/seasons'
+import { formatVote } from '../../lib/voting'
 import type { Player, Team } from '../../types/database'
 import type { PlayerOverall, GeneratedTeams } from '../../lib/teamGeneration'
 
@@ -47,6 +49,11 @@ export default function MatchEdit() {
   const [savingPagelle, setSavingPagelle] = useState(false)
   const [publishing, setPublishing] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [openingVoting, setOpeningVoting] = useState(false)
+  const [closingVoting, setClosingVoting] = useState(false)
+
+  const { averages, provisionalMvpId, voterIds, participants, refetch: refetchVoting } =
+    useMatchVoting(id)
 
   // Sondaggio: aggiunta manuale giocatore
   const [allPlayers, setAllPlayers] = useState<Player[]>([])
@@ -206,6 +213,44 @@ export default function MatchEdit() {
     }
     await logActivity('partita_eliminata', { matchId: id, data: match.match_date })
     navigate('/admin/partite')
+  }
+
+  // --- Azioni votazioni ---
+  async function handleOpenVoting() {
+    if (!id) return
+    setOpeningVoting(true)
+    await supabase.from('matches').update({ voting_open: true }).eq('id', id)
+    logActivity('votazioni_aperte', { matchId: id, data: match.match_date })
+    setOpeningVoting(false)
+    refetch()
+    refetchVoting()
+  }
+
+  async function handleCloseVoting() {
+    if (!id || !confirm('Chiudere le votazioni? I giocatori non potranno più modificare i voti.')) return
+    setClosingVoting(true)
+    await supabase.from('matches').update({ voting_open: false }).eq('id', id)
+    logActivity('votazioni_chiuse', { matchId: id, data: match.match_date })
+    setClosingVoting(false)
+    refetch()
+    refetchVoting()
+  }
+
+  function prefillFromVoting() {
+    setDrafts((prev) => {
+      const next = { ...prev }
+      for (const avg of averages) {
+        if (avg.average !== null && next[avg.player_id]) {
+          next[avg.player_id] = { ...next[avg.player_id], voto: formatVote(avg.average) }
+        }
+      }
+      if (provisionalMvpId) {
+        for (const pid of Object.keys(next)) {
+          next[pid] = { ...next[pid], is_mvp: pid === provisionalMvpId }
+        }
+      }
+      return next
+    })
   }
 
   // --- Azioni sondaggio ---
@@ -655,6 +700,94 @@ export default function MatchEdit() {
         </p>
       </div>
 
+      {/* ===== VOTAZIONI (admin) ===== */}
+      {matchPlayers.length > 0 && (
+        <div className="mt-4 rounded-xl border border-purple-200 bg-purple-50 p-4">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold text-purple-800">🗳️ Votazioni</h2>
+            <span className="text-sm font-medium text-purple-600">
+              {voterIds.size}/{matchPlayers.length} hanno votato
+            </span>
+          </div>
+          <p className="mt-1 text-xs text-purple-500">
+            I voti degli admin e superadmin contano il doppio nel calcolo della media.
+          </p>
+
+          <div className="mt-3 flex gap-2">
+            {!match.voting_open ? (
+              <button
+                onClick={handleOpenVoting}
+                disabled={openingVoting}
+                className="flex-1 rounded-lg bg-purple-600 px-3 py-2 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50"
+              >
+                {openingVoting ? 'Apertura...' : '🔓 Apri votazioni'}
+              </button>
+            ) : (
+              <button
+                onClick={handleCloseVoting}
+                disabled={closingVoting}
+                className="flex-1 rounded-lg border border-purple-400 bg-white px-3 py-2 text-sm font-medium text-purple-700 hover:bg-purple-100 disabled:opacity-50"
+              >
+                {closingVoting ? 'Chiusura...' : '🔒 Chiudi votazioni'}
+              </button>
+            )}
+            {averages.some((a) => a.average !== null) && (
+              <button
+                onClick={prefillFromVoting}
+                className="rounded-lg border border-purple-300 bg-white px-3 py-2 text-sm text-purple-700 hover:bg-purple-50"
+                title="Copia le medie nelle pagelle"
+              >
+                ↓ Pre-compila pagelle
+              </button>
+            )}
+          </div>
+
+          {averages.some((a) => a.average !== null) && (
+            <div className="mt-3 space-y-1.5">
+              {[...averages]
+                .sort((a, b) => (b.average ?? 0) - (a.average ?? 0))
+                .map((avg) => {
+                  const p = participants.find((x) => x.player_id === avg.player_id)
+                  if (!p) return null
+                  const isMvp = avg.player_id === provisionalMvpId
+                  return (
+                    <div
+                      key={avg.player_id}
+                      className={`flex items-center justify-between rounded-lg px-3 py-2 ${
+                        isMvp ? 'bg-yellow-50 border border-yellow-200' : 'bg-white'
+                      }`}
+                    >
+                      <span className="text-sm font-medium text-gray-800">
+                        {isMvp && <span className="mr-1">🏆</span>}
+                        {p.name}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-400">
+                          {avg.raw_count} {avg.raw_count === 1 ? 'voto' : 'voti'}
+                        </span>
+                        <span className="rounded-full bg-purple-100 px-2.5 py-0.5 text-sm font-bold text-purple-700">
+                          {avg.average !== null ? formatVote(avg.average) : '—'}
+                        </span>
+                      </div>
+                    </div>
+                  )
+                })}
+              {provisionalMvpId === null && averages.filter((a) => a.average !== null).length > 1 && (
+                <p className="mt-1 text-xs text-yellow-600">
+                  ⚠️ MVP: parità — scegli tu manualmente nelle pagelle.
+                </p>
+              )}
+            </div>
+          )}
+
+          {match.voting_open && (
+            <p className="mt-2 text-center text-xs text-purple-500 animate-pulse">
+              Votazioni in corso...
+            </p>
+          )}
+        </div>
+      )}
+
       {/* ===== MARCATORI ===== */}
       {matchPlayers.length > 0 && (
         <div className="mt-4 grid grid-cols-2 gap-3">
@@ -733,12 +866,26 @@ export default function MatchEdit() {
                     </label>
                   </div>
                   <div className="mt-2 flex gap-2">
-                    <input
-                      placeholder="Voto (es. 7+)"
-                      value={draft.voto}
-                      onChange={(e) => updateDraft(mp.player_id, { voto: e.target.value })}
-                      className="w-24 rounded-lg border border-gray-300 px-2 py-1 text-sm"
-                    />
+                    <div className="flex flex-col gap-0.5">
+                      <input
+                        placeholder="Voto"
+                        value={draft.voto}
+                        onChange={(e) => updateDraft(mp.player_id, { voto: e.target.value })}
+                        className="w-20 rounded-lg border border-gray-300 px-2 py-1 text-sm"
+                      />
+                      {(() => {
+                        const avg = averages.find((a) => a.player_id === mp.player_id)
+                        return avg?.average !== null && avg?.average !== undefined ? (
+                          <button
+                            type="button"
+                            onClick={() => updateDraft(mp.player_id, { voto: formatVote(avg.average!) })}
+                            className="text-[10px] text-purple-600 hover:underline text-left"
+                          >
+                            Media: {formatVote(avg.average!)} →
+                          </button>
+                        ) : null
+                      })()}
+                    </div>
                     <input
                       placeholder="Titolo"
                       value={draft.titolo}

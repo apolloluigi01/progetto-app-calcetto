@@ -18,6 +18,8 @@ export type ActivityAction =
   | 'squadre_generate'
   | 'prenotazione_aggiunta'
   | 'prenotazione_rimossa'
+  | 'votazioni_aperte'
+  | 'votazioni_chiuse'
 
 export const actionLabels: Record<ActivityAction, string> = {
   giocatore_creato:      'Giocatore creato',
@@ -37,6 +39,8 @@ export const actionLabels: Record<ActivityAction, string> = {
   squadre_generate:      'Squadre generate',
   prenotazione_aggiunta: 'Prenotazione aggiunta (admin)',
   prenotazione_rimossa:  'Prenotazione rimossa (admin)',
+  votazioni_aperte:      'Votazioni aperte',
+  votazioni_chiuse:      'Votazioni chiuse',
 }
 
 export async function logActivity(

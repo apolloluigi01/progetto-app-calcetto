@@ -28,6 +28,16 @@ export interface Match {
   field: string | null
   status: MatchStatus
   booking_open: boolean
+  voting_open: boolean
+  created_at: string
+}
+
+export interface PlayerVote {
+  id: string
+  match_id: string
+  voter_id: string
+  voted_id: string
+  vote: number
   created_at: string
 }
 

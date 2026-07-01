@@ -28,6 +28,8 @@ const actionColors: Record<ActivityAction, string> = {
   squadre_generate:      'bg-field-green/10 text-field-green-dark',
   prenotazione_aggiunta: 'bg-field-green/10 text-field-green-dark',
   prenotazione_rimossa:  'bg-red-50 text-red-600',
+  votazioni_aperte:      'bg-purple-50 text-purple-700',
+  votazioni_chiuse:      'bg-purple-50 text-purple-700',
 }
 
 function formatDetails(action: ActivityAction, details: Record<string, unknown>): string {

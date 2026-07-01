@@ -1,9 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useMatchDetail } from '../hooks/useMatchDetail'
 import { useMatchBookings } from '../hooks/useMatchBookings'
+import { useMatchVoting } from '../hooks/useMatchVoting'
+import { formatVote } from '../lib/voting'
 import type { Team } from '../types/database'
 
 const MAX_PLAYERS = 10
@@ -20,6 +22,12 @@ export default function MatchDetail() {
   } = useMatchBookings(id, player?.id)
 
   const [bookingBusy, setBookingBusy] = useState(false)
+  const [localVotes, setLocalVotes] = useState<Record<string, number>>({})
+  const [votingBusy, setVotingBusy] = useState(false)
+  const [votingSuccess, setVotingSuccess] = useState(false)
+
+  const { participants, averages, voterIds, getMyVotes, hasVotedAll, submitVotes } =
+    useMatchVoting(id)
 
   async function handleBook() {
     if (!id || !player) return
@@ -37,6 +45,27 @@ export default function MatchDetail() {
     refetchBookings()
   }
 
+  useEffect(() => {
+    if (!player?.id || participants.length === 0) return
+    const existing = getMyVotes(player.id)
+    const others = participants.filter((p) => p.player_id !== player.id)
+    const defaults: Record<string, number> = {}
+    for (const p of others) {
+      defaults[p.player_id] = existing[p.player_id] ?? 6
+    }
+    setLocalVotes(defaults)
+  }, [player?.id, participants.length]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function handleSubmitVotes() {
+    if (!player?.id) return
+    setVotingBusy(true)
+    setVotingSuccess(false)
+    await submitVotes(player.id, localVotes)
+    setVotingBusy(false)
+    setVotingSuccess(true)
+    setTimeout(() => setVotingSuccess(false), 3000)
+  }
+
   if (loading) return <div className="p-4 text-sm text-gray-500">Caricamento...</div>
   if (error || !data) return <div className="p-4 text-sm text-red-600">{error ?? 'Partita non trovata'}</div>
 
@@ -47,6 +76,10 @@ export default function MatchDetail() {
   const isPublished = pagelle.length > 0 && pagelle.every((p) => p.published_at)
   const bookingCount = bookings.length
   const bookingFull = bookingCount >= MAX_PLAYERS
+
+  const isParticipant = !!player && matchPlayers.some((mp) => mp.player_id === player.id)
+  const otherParticipants = participants.filter((p) => p.player_id !== player?.id)
+  const alreadyVotedAll = player ? hasVotedAll(player.id) : false
 
   return (
     <div className="p-4 pb-12">
@@ -151,6 +184,78 @@ export default function MatchDetail() {
               </button>
             )}
           </div>
+        </div>
+      )}
+
+      {/* ===== SEZIONE VOTAZIONI (giocatore) ===== */}
+      {match.voting_open && isParticipant && otherParticipants.length > 0 && (
+        <div className="mt-4 rounded-xl border border-purple-200 bg-purple-50 p-4">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold text-purple-800">🗳️ Vota i tuoi compagni</h3>
+            <span className="text-xs text-purple-500">
+              {voterIds.size}/{matchPlayers.length} hanno votato
+            </span>
+          </div>
+          <p className="mt-1 text-xs text-purple-500">
+            Dai un voto da 1 a 10 (con mezzi voti) per ogni compagno di partita.
+            I voti degli admin contano il doppio.
+          </p>
+
+          <div className="mt-3 space-y-3">
+            {otherParticipants.map((p) => {
+              const v = localVotes[p.player_id] ?? 6
+              return (
+                <div key={p.player_id} className="flex items-center gap-3">
+                  <span className="w-28 shrink-0 truncate text-sm font-medium text-gray-800">
+                    {p.name}
+                  </span>
+                  <input
+                    type="range"
+                    min={1}
+                    max={10}
+                    step={0.5}
+                    value={v}
+                    onChange={(e) =>
+                      setLocalVotes((prev) => ({
+                        ...prev,
+                        [p.player_id]: Number(e.target.value),
+                      }))
+                    }
+                    className="flex-1 accent-purple-600"
+                  />
+                  <span className="w-8 text-right text-sm font-bold text-purple-700">
+                    {formatVote(v)}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+
+          {votingSuccess && (
+            <p className="mt-3 text-center text-sm font-medium text-purple-700">
+              ✓ Voti inviati correttamente!
+            </p>
+          )}
+
+          <button
+            onClick={handleSubmitVotes}
+            disabled={votingBusy || Object.keys(localVotes).length === 0}
+            className="mt-4 w-full rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50"
+          >
+            {votingBusy
+              ? 'Invio...'
+              : alreadyVotedAll
+              ? '✓ Aggiorna i tuoi voti'
+              : 'Invia i tuoi voti'}
+          </button>
+        </div>
+      )}
+
+      {match.voting_open && !isParticipant && !isAdmin && (
+        <div className="mt-4 rounded-xl border border-purple-100 bg-purple-50 p-3 text-center">
+          <p className="text-sm text-purple-600">
+            🗳️ Le votazioni sono aperte per i partecipanti a questa partita.
+          </p>
         </div>
       )}
 
