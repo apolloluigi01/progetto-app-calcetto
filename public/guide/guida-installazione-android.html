@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<title>Guida Installazione Android – Pavone League</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+@page { size: A4 portrait; margin: 14mm 12mm; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Roboto', 'Segoe UI', Arial, sans-serif;
+  color: #1a1a1a;
+  background: #fff;
+  font-size: 10pt;
+  line-height: 1.55;
+}
+
+.header {
+  background: linear-gradient(135deg, #1b5e20 0%, #2e7d32 70%, #43a047 100%);
+  color: white;
+  padding: 16px 20px;
+  border-radius: 14px;
+  margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.app-icon {
+  width: 50px; height: 50px;
+  background: white;
+  border-radius: 11px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 26px;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+.header-text { flex: 1; }
+.header-text h1 { font-size: 16pt; font-weight: 800; letter-spacing: -0.3px; }
+.header-text p { font-size: 9pt; opacity: 0.85; margin-top: 2px; }
+.os-badge {
+  background: rgba(255,255,255,0.2);
+  border: 1px solid rgba(255,255,255,0.4);
+  border-radius: 20px;
+  padding: 5px 14px;
+  font-size: 9pt; font-weight: 700;
+  white-space: nowrap;
+  display: flex; align-items: center; gap: 5px;
+}
+
+.intro-box {
+  background: #e8f5e9;
+  border: 1.5px solid #a5d6a7;
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 18px;
+  font-size: 9pt;
+  color: #1b5e20;
+  display: flex; align-items: flex-start; gap: 10px;
+}
+.intro-box .icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+
+.info-box {
+  background: #e3f2fd;
+  border: 1.5px solid #90caf9;
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 20px;
+  font-size: 9pt;
+  color: #0d47a1;
+  display: flex; align-items: flex-start; gap: 10px;
+}
+.info-box .icon { font-size: 16px; flex-shrink: 0; }
+
+.steps { display: flex; flex-direction: column; gap: 0; }
+
+.step {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+  padding: 14px 0;
+  border-bottom: 1px solid #eeeeee;
+  page-break-inside: avoid;
+}
+.step:last-child { border-bottom: none; }
+
+.step-visual {
+  flex-shrink: 0;
+  width: 110px;
+  display: flex;
+  justify-content: center;
+}
+
+.step-content { flex: 1; padding-top: 2px; }
+
+.step-header {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 7px;
+}
+
+.step-num {
+  display: inline-flex;
+  align-items: center; justify-content: center;
+  width: 24px; height: 24px;
+  background: #2e7d32;
+  color: white;
+  border-radius: 50%;
+  font-size: 11px; font-weight: 800;
+  flex-shrink: 0;
+}
+.step-num.final { background: #f9a825; }
+.step-num.alt { background: #1565c0; }
+
+.step-title { font-size: 12pt; font-weight: 700; color: #1b5e20; }
+.step-title.final { color: #e65100; }
+.step-title.alt { color: #1565c0; }
+
+.step-desc { font-size: 9.5pt; color: #444; line-height: 1.65; }
+.step-desc strong { color: #1b5e20; }
+
+.tip {
+  background: #f1f8e9;
+  border-left: 3px solid #66bb6a;
+  padding: 6px 10px;
+  border-radius: 0 6px 6px 0;
+  margin-top: 8px;
+  font-size: 8.5pt;
+  color: #2e7d32;
+}
+.info {
+  background: #e3f2fd;
+  border-left: 3px solid #64b5f6;
+  padding: 6px 10px;
+  border-radius: 0 6px 6px 0;
+  margin-top: 8px;
+  font-size: 8.5pt;
+  color: #1565c0;
+}
+
+.alt-method {
+  background: #fafafa;
+  border: 1.5px dashed #bdbdbd;
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin: 14px 0;
+  font-size: 9pt;
+  color: #555;
+}
+.alt-method strong { color: #1565c0; }
+
+.footer {
+  margin-top: 18px;
+  padding-top: 12px;
+  border-top: 2px solid #2e7d32;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 8pt;
+  color: #999;
+}
+.url-chip {
+  background: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-family: 'Courier New', monospace;
+  font-size: 7.5pt;
+  color: #333;
+}
+
+@media print {
+  body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="app-icon">⚽</div>
+  <div class="header-text">
+    <h1>Pavone League</h1>
+    <p>Guida all'installazione dell'app sul tuo smartphone Android</p>
+  </div>
+  <div class="os-badge">🤖 Android</div>
+</div>
+
+<!-- INTRO -->
+<div class="intro-box">
+  <span class="icon">ℹ️</span>
+  <div>
+    L'app viene installata direttamente dal browser, <strong>senza passare dal Play Store</strong>. Una volta installata si comporta esattamente come un'app nativa: icona sulla schermata Home, schermo intero, notifiche.
+  </div>
+</div>
+
+<!-- INFO CHROME -->
+<div class="info-box">
+  <span class="icon">💡</span>
+  <div>
+    La procedura illustrata usa <strong>Google Chrome</strong>, il browser predefinito su Android. Se usi Samsung Internet o Firefox la procedura è simile, ma i nomi dei menu potrebbero essere leggermente diversi.
+  </div>
+</div>
+
+<!-- STEPS -->
+<div class="steps">
+
+  <!-- STEP 1 -->
+  <div class="step">
+    <div class="step-visual">
+      <svg viewBox="0 0 110 220" width="110" height="220" xmlns="http://www.w3.org/2000/svg">
+        <!-- Phone body Android style -->
+        <rect x="2" y="2" width="106" height="216" rx="14" fill="#222"/>
+        <rect x="3" y="3" width="104" height="214" rx="13" fill="#2d2d2d"/>
+        <!-- Side buttons -->
+        <rect x="108" y="68" width="2.5" height="30" rx="1.25" fill="#444"/>
+        <rect x="108" y="102" width="2.5" height="20" rx="1.25" fill="#444"/>
+        <rect x="0" y="78" width="2.5" height="22" rx="1.25" fill="#444"/>
+        <!-- Screen -->
+        <rect x="8" y="8" width="94" height="204" rx="10" fill="white"/>
+        <!-- Punch-hole camera -->
+        <circle cx="55" cy="16" r="4" fill="#222"/>
+        <!-- Status bar -->
+        <text x="14" y="26" font-size="6.5" font-weight="600" fill="#1a1a1a" font-family="Roboto,Arial">9:41</text>
+        <text x="80" y="26" font-size="6.5" fill="#1a1a1a" font-family="Arial">🔋 📶</text>
+        <!-- Chrome address bar -->
+        <rect x="10" y="30" width="90" height="14" rx="7" fill="#f1f3f4"/>
+        <text x="17" y="39" font-size="5" fill="#666" font-family="Arial">🔒</text>
+        <text x="55" y="39" font-size="5.2" fill="#555" text-anchor="middle" font-family="monospace">progetto-app-calcetto.vercel.app</text>
+        <!-- Three dots highlighted -->
+        <circle cx="100" cy="22" r="7" fill="#e8f5e9" stroke="#2e7d32" stroke-width="1.5"/>
+        <circle cx="98" cy="22" r="1.2" fill="#1a1a1a"/>
+        <circle cx="100" cy="22" r="1.2" fill="#1a1a1a"/>
+        <circle cx="102" cy="22" r="1.2" fill="#1a1a1a"/>
+        <!-- Page content -->
+        <rect x="12" y="50" width="86" height="40" rx="6" fill="#e8f5e9"/>
+        <text x="55" y="65" font-size="8" fill="#2e7d32" text-anchor="middle" font-weight="700" font-family="Arial">⚽ Pavone League</text>
+        <text x="55" y="77" font-size="5.5" fill="#555" text-anchor="middle" font-family="Arial">Accedi al tuo account</text>
+        <rect x="20" y="96" width="70" height="14" rx="3" fill="#f5f5f5"/>
+        <rect x="20" y="114" width="70" height="14" rx="3" fill="#f5f5f5"/>
+        <rect x="28" y="134" width="54" height="12" rx="6" fill="#2e7d32"/>
+        <text x="55" y="143" font-size="5.5" fill="white" text-anchor="middle" font-family="Arial">Accedi</text>
+        <!-- Tap finger -->
+        <text x="96" y="14" font-size="12" font-family="Arial">👆</text>
+        <!-- Bottom nav bar Android -->
+        <rect x="8" y="198" width="94" height="14" fill="#f5f5f5"/>
+        <line x1="8" y1="198" x2="102" y2="198" stroke="#e0e0e0" stroke-width="0.5"/>
+        <text x="28" y="208" font-size="8" fill="#555" text-anchor="middle" font-family="Arial">◁</text>
+        <text x="55" y="208" font-size="8" fill="#555" text-anchor="middle" font-family="Arial">○</text>
+        <text x="82" y="208" font-size="8" fill="#555" text-anchor="middle" font-family="Arial">□</text>
+      </svg>
+    </div>
+    <div class="step-content">
+      <div class="step-header">
+        <span class="step-num">1</span>
+        <span class="step-title">Apri Chrome e vai all'app</span>
+      </div>
+      <p class="step-desc">
+        Apri <strong>Google Chrome</strong> sul tuo smartphone Android e digita o incolla il seguente indirizzo nella barra degli indirizzi:
+      </p>
+      <div style="background:#f5f5f5;border:1px solid #ddd;border-radius:6px;padding:6px 12px;margin-top:8px;font-family:monospace;font-size:8pt;color:#1a1a1a;">
+        progetto-app-calcetto.vercel.app
+      </div>
+      <p class="step-desc" style="margin-top:8px;">
+        Una volta caricata la pagina, tocca i <strong>tre puntini verticali</strong> in alto a destra per aprire il menu di Chrome (evidenziato nell'immagine).
+      </p>
+    </div>
+  </div>
+
+  <!-- STEP 2 -->
+  <div class="step">
+    <div class="step-visual">
+      <svg viewBox="0 0 110 220" width="110" height="220" xmlns="http://www.w3.org/2000/svg">
+        <!-- Phone -->
+        <rect x="2" y="2" width="106" height="216" rx="14" fill="#222"/>
+        <rect x="3" y="3" width="104" height="214" rx="13" fill="#2d2d2d"/>
+        <rect x="108" y="68" width="2.5" height="30" rx="1.25" fill="#444"/>
+        <rect x="0" y="78" width="2.5" height="22" rx="1.25" fill="#444"/>
+        <rect x="8" y="8" width="94" height="204" rx="10" fill="white"/>
+        <circle cx="55" cy="16" r="4" fill="#222"/>
+        <text x="14" y="26" font-size="6.5" font-weight="600" fill="#1a1a1a" font-family="Arial">9:41</text>
+        <!-- Chrome top bar -->
+        <rect x="10" y="30" width="90" height="14" rx="7" fill="#f1f3f4"/>
+        <text x="55" y="39" font-size="5.2" fill="#555" text-anchor="middle" font-family="monospace">progetto-app-calcetto.vercel.app</text>
+        <!-- Dropdown menu -->
+        <rect x="42" y="44" width="60" height="120" rx="8" fill="white" filter="url(#shadow)"/>
+        <filter id="shadow">
+          <feDropShadow dx="0" dy="2" stdDeviation="4" flood-opacity="0.2"/>
+        </filter>
+        <rect x="42" y="44" width="60" height="120" rx="8" fill="white" stroke="#e0e0e0" stroke-width="0.5"/>
+        <!-- Menu items -->
+        <text x="52" y="58" font-size="7" fill="#1a1a1a" font-family="Arial">🔁 Nuova scheda</text>
+        <line x1="44" y1="63" x2="100" y2="63" stroke="#f0f0f0" stroke-width="0.5"/>
+        <text x="52" y="74" font-size="7" fill="#1a1a1a" font-family="Arial">⭐ Preferiti</text>
+        <line x1="44" y1="79" x2="100" y2="79" stroke="#f0f0f0" stroke-width="0.5"/>
+        <text x="52" y="90" font-size="7" fill="#1a1a1a" font-family="Arial">💾 Scarica</text>
+        <line x1="44" y1="95" x2="100" y2="95" stroke="#f0f0f0" stroke-width="0.5"/>
+        <!-- "Aggiungi a schermata Home" highlighted -->
+        <rect x="43" y="97" width="58" height="18" rx="4" fill="#e8f5e9"/>
+        <text x="52" y="106" font-size="6" fill="#1b5e20" font-weight="700" font-family="Arial">➕ Aggiungi a</text>
+        <text x="52" y="113" font-size="6" fill="#1b5e20" font-weight="700" font-family="Arial">schermata Home</text>
+        <rect x="42" y="96" width="60" height="20" rx="4" fill="none" stroke="#2e7d32" stroke-width="1.5"/>
+        <line x1="44" y1="117" x2="100" y2="117" stroke="#f0f0f0" stroke-width="0.5"/>
+        <text x="52" y="128" font-size="7" fill="#1a1a1a" font-family="Arial">🖨 Stampa</text>
+        <line x1="44" y1="133" x2="100" y2="133" stroke="#f0f0f0" stroke-width="0.5"/>
+        <text x="52" y="144" font-size="7" fill="#1a1a1a" font-family="Arial">⚙️ Impostazioni</text>
+        <!-- Tap indicator -->
+        <text x="88" y="103" font-size="12" font-family="Arial">👆</text>
+        <!-- Bottom nav -->
+        <rect x="8" y="198" width="94" height="14" fill="#f5f5f5"/>
+        <line x1="8" y1="198" x2="102" y2="198" stroke="#e0e0e0" stroke-width="0.5"/>
+        <text x="28" y="208" font-size="8" fill="#555" text-anchor="middle" font-family="Arial">◁</text>
+        <text x="55" y="208" font-size="8" fill="#555" text-anchor="middle" font-family="Arial">○</text>
+        <text x="82" y="208" font-size="8" fill="#555" text-anchor="middle" font-family="Arial">□</text>
+      </svg>
+    </div>
+    <div class="step-content">
+      <div class="step-header">
+        <span class="step-num">2</span>
+        <span class="step-title">Tocca "Aggiungi a schermata Home"</span>
+      </div>
+      <p class="step-desc">
+        Nel menu a tendina cerca e tocca la voce:<br><br>
+        <strong>➕ Aggiungi a schermata Home</strong><br><br>
+        Potresti dover scorrere leggermente il menu verso il basso per trovarla.
+      </p>
+      <div class="tip">💡 Su alcune versioni di Chrome la voce potrebbe chiamarsi "Installa app" — ha lo stesso effetto.</div>
+    </div>
+  </div>
+
+  <!-- STEP 2B: Banner automatico (alternativa) -->
+  <div style="page-break-inside: avoid; padding: 10px 0;">
+    <div class="alt-method">
+      <strong>Metodo alternativo — banner automatico</strong><br>
+      Su molti dispositivi Android, Chrome mostra automaticamente un banner in basso con il testo <em>"Aggiungi Pavone League alla schermata Home"</em> oppure un'icona di installazione nella barra degli indirizzi.<br><br>
+      Se vedi questo banner, tocca semplicemente <strong>"Installa"</strong> o <strong>"Aggiungi"</strong> direttamente senza aprire il menu.
+      <div style="margin-top:8px; display:flex; align-items:center; gap:10px;">
+        <svg viewBox="0 0 220 44" width="220" height="44" xmlns="http://www.w3.org/2000/svg">
+          <rect x="0" y="0" width="220" height="44" rx="8" fill="white" stroke="#e0e0e0" stroke-width="1"/>
+          <rect x="8" y="10" width="24" height="24" rx="6" fill="#2e7d32"/>
+          <text x="20" y="26" font-size="14" text-anchor="middle" font-family="Arial">⚽</text>
+          <text x="40" y="20" font-size="8" fill="#1a1a1a" font-family="Arial" font-weight="600">Pavone League</text>
+          <text x="40" y="32" font-size="7" fill="#666" font-family="Arial">Aggiungi a schermata Home</text>
+          <rect x="168" y="14" width="44" height="16" rx="8" fill="#2e7d32"/>
+          <text x="190" y="25" font-size="7" fill="white" text-anchor="middle" font-family="Arial" font-weight="700">Installa</text>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 3 -->
+  <div class="step">
+    <div class="step-visual">
+      <svg viewBox="0 0 110 220" width="110" height="220" xmlns="http://www.w3.org/2000/svg">
+        <!-- Phone -->
+        <rect x="2" y="2" width="106" height="216" rx="14" fill="#222"/>
+        <rect x="3" y="3" width="104" height="214" rx="13" fill="#2d2d2d"/>
+        <rect x="108" y="68" width="2.5" height="30" rx="1.25" fill="#444"/>
+        <rect x="0" y="78" width="2.5" height="22" rx="1.25" fill="#444"/>
+        <rect x="8" y="8" width="94" height="204" rx="10" fill="white"/>
+        <circle cx="55" cy="16" r="4" fill="#222"/>
+        <text x="14" y="26" font-size="6.5" font-weight="600" fill="#1a1a1a" font-family="Arial">9:41</text>
+        <!-- Chrome top bar dimmed -->
+        <rect x="10" y="30" width="90" height="14" rx="7" fill="#f1f3f4"/>
+        <text x="55" y="39" font-size="5.2" fill="#999" text-anchor="middle" font-family="monospace">progetto-app-calcetto.vercel.app</text>
+        <!-- Background dimmed -->
+        <rect x="8" y="44" width="94" height="158" fill="rgba(0,0,0,0.5)" rx="0"/>
+        <!-- Dialog box -->
+        <rect x="16" y="80" width="78" height="90" rx="10" fill="white"/>
+        <!-- App icon in dialog -->
+        <rect x="42" y="90" width="26" height="26" rx="6" fill="#2e7d32"/>
+        <text x="55" y="108" font-size="16" text-anchor="middle" font-family="Arial">⚽</text>
+        <!-- Dialog text -->
+        <text x="55" y="127" font-size="7" fill="#1a1a1a" text-anchor="middle" font-weight="700" font-family="Arial">Pavone League</text>
+        <text x="55" y="138" font-size="6" fill="#666" text-anchor="middle" font-family="Arial">Aggiungere alla schermata</text>
+        <text x="55" y="145" font-size="6" fill="#666" text-anchor="middle" font-family="Arial">Home?</text>
+        <!-- Buttons -->
+        <rect x="18" y="152" width="34" height="12" rx="6" fill="white" stroke="#e0e0e0" stroke-width="1"/>
+        <text x="35" y="160" font-size="7" fill="#666" text-anchor="middle" font-family="Arial">Annulla</text>
+        <rect x="58" y="152" width="34" height="12" rx="6" fill="#2e7d32"/>
+        <text x="75" y="160" font-size="7" fill="white" text-anchor="middle" font-weight="700" font-family="Arial">Aggiungi</text>
+        <!-- Highlight on Aggiungi -->
+        <rect x="57" y="151" width="36" height="14" rx="7" fill="none" stroke="#ff6b00" stroke-width="2"/>
+        <!-- Tap indicator -->
+        <text x="80" y="150" font-size="12" font-family="Arial">👆</text>
+        <!-- Bottom nav -->
+        <rect x="8" y="198" width="94" height="14" fill="#f5f5f5"/>
+        <line x1="8" y1="198" x2="102" y2="198" stroke="#e0e0e0" stroke-width="0.5"/>
+        <text x="28" y="208" font-size="8" fill="#555" text-anchor="middle" font-family="Arial">◁</text>
+        <text x="55" y="208" font-size="8" fill="#555" text-anchor="middle" font-family="Arial">○</text>
+        <text x="82" y="208" font-size="8" fill="#555" text-anchor="middle" font-family="Arial">□</text>
+      </svg>
+    </div>
+    <div class="step-content">
+      <div class="step-header">
+        <span class="step-num">3</span>
+        <span class="step-title">Conferma l'aggiunta</span>
+      </div>
+      <p class="step-desc">
+        Apparirà una finestra di dialogo che chiede conferma.<br><br>
+        Tocca <strong>"Aggiungi"</strong> (o "Installa") per confermare.<br><br>
+        Su alcune versioni di Android potresti vedere una schermata dove puoi personalizzare il nome dell'app prima di procedere.
+      </p>
+      <div class="tip">💡 Se viene richiesto un nome, puoi lasciare "Pavone League" oppure personalizzarlo.</div>
+    </div>
+  </div>
+
+  <!-- STEP 4: Done -->
+  <div class="step">
+    <div class="step-visual">
+      <svg viewBox="0 0 110 220" width="110" height="220" xmlns="http://www.w3.org/2000/svg">
+        <!-- Phone -->
+        <rect x="2" y="2" width="106" height="216" rx="14" fill="#222"/>
+        <rect x="3" y="3" width="104" height="214" rx="13" fill="#2d2d2d"/>
+        <rect x="108" y="68" width="2.5" height="30" rx="1.25" fill="#444"/>
+        <rect x="0" y="78" width="2.5" height="22" rx="1.25" fill="#444"/>
+        <!-- Screen with wallpaper -->
+        <rect x="8" y="8" width="94" height="204" rx="10" fill="#1565c0"/>
+        <defs>
+          <linearGradient id="grad2" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#0d47a1"/>
+            <stop offset="100%" stop-color="#1565c0"/>
+          </linearGradient>
+        </defs>
+        <rect x="8" y="8" width="94" height="204" rx="10" fill="url(#grad2)"/>
+        <circle cx="55" cy="16" r="4" fill="rgba(0,0,0,0.5)"/>
+        <!-- Status bar -->
+        <text x="14" y="26" font-size="6.5" font-weight="600" fill="white" font-family="Arial">9:41</text>
+        <!-- App grid -->
+        <rect x="16" y="36" width="18" height="18" rx="4" fill="#ff9800" opacity="0.9"/>
+        <rect x="40" y="36" width="18" height="18" rx="4" fill="#e91e63" opacity="0.9"/>
+        <rect x="64" y="36" width="18" height="18" rx="4" fill="#9c27b0" opacity="0.9"/>
+        <rect x="76" y="36" width="18" height="18" rx="4" fill="#00bcd4" opacity="0.9"/>
+        <!-- Row 2 -->
+        <rect x="16" y="60" width="18" height="18" rx="4" fill="#4caf50" opacity="0.9"/>
+        <rect x="40" y="60" width="18" height="18" rx="4" fill="#ff5722" opacity="0.9"/>
+        <!-- Pavone League icon highlighted -->
+        <rect x="62" y="58" width="22" height="22" rx="5" fill="#2e7d32" stroke="rgba(255,255,255,0.5)" stroke-width="1.5"/>
+        <text x="73" y="74" font-size="13" text-anchor="middle" font-family="Arial">⚽</text>
+        <text x="73" y="91" font-size="5" fill="white" text-anchor="middle" font-family="Arial">Pavone</text>
+        <text x="73" y="97" font-size="5" fill="white" text-anchor="middle" font-family="Arial">League</text>
+        <rect x="86" y="60" width="18" height="18" rx="4" fill="#3f51b5" opacity="0.9"/>
+        <!-- Highlight glow -->
+        <rect x="61" y="57" width="24" height="24" rx="6" fill="none" stroke="white" stroke-width="2" opacity="0.7"/>
+        <!-- Checkmark circle -->
+        <circle cx="84" cy="58" r="8" fill="#66bb6a"/>
+        <polyline points="80,58 83,61 88,55" stroke="white" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        <!-- Bottom nav Android -->
+        <rect x="8" y="198" width="94" height="14" fill="rgba(0,0,0,0.3)" rx="0"/>
+        <text x="28" y="208" font-size="8" fill="rgba(255,255,255,0.7)" text-anchor="middle" font-family="Arial">◁</text>
+        <text x="55" y="208" font-size="8" fill="rgba(255,255,255,0.7)" text-anchor="middle" font-family="Arial">○</text>
+        <text x="82" y="208" font-size="8" fill="rgba(255,255,255,0.7)" text-anchor="middle" font-family="Arial">□</text>
+      </svg>
+    </div>
+    <div class="step-content">
+      <div class="step-header">
+        <span class="step-num final">✓</span>
+        <span class="step-title final">Installazione completata!</span>
+      </div>
+      <p class="step-desc">
+        L'icona di <strong>Pavone League</strong> è ora sulla tua schermata Home, esattamente come un'app nativa.<br><br>
+        Toccala per aprire l'app in modalità schermo intero, senza la barra di Chrome.<br><br>
+        L'app si aggiornerà automaticamente ogni volta che ci saranno nuove versioni.
+      </p>
+      <div class="tip">🎉 Fatto! Puoi ora accedere con le tue credenziali e prenotarti per le prossime partite direttamente dall'app.</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- FAQ SECTION -->
+<div style="margin-top:20px; page-break-inside:avoid;">
+  <h3 style="font-size:11pt; color:#1b5e20; margin-bottom:10px;">Domande frequenti</h3>
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+    <div style="background:#f9f9f9; border-radius:8px; padding:10px 12px; font-size:8.5pt;">
+      <strong style="color:#1b5e20;">L'app non si apre a schermo intero?</strong><br>
+      <span style="color:#555;">Assicurati di aprirla dall'icona sulla schermata Home, non dal link nel browser.</span>
+    </div>
+    <div style="background:#f9f9f9; border-radius:8px; padding:10px 12px; font-size:8.5pt;">
+      <strong style="color:#1b5e20;">Non vedo la voce nel menu?</strong><br>
+      <span style="color:#555;">Aggiorna Chrome all'ultima versione dal Play Store e riprova.</span>
+    </div>
+    <div style="background:#f9f9f9; border-radius:8px; padding:10px 12px; font-size:8.5pt;">
+      <strong style="color:#1b5e20;">Samsung Internet o altri browser?</strong><br>
+      <span style="color:#555;">Il percorso è simile: cerca "Aggiungi a schermata Home" o "Installa" nel menu del browser.</span>
+    </div>
+    <div style="background:#f9f9f9; border-radius:8px; padding:10px 12px; font-size:8.5pt;">
+      <strong style="color:#1b5e20;">Come disinstallare l'app?</strong><br>
+      <span style="color:#555;">Tieni premuto l'icona sulla schermata Home e seleziona "Disinstalla" o "Rimuovi".</span>
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  <span>Pavone League — Guida installazione Android</span>
+  <span class="url-chip">progetto-app-calcetto.vercel.app</span>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<title>Guida Installazione iPhone – Pavone League</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+@page { size: A4 portrait; margin: 14mm 12mm; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+  color: #1a1a1a;
+  background: #fff;
+  font-size: 10pt;
+  line-height: 1.55;
+}
+
+.header {
+  background: linear-gradient(135deg, #1b5e20 0%, #2e7d32 70%, #43a047 100%);
+  color: white;
+  padding: 16px 20px;
+  border-radius: 14px;
+  margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.app-icon {
+  width: 50px; height: 50px;
+  background: white;
+  border-radius: 11px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 26px;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+.header-text { flex: 1; }
+.header-text h1 { font-size: 16pt; font-weight: 800; letter-spacing: -0.3px; }
+.header-text p { font-size: 9pt; opacity: 0.85; margin-top: 2px; }
+.os-badge {
+  background: rgba(255,255,255,0.2);
+  border: 1px solid rgba(255,255,255,0.4);
+  border-radius: 20px;
+  padding: 5px 14px;
+  font-size: 9pt; font-weight: 700;
+  white-space: nowrap;
+  display: flex; align-items: center; gap: 5px;
+}
+
+.warning-box {
+  background: #fff8e1;
+  border: 1.5px solid #ffe082;
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 18px;
+  font-size: 9pt;
+  color: #bf360c;
+  display: flex; align-items: flex-start; gap: 10px;
+}
+.warning-box .icon { font-size: 18px; flex-shrink: 0; }
+
+.intro-box {
+  background: #e8f5e9;
+  border: 1.5px solid #a5d6a7;
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 20px;
+  font-size: 9pt;
+  color: #1b5e20;
+  display: flex; align-items: flex-start; gap: 10px;
+}
+.intro-box .icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+
+.steps { display: flex; flex-direction: column; gap: 0; }
+
+.step {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+  padding: 14px 0;
+  border-bottom: 1px solid #eeeeee;
+  page-break-inside: avoid;
+}
+.step:last-child { border-bottom: none; }
+
+.step-visual {
+  flex-shrink: 0;
+  width: 110px;
+  display: flex;
+  justify-content: center;
+}
+
+.step-content { flex: 1; padding-top: 2px; }
+
+.step-header {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 7px;
+}
+
+.step-num {
+  display: inline-flex;
+  align-items: center; justify-content: center;
+  width: 24px; height: 24px;
+  background: #2e7d32;
+  color: white;
+  border-radius: 50%;
+  font-size: 11px; font-weight: 800;
+  flex-shrink: 0;
+}
+.step-num.final { background: #f9a825; }
+
+.step-title { font-size: 12pt; font-weight: 700; color: #1b5e20; }
+.step-title.final { color: #e65100; }
+
+.step-desc { font-size: 9.5pt; color: #444; line-height: 1.65; }
+.step-desc strong { color: #1b5e20; }
+
+.tip {
+  background: #f1f8e9;
+  border-left: 3px solid #66bb6a;
+  padding: 6px 10px;
+  border-radius: 0 6px 6px 0;
+  margin-top: 8px;
+  font-size: 8.5pt;
+  color: #2e7d32;
+}
+.warn {
+  background: #fff8e1;
+  border-left: 3px solid #ffa726;
+  padding: 6px 10px;
+  border-radius: 0 6px 6px 0;
+  margin-top: 8px;
+  font-size: 8.5pt;
+  color: #e65100;
+}
+
+.footer {
+  margin-top: 18px;
+  padding-top: 12px;
+  border-top: 2px solid #2e7d32;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 8pt;
+  color: #999;
+}
+.url-chip {
+  background: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-family: 'Courier New', monospace;
+  font-size: 7.5pt;
+  color: #333;
+}
+
+@media print {
+  body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="app-icon">⚽</div>
+  <div class="header-text">
+    <h1>Pavone League</h1>
+    <p>Guida all'installazione dell'app sul tuo iPhone o iPad</p>
+  </div>
+  <div class="os-badge">🍎 iOS / iPadOS</div>
+</div>
+
+<!-- WARNING -->
+<div class="warning-box">
+  <span class="icon">⚠️</span>
+  <div>
+    <strong>Importante:</strong> questa procedura funziona <strong>solo con Safari</strong>. Se stai usando Chrome o un altro browser, aprilo e copia l'indirizzo nella barra di Safari prima di procedere.
+  </div>
+</div>
+
+<!-- INTRO -->
+<div class="intro-box">
+  <span class="icon">ℹ️</span>
+  <div>
+    L'app viene installata direttamente dal browser, <strong>senza passare dall'App Store</strong>. Una volta installata si comporta esattamente come un'app nativa: icona sulla schermata Home, schermo intero, notifiche.
+  </div>
+</div>
+
+<!-- STEPS -->
+<div class="steps">
+
+  <!-- STEP 1 -->
+  <div class="step">
+    <div class="step-visual">
+      <svg viewBox="0 0 110 220" width="110" height="220" xmlns="http://www.w3.org/2000/svg">
+        <!-- Phone body -->
+        <rect x="1" y="1" width="108" height="218" rx="18" fill="#1c1c1e"/>
+        <rect x="2" y="2" width="106" height="216" rx="17" fill="#2c2c2e"/>
+        <!-- Side buttons -->
+        <rect x="0" y="62" width="2.5" height="18" rx="1.25" fill="#3a3a3c"/>
+        <rect x="0" y="84" width="2.5" height="28" rx="1.25" fill="#3a3a3c"/>
+        <rect x="107.5" y="72" width="2.5" height="38" rx="1.25" fill="#3a3a3c"/>
+        <!-- Screen -->
+        <rect x="7" y="10" width="96" height="198" rx="12" fill="white"/>
+        <!-- Dynamic island -->
+        <rect x="34" y="13" width="42" height="10" rx="5" fill="#1c1c1e"/>
+        <!-- Status bar -->
+        <text x="14" y="28" font-size="7" font-weight="600" fill="#1c1c1e" font-family="Arial">9:41</text>
+        <text x="88" y="28" font-size="7" fill="#1c1c1e" font-family="Arial">🔋</text>
+        <!-- URL bar -->
+        <rect x="11" y="32" width="88" height="14" rx="7" fill="#f2f2f7"/>
+        <text x="55" y="41" font-size="5.5" fill="#666" text-anchor="middle" font-family="Arial">progetto-app-calcetto.vercel.app</text>
+        <!-- Lock icon -->
+        <text x="15" y="41" font-size="6" fill="#666" font-family="Arial">🔒</text>
+        <!-- Page content (simplified) -->
+        <rect x="11" y="52" width="88" height="40" rx="6" fill="#e8f5e9"/>
+        <text x="55" y="67" font-size="8" fill="#2e7d32" text-anchor="middle" font-weight="700" font-family="Arial">⚽ Pavone League</text>
+        <text x="55" y="79" font-size="5.5" fill="#555" text-anchor="middle" font-family="Arial">Accedi al tuo account</text>
+        <rect x="22" y="98" width="66" height="20" rx="4" fill="#f5f5f5"/>
+        <rect x="22" y="122" width="66" height="20" rx="4" fill="#f5f5f5"/>
+        <rect x="30" y="148" width="50" height="12" rx="6" fill="#2e7d32"/>
+        <text x="55" y="157" font-size="5.5" fill="white" text-anchor="middle" font-family="Arial">Accedi</text>
+        <!-- Bottom toolbar Safari -->
+        <rect x="7" y="186" width="96" height="22" rx="0" fill="#f9f9f9"/>
+        <line x1="7" y1="186" x2="103" y2="186" stroke="#e0e0e0" stroke-width="0.5"/>
+        <!-- back -->
+        <text x="19" y="200" font-size="11" fill="#007aff" text-anchor="middle" font-family="Arial">‹</text>
+        <!-- forward -->
+        <text x="32" y="200" font-size="11" fill="#c7c7cc" text-anchor="middle" font-family="Arial">›</text>
+        <!-- share icon -->
+        <g transform="translate(50,190)">
+          <rect x="1" y="4" width="8" height="7" rx="1" stroke="#007aff" stroke-width="1" fill="none"/>
+          <line x1="5" y1="7" x2="5" y2="1" stroke="#007aff" stroke-width="1" stroke-linecap="round"/>
+          <polyline points="2.5,3.5 5,1 7.5,3.5" stroke="#007aff" stroke-width="1" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </g>
+        <!-- bookmark -->
+        <text x="78" y="200" font-size="8" fill="#007aff" text-anchor="middle" font-family="Arial">⊟</text>
+        <!-- tabs -->
+        <text x="92" y="200" font-size="8" fill="#007aff" text-anchor="middle" font-family="Arial">⊡</text>
+        <!-- Home indicator -->
+        <rect x="38" y="202" width="34" height="3" rx="1.5" fill="#8e8e93"/>
+      </svg>
+    </div>
+    <div class="step-content">
+      <div class="step-header">
+        <span class="step-num">1</span>
+        <span class="step-title">Apri Safari e vai all'app</span>
+      </div>
+      <p class="step-desc">
+        Apri <strong>Safari</strong> sul tuo iPhone o iPad e digita o incolla il seguente indirizzo nella barra degli indirizzi in alto:
+      </p>
+      <div style="background:#f5f5f5;border:1px solid #ddd;border-radius:6px;padding:6px 12px;margin-top:8px;font-family:monospace;font-size:8pt;color:#1a1a1a;">
+        progetto-app-calcetto.vercel.app
+      </div>
+      <div class="warn">⚠️ Usa solo Safari. L'installazione da Chrome o Firefox non è supportata su iOS.</div>
+    </div>
+  </div>
+
+  <!-- STEP 2 -->
+  <div class="step">
+    <div class="step-visual">
+      <svg viewBox="0 0 110 220" width="110" height="220" xmlns="http://www.w3.org/2000/svg">
+        <!-- Phone -->
+        <rect x="1" y="1" width="108" height="218" rx="18" fill="#1c1c1e"/>
+        <rect x="2" y="2" width="106" height="216" rx="17" fill="#2c2c2e"/>
+        <rect x="0" y="62" width="2.5" height="18" rx="1.25" fill="#3a3a3c"/>
+        <rect x="0" y="84" width="2.5" height="28" rx="1.25" fill="#3a3a3c"/>
+        <rect x="107.5" y="72" width="2.5" height="38" rx="1.25" fill="#3a3a3c"/>
+        <rect x="7" y="10" width="96" height="198" rx="12" fill="white"/>
+        <rect x="34" y="13" width="42" height="10" rx="5" fill="#1c1c1e"/>
+        <text x="14" y="28" font-size="7" font-weight="600" fill="#1c1c1e" font-family="Arial">9:41</text>
+        <text x="88" y="28" font-size="7" fill="#1c1c1e" font-family="Arial">🔋</text>
+        <!-- URL bar -->
+        <rect x="11" y="32" width="88" height="14" rx="7" fill="#f2f2f7"/>
+        <text x="55" y="41" font-size="5.5" fill="#666" text-anchor="middle" font-family="Arial">progetto-app-calcetto.vercel.app</text>
+        <text x="15" y="41" font-size="6" fill="#666" font-family="Arial">🔒</text>
+        <!-- Content area -->
+        <rect x="11" y="52" width="88" height="130" rx="4" fill="#f9f9f9"/>
+        <text x="55" y="80" font-size="7" fill="#bbb" text-anchor="middle" font-family="Arial">— contenuto app —</text>
+        <!-- Bottom toolbar -->
+        <rect x="7" y="186" width="96" height="22" rx="0" fill="#f9f9f9"/>
+        <line x1="7" y1="186" x2="103" y2="186" stroke="#e0e0e0" stroke-width="0.5"/>
+        <text x="19" y="200" font-size="11" fill="#007aff" text-anchor="middle" font-family="Arial">‹</text>
+        <text x="32" y="200" font-size="11" fill="#c7c7cc" text-anchor="middle" font-family="Arial">›</text>
+        <!-- Share icon -->
+        <g transform="translate(50,190)">
+          <rect x="1" y="4" width="8" height="7" rx="1" stroke="#007aff" stroke-width="1.2" fill="none"/>
+          <line x1="5" y1="7" x2="5" y2="1" stroke="#007aff" stroke-width="1.2" stroke-linecap="round"/>
+          <polyline points="2.5,3.5 5,1 7.5,3.5" stroke="#007aff" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </g>
+        <text x="78" y="200" font-size="8" fill="#007aff" text-anchor="middle" font-family="Arial">⊟</text>
+        <text x="92" y="200" font-size="8" fill="#007aff" text-anchor="middle" font-family="Arial">⊡</text>
+        <!-- HIGHLIGHT circle on share button -->
+        <circle cx="55" cy="197" r="10" fill="none" stroke="#ff6b00" stroke-width="2.5" opacity="0.9"/>
+        <circle cx="55" cy="197" r="10" fill="#ff6b00" opacity="0.12"/>
+        <!-- Tap finger indicator -->
+        <text x="69" y="192" font-size="12" font-family="Arial">👆</text>
+        <rect x="38" y="202" width="34" height="3" rx="1.5" fill="#8e8e93"/>
+      </svg>
+    </div>
+    <div class="step-content">
+      <div class="step-header">
+        <span class="step-num">2</span>
+        <span class="step-title">Tocca il pulsante Condividi</span>
+      </div>
+      <p class="step-desc">
+        In basso al centro della schermata di Safari troverai la barra degli strumenti.<br><br>
+        Tocca il <strong>pulsante Condividi</strong> — è il quadrato con la freccia verso l'alto (evidenziato in arancione nell'immagine).
+      </p>
+      <div class="tip">💡 Se la barra in basso non è visibile, scorri leggermente la pagina verso l'alto per farla riapparire.</div>
+    </div>
+  </div>
+
+  <!-- STEP 3 -->
+  <div class="step">
+    <div class="step-visual">
+      <svg viewBox="0 0 110 220" width="110" height="220" xmlns="http://www.w3.org/2000/svg">
+        <!-- Phone -->
+        <rect x="1" y="1" width="108" height="218" rx="18" fill="#1c1c1e"/>
+        <rect x="2" y="2" width="106" height="216" rx="17" fill="#2c2c2e"/>
+        <rect x="0" y="62" width="2.5" height="18" rx="1.25" fill="#3a3a3c"/>
+        <rect x="0" y="84" width="2.5" height="28" rx="1.25" fill="#3a3a3c"/>
+        <rect x="107.5" y="72" width="2.5" height="38" rx="1.25" fill="#3a3a3c"/>
+        <rect x="7" y="10" width="96" height="198" rx="12" fill="white"/>
+        <rect x="34" y="13" width="42" height="10" rx="5" fill="#1c1c1e"/>
+        <!-- Dimmed page -->
+        <rect x="7" y="10" width="96" height="198" rx="12" fill="rgba(0,0,0,0.45)"/>
+        <!-- Share sheet -->
+        <rect x="7" y="100" width="96" height="108" rx="14" fill="#f2f2f7"/>
+        <!-- Handle -->
+        <rect x="46" y="106" width="18" height="3" rx="1.5" fill="#c7c7cc"/>
+        <!-- App icons row -->
+        <text x="22" y="126" font-size="14" font-family="Arial">💬</text>
+        <text x="40" y="126" font-size="14" font-family="Arial">✉️</text>
+        <text x="58" y="126" font-size="14" font-family="Arial">📋</text>
+        <text x="76" y="126" font-size="14" font-family="Arial">⋯</text>
+        <!-- Divider -->
+        <line x1="11" y1="133" x2="99" y2="133" stroke="#e0e0e0" stroke-width="0.5"/>
+        <!-- Menu items -->
+        <rect x="10" y="135" width="90" height="16" rx="4" fill="white"/>
+        <text x="19" y="146" font-size="7" fill="#1c1c1e" font-family="Arial">📌 Aggiungi ai Preferiti</text>
+        <rect x="10" y="153" width="90" height="16" rx="4" fill="#e8f5e9"/>
+        <text x="19" y="164" font-size="7" fill="#1b5e20" font-weight="700" font-family="Arial">➕ Aggiungi a schermata Home</text>
+        <rect x="10" y="171" width="90" height="16" rx="4" fill="white"/>
+        <text x="19" y="182" font-size="7" fill="#1c1c1e" font-family="Arial">🔖 Aggiungi ai Segnalibri</text>
+        <!-- HIGHLIGHT on "Aggiungi a schermata Home" -->
+        <rect x="9" y="152" width="92" height="18" rx="4" fill="none" stroke="#ff6b00" stroke-width="2" opacity="0.9"/>
+        <!-- Tap indicator -->
+        <text x="88" y="160" font-size="12" font-family="Arial">👆</text>
+        <rect x="38" y="202" width="34" height="3" rx="1.5" fill="#8e8e93"/>
+      </svg>
+    </div>
+    <div class="step-content">
+      <div class="step-header">
+        <span class="step-num">3</span>
+        <span class="step-title">Tocca "Aggiungi a schermata Home"</span>
+      </div>
+      <p class="step-desc">
+        Si aprirà un pannello con diverse opzioni. <strong>Scorri verso il basso</strong> nell'elenco finché non trovi la voce:<br><br>
+        <strong>➕ Aggiungi a schermata Home</strong><br><br>
+        Toccala per continuare.
+      </p>
+      <div class="tip">💡 La voce potrebbe trovarsi dopo un paio di scorrimenti. Cerca l'icona di un quadrato con il simbolo +.</div>
+    </div>
+  </div>
+
+  <!-- STEP 4 -->
+  <div class="step">
+    <div class="step-visual">
+      <svg viewBox="0 0 110 220" width="110" height="220" xmlns="http://www.w3.org/2000/svg">
+        <!-- Phone -->
+        <rect x="1" y="1" width="108" height="218" rx="18" fill="#1c1c1e"/>
+        <rect x="2" y="2" width="106" height="216" rx="17" fill="#2c2c2e"/>
+        <rect x="0" y="62" width="2.5" height="18" rx="1.25" fill="#3a3a3c"/>
+        <rect x="0" y="84" width="2.5" height="28" rx="1.25" fill="#3a3a3c"/>
+        <rect x="107.5" y="72" width="2.5" height="38" rx="1.25" fill="#3a3a3c"/>
+        <rect x="7" y="10" width="96" height="198" rx="12" fill="white"/>
+        <rect x="34" y="13" width="42" height="10" rx="5" fill="#1c1c1e"/>
+        <!-- Status bar -->
+        <text x="14" y="28" font-size="7" font-weight="600" fill="#1c1c1e" font-family="Arial">9:41</text>
+        <!-- Top navigation bar -->
+        <rect x="7" y="30" width="96" height="20" fill="#f9f9f9"/>
+        <line x1="7" y1="50" x2="103" y2="50" stroke="#e0e0e0" stroke-width="0.5"/>
+        <text x="18" y="43" font-size="7.5" fill="#007aff" font-family="Arial">Annulla</text>
+        <text x="55" y="43" font-size="7" fill="#1c1c1e" text-anchor="middle" font-weight="600" font-family="Arial">Aggiungi a schermata Home</text>
+        <!-- "Aggiungi" button highlighted -->
+        <text x="96" y="43" font-size="7.5" fill="#007aff" text-anchor="end" font-weight="700" font-family="Arial">Aggiungi</text>
+        <!-- Highlight on "Aggiungi" -->
+        <circle cx="90" cy="41" r="11" fill="none" stroke="#ff6b00" stroke-width="2" opacity="0.9"/>
+        <circle cx="90" cy="41" r="11" fill="#ff6b00" opacity="0.12"/>
+        <!-- App icon preview -->
+        <rect x="40" y="58" width="30" height="30" rx="7" fill="#2e7d32"/>
+        <text x="55" y="79" font-size="16" text-anchor="middle" font-family="Arial">⚽</text>
+        <!-- Name field -->
+        <text x="55" y="105" font-size="7" fill="#888" text-anchor="middle" font-family="Arial">Nome</text>
+        <rect x="15" y="108" width="80" height="16" rx="4" fill="white" stroke="#d1d1d6" stroke-width="1"/>
+        <text x="55" y="119" font-size="7.5" fill="#1c1c1e" text-anchor="middle" font-family="Arial">Pavone League</text>
+        <!-- URL preview -->
+        <text x="55" y="138" font-size="6" fill="#888" text-anchor="middle" font-family="Arial">progetto-app-calcetto.vercel.app</text>
+        <!-- Finger on "Aggiungi" -->
+        <text x="95" y="32" font-size="12" font-family="Arial">👆</text>
+        <rect x="38" y="202" width="34" height="3" rx="1.5" fill="#8e8e93"/>
+      </svg>
+    </div>
+    <div class="step-content">
+      <div class="step-header">
+        <span class="step-num">4</span>
+        <span class="step-title">Conferma e tocca "Aggiungi"</span>
+      </div>
+      <p class="step-desc">
+        Apparirà una schermata con l'anteprima dell'icona e il nome dell'app.<br><br>
+        Se vuoi, puoi <strong>modificare il nome</strong> che apparirà sotto l'icona sulla schermata Home.<br><br>
+        Tocca <strong>"Aggiungi"</strong> in alto a destra per procedere.
+      </p>
+      <div class="tip">💡 Il nome predefinito è già "Pavone League". Puoi lasciarlo invariato o personalizzarlo.</div>
+    </div>
+  </div>
+
+  <!-- STEP 5: Done -->
+  <div class="step">
+    <div class="step-visual">
+      <svg viewBox="0 0 110 220" width="110" height="220" xmlns="http://www.w3.org/2000/svg">
+        <!-- Phone -->
+        <rect x="1" y="1" width="108" height="218" rx="18" fill="#1c1c1e"/>
+        <rect x="2" y="2" width="106" height="216" rx="17" fill="#2c2c2e"/>
+        <rect x="0" y="62" width="2.5" height="18" rx="1.25" fill="#3a3a3c"/>
+        <rect x="0" y="84" width="2.5" height="28" rx="1.25" fill="#3a3a3c"/>
+        <rect x="107.5" y="72" width="2.5" height="38" rx="1.25" fill="#3a3a3c"/>
+        <rect x="7" y="10" width="96" height="198" rx="12" fill="#f0f0f5"/>
+        <rect x="34" y="13" width="42" height="10" rx="5" fill="#1c1c1e"/>
+        <!-- Home screen wallpaper -->
+        <rect x="7" y="10" width="96" height="198" rx="12" fill="url(#grad)" />
+        <defs>
+          <linearGradient id="grad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#1565c0"/>
+            <stop offset="100%" stop-color="#0d47a1"/>
+          </linearGradient>
+        </defs>
+        <!-- Status bar -->
+        <text x="14" y="28" font-size="7" font-weight="600" fill="white" font-family="Arial">9:41</text>
+        <!-- App grid (simplified) -->
+        <!-- Row 1 -->
+        <rect x="16" y="38" width="18" height="18" rx="4" fill="#ff9500" opacity="0.8"/>
+        <rect x="40" y="38" width="18" height="18" rx="4" fill="#34c759" opacity="0.8"/>
+        <rect x="64" y="38" width="18" height="18" rx="4" fill="#ff3b30" opacity="0.8"/>
+        <rect x="76" y="38" width="18" height="18" rx="4" fill="#007aff" opacity="0.8"/>
+        <!-- Row 2 -->
+        <rect x="16" y="62" width="18" height="18" rx="4" fill="#5856d6" opacity="0.8"/>
+        <rect x="40" y="62" width="18" height="18" rx="4" fill="#ff2d55" opacity="0.8"/>
+        <!-- Pavone League icon (highlighted) -->
+        <rect x="62" y="60" width="22" height="22" rx="5" fill="#2e7d32" stroke="#fff" stroke-width="1.5"/>
+        <text x="73" y="76" font-size="13" text-anchor="middle" font-family="Arial">⚽</text>
+        <text x="73" y="92" font-size="5" fill="white" text-anchor="middle" font-family="Arial">Pavone League</text>
+        <rect x="80" y="62" width="18" height="18" rx="4" fill="#ff9500" opacity="0.8"/>
+        <!-- Highlight glow on Pavone icon -->
+        <rect x="61" y="59" width="24" height="24" rx="6" fill="none" stroke="#fff" stroke-width="2" opacity="0.7"/>
+        <!-- Checkmark overlay -->
+        <circle cx="84" cy="60" r="8" fill="#34c759"/>
+        <polyline points="80,60 83,63 88,57" stroke="white" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        <rect x="38" y="202" width="34" height="3" rx="1.5" fill="#8e8e93"/>
+      </svg>
+    </div>
+    <div class="step-content">
+      <div class="step-header">
+        <span class="step-num final">✓</span>
+        <span class="step-title final">Installazione completata!</span>
+      </div>
+      <p class="step-desc">
+        L'icona di <strong>Pavone League</strong> è ora sulla tua schermata Home, esattamente come un'app nativa.<br><br>
+        Toccala per aprire l'app in modalità schermo intero, senza la barra di Safari.<br><br>
+        L'app si aggiornerà automaticamente ogni volta che ci saranno nuove versioni.
+      </p>
+      <div class="tip">🎉 Fatto! Puoi ora accedere con le tue credenziali e prenotarti per le prossime partite direttamente dall'app.</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  <span>Pavone League — Guida installazione iPhone &amp; iPad</span>
+  <span class="url-chip">progetto-app-calcetto.vercel.app</span>
+</div>
+
+</body>
+</html>
