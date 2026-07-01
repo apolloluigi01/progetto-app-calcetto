@@ -26,7 +26,7 @@ export default function MatchDetail() {
   const [votingBusy, setVotingBusy] = useState(false)
   const [votingSuccess, setVotingSuccess] = useState(false)
 
-  const { participants, averages, voterIds, getMyVotes, hasVotedAll, submitVotes } =
+  const { participants, voterIds, getMyVotes, hasVotedAll, submitVotes } =
     useMatchVoting(id)
 
   async function handleBook() {
