@@ -23,6 +23,10 @@ export default function GiocatoreEdit() {
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
+  const [overallValue, setOverallValue] = useState<number>(50)
+  const [savingOverall, setSavingOverall] = useState(false)
+  const [overallSaved, setOverallSaved] = useState(false)
+
   const [showResetPassword, setShowResetPassword] = useState(false)
   const [newPassword, setNewPassword] = useState('')
   const [resetError, setResetError] = useState<string | null>(null)
@@ -34,9 +38,13 @@ export default function GiocatoreEdit() {
   async function load() {
     if (!id) return
     setLoading(true)
-    const { data, error } = await supabase.functions.invoke<{ players: PlayerWithStatus[] }>('list-players')
-    if (error) setError(error.message)
-    setPlayer(data?.players.find((p) => p.id === id) ?? null)
+    const [listRes, ratingRes] = await Promise.all([
+      supabase.functions.invoke<{ players: PlayerWithStatus[] }>('list-players'),
+      supabase.from('ratings').select('rating_value').eq('player_id', id).maybeSingle(),
+    ])
+    if (listRes.error) setError(listRes.error.message)
+    setPlayer(listRes.data?.players.find((p) => p.id === id) ?? null)
+    if (ratingRes.data) setOverallValue(Math.round(Number(ratingRes.data.rating_value)))
     setLoading(false)
   }
 
@@ -76,6 +84,22 @@ export default function GiocatoreEdit() {
     }
     logActivity('giocatore_modificato', { nome: name, nickname: nickname || null, ruolo: isSuperAdmin ? role : undefined, playerId: id })
     load()
+  }
+
+  async function handleSaveOverall() {
+    if (!id) return
+    setSavingOverall(true)
+    setOverallSaved(false)
+    const val = Math.min(100, Math.max(1, Math.round(overallValue)))
+    const fascia = val >= 75 ? 'A' : val >= 55 ? 'B' : val >= 35 ? 'C' : 'D'
+    await supabase
+      .from('ratings')
+      .upsert(
+        { player_id: id, rating_value: val, fascia, updated_at: new Date().toISOString() },
+        { onConflict: 'player_id' },
+      )
+    setSavingOverall(false)
+    setOverallSaved(true)
   }
 
   async function handleResetPassword(e: FormEvent) {
@@ -179,6 +203,50 @@ export default function GiocatoreEdit() {
           </div>
         )}
       </div>
+
+      {canEditDetails && (
+        <div className="mt-4 rounded-xl bg-white p-4 shadow">
+          <h2 className="font-medium text-gray-800">Overall iniziale</h2>
+          <p className="mt-1 text-xs text-gray-500">
+            Valore usato per la generazione automatica delle squadre quando il giocatore non ha ancora statistiche (1–100).
+          </p>
+          <div className="mt-3 flex items-center gap-3">
+            <input
+              type="number"
+              min={1}
+              max={100}
+              value={overallValue}
+              onChange={(e) => {
+                setOverallSaved(false)
+                setOverallValue(Number(e.target.value))
+              }}
+              className="w-24 rounded-lg border border-gray-300 px-3 py-2 text-center text-lg font-bold"
+            />
+            <input
+              type="range"
+              min={1}
+              max={100}
+              value={overallValue}
+              onChange={(e) => {
+                setOverallSaved(false)
+                setOverallValue(Number(e.target.value))
+              }}
+              className="flex-1 accent-field-green-dark"
+            />
+          </div>
+          <p className="mt-1 text-xs text-gray-400">
+            Fascia: {overallValue >= 75 ? 'A (top)' : overallValue >= 55 ? 'B' : overallValue >= 35 ? 'C' : 'D (base)'}
+          </p>
+          {overallSaved && <p className="mt-1 text-xs text-green-700">Overall salvato.</p>}
+          <button
+            onClick={handleSaveOverall}
+            disabled={savingOverall}
+            className="mt-3 w-full rounded-lg bg-field-green px-4 py-2 text-sm font-medium text-white hover:bg-field-green-dark disabled:opacity-60"
+          >
+            {savingOverall ? 'Salvataggio...' : 'Salva overall'}
+          </button>
+        </div>
+      )}
 
       {canEditDetails && (
         <div className="mt-4 rounded-xl bg-white p-4 shadow">

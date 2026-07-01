@@ -13,20 +13,30 @@ export type ActivityAction =
   | 'pagelle_bozza'
   | 'pagelle_pubblicate'
   | 'partita_eliminata'
+  | 'sondaggio_aperto'
+  | 'sondaggio_chiuso'
+  | 'squadre_generate'
+  | 'prenotazione_aggiunta'
+  | 'prenotazione_rimossa'
 
 export const actionLabels: Record<ActivityAction, string> = {
-  giocatore_creato:    'Giocatore creato',
-  giocatore_modificato:'Giocatore modificato',
-  giocatore_eliminato: 'Giocatore eliminato',
-  password_reimpostata:'Password reimpostata',
-  partita_creata:      'Partita creata',
-  partita_modificata:  'Partita modificata',
-  risultato_salvato:   'Risultato salvato',
-  gol_aggiunto:        'Gol aggiunto',
-  gol_rimosso:         'Gol rimosso',
-  pagelle_bozza:       'Pagelle salvate in bozza',
-  pagelle_pubblicate:  'Pagelle pubblicate',
-  partita_eliminata:   'Partita eliminata',
+  giocatore_creato:      'Giocatore creato',
+  giocatore_modificato:  'Giocatore modificato',
+  giocatore_eliminato:   'Giocatore eliminato',
+  password_reimpostata:  'Password reimpostata',
+  partita_creata:        'Partita creata',
+  partita_modificata:    'Partita modificata',
+  risultato_salvato:     'Risultato salvato',
+  gol_aggiunto:          'Gol aggiunto',
+  gol_rimosso:           'Gol rimosso',
+  pagelle_bozza:         'Pagelle salvate in bozza',
+  pagelle_pubblicate:    'Pagelle pubblicate',
+  partita_eliminata:     'Partita eliminata',
+  sondaggio_aperto:      'Sondaggio aperto',
+  sondaggio_chiuso:      'Sondaggio chiuso',
+  squadre_generate:      'Squadre generate',
+  prenotazione_aggiunta: 'Prenotazione aggiunta (admin)',
+  prenotazione_rimossa:  'Prenotazione rimossa (admin)',
 }
 
 export async function logActivity(

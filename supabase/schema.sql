@@ -29,6 +29,7 @@ create table if not exists matches (
   match_time time,
   field text,
   status text not null default 'draft' check (status in ('draft', 'completed')),
+  booking_open boolean not null default false,
   created_at timestamptz not null default now()
 );
 
@@ -68,6 +69,14 @@ create table if not exists rating_weights (
   weight_percent numeric(5,2) not null
 );
 
+create table if not exists match_bookings (
+  id uuid primary key default gen_random_uuid(),
+  match_id uuid not null references matches(id) on delete cascade,
+  player_id uuid not null references players(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  unique (match_id, player_id)
+);
+
 create table if not exists pagelle (
   id uuid primary key default gen_random_uuid(),
   match_id uuid not null references matches(id) on delete cascade,
@@ -81,11 +90,11 @@ create table if not exists pagelle (
 );
 
 -- Pesi rating di default (modificabili da pannello admin)
+-- 3 statistiche: % vittorie, gol totali, media voto
 insert into rating_weights (stat_key, weight_percent) values
-  ('win_percentage', 30),
-  ('goals_per_match', 25),
-  ('voto_medio_pagelle', 25),
-  ('mvp_count', 20)
+  ('win_percentage', 40),
+  ('goals_total', 35),
+  ('voto_medio', 25)
 on conflict (stat_key) do nothing;
 
 -- =========================================================
@@ -123,6 +132,7 @@ alter table players enable row level security;
 alter table seasons enable row level security;
 alter table matches enable row level security;
 alter table match_players enable row level security;
+alter table match_bookings enable row level security;
 alter table goals enable row level security;
 alter table match_results enable row level security;
 alter table ratings enable row level security;
@@ -147,6 +157,13 @@ create policy "matches_write_admin" on matches for all to authenticated using (i
 create policy "match_players_select_all" on match_players for select to authenticated using (true);
 create policy "match_players_write_admin" on match_players for all to authenticated using (is_admin()) with check (is_admin());
 
+-- match_bookings: tutti i loggati vedono le prenotazioni; ogni player gestisce la propria, admin gestisce tutte
+create policy "match_bookings_select_all" on match_bookings for select to authenticated using (true);
+create policy "match_bookings_insert_self_or_admin" on match_bookings for insert to authenticated
+  with check (player_id = auth.uid() or is_admin());
+create policy "match_bookings_delete_self_or_admin" on match_bookings for delete to authenticated
+  using (player_id = auth.uid() or is_admin());
+
 -- goals: lettura libera, scrittura admin
 create policy "goals_select_all" on goals for select to authenticated using (true);
 create policy "goals_write_admin" on goals for all to authenticated using (is_admin()) with check (is_admin());
@@ -167,3 +184,29 @@ create policy "rating_weights_write_admin" on rating_weights for all to authenti
 create policy "pagelle_select_published_or_admin" on pagelle for select to authenticated
   using (published_at is not null or is_admin());
 create policy "pagelle_write_admin" on pagelle for all to authenticated using (is_admin()) with check (is_admin());
+
+-- =========================================================
+-- MIGRATION: eseguire sul DB esistente (se schema già creato)
+-- =========================================================
+-- alter table matches add column if not exists booking_open boolean not null default false;
+--
+-- create table if not exists match_bookings (
+--   id uuid primary key default gen_random_uuid(),
+--   match_id uuid not null references matches(id) on delete cascade,
+--   player_id uuid not null references players(id) on delete cascade,
+--   created_at timestamptz not null default now(),
+--   unique (match_id, player_id)
+-- );
+-- alter table match_bookings enable row level security;
+-- create policy "match_bookings_select_all" on match_bookings for select to authenticated using (true);
+-- create policy "match_bookings_insert_self_or_admin" on match_bookings for insert to authenticated
+--   with check (player_id = auth.uid() or is_admin());
+-- create policy "match_bookings_delete_self_or_admin" on match_bookings for delete to authenticated
+--   using (player_id = auth.uid() or is_admin());
+--
+-- Aggiornare i pesi (opzionale, rimuovere vecchi e inserire nuovi):
+-- delete from rating_weights where stat_key in ('goals_per_match','voto_medio_pagelle','mvp_count');
+-- insert into rating_weights (stat_key, weight_percent) values
+--   ('goals_total', 35), ('voto_medio', 25)
+-- on conflict (stat_key) do nothing;
+-- update rating_weights set weight_percent = 40 where stat_key = 'win_percentage';

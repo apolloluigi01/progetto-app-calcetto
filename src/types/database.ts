@@ -27,6 +27,14 @@ export interface Match {
   match_time: string | null
   field: string | null
   status: MatchStatus
+  booking_open: boolean
+  created_at: string
+}
+
+export interface MatchBooking {
+  id: string
+  match_id: string
+  player_id: string
   created_at: string
 }
 

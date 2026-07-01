@@ -1,0 +1,156 @@
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "jsr:@supabase/supabase-js@2";
+
+const supabaseUrl    = Deno.env.get("SUPABASE_URL")!;
+const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const brevoApiKey    = Deno.env.get("BREVO_API_KEY") ?? "";
+const senderEmail    = "pavoneleague@gmail.com";
+const senderName     = "Pavone League";
+const appUrl         = Deno.env.get("APP_URL") ?? "https://progetto-app-calcetto.vercel.app";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+function welcomeHtml(name: string, email: string, confirmLink: string): string {
+  return `
+  <div style="font-family:sans-serif;max-width:520px;margin:0 auto;color:#1a1a1a;">
+    <div style="background:#2e7d32;border-radius:12px 12px 0 0;padding:20px 24px;">
+      <h2 style="color:white;margin:0;font-size:20px;">⚽ Benvenuto in Pavone League!</h2>
+    </div>
+    <div style="border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;padding:20px 24px;">
+      <p>Ciao <strong>${name}</strong>,</p>
+      <p>Il tuo account è stato creato. Per attivarlo e scegliere la tua password, clicca sul pulsante qui sotto:</p>
+      <div style="text-align:center;margin:24px 0;">
+        <a href="${confirmLink}"
+           style="display:inline-block;background:#2e7d32;color:white;padding:14px 32px;
+                  border-radius:8px;text-decoration:none;font-weight:bold;font-size:16px;">
+          Attiva il tuo account
+        </a>
+      </div>
+      <p style="color:#555;font-size:13px;">
+        Accedi con questa email: <strong>${email}</strong>
+      </p>
+      <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0;">
+      <p style="color:#9ca3af;font-size:12px;margin:0;">
+        Se non ti aspettavi questo messaggio, puoi ignorarlo.
+      </p>
+    </div>
+  </div>`;
+}
+
+async function sendWelcomeEmail(to: string, name: string, confirmLink: string): Promise<void> {
+  if (!brevoApiKey) {
+    console.warn("BREVO_API_KEY non configurata — email non inviata");
+    return;
+  }
+  const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+    method: "POST",
+    headers: {
+      "api-key": brevoApiKey,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      sender: { name: senderName, email: senderEmail },
+      to: [{ email: to }],
+      subject: "Attiva il tuo account Pavone League",
+      htmlContent: welcomeHtml(name, to, confirmLink),
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(`Brevo error ${res.status}: ${await res.text()}`);
+  }
+}
+
+Deno.serve(async (req: Request) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
+
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader) return json({ error: "Missing Authorization header" }, 401);
+
+  const callerClient = createClient(supabaseUrl, serviceRoleKey, {
+    global: { headers: { Authorization: authHeader } },
+  });
+  const { data: callerData, error: callerError } = await callerClient.auth.getUser();
+  if (callerError || !callerData.user) return json({ error: "Not authenticated" }, 401);
+
+  const adminClient = createClient(supabaseUrl, serviceRoleKey);
+
+  const { data: callerPlayer, error: callerPlayerError } = await adminClient
+    .from("players")
+    .select("role")
+    .eq("id", callerData.user.id)
+    .single();
+
+  const callerRole = callerPlayer?.role;
+  if (callerPlayerError || (callerRole !== "admin" && callerRole !== "superadmin")) {
+    return json({ error: "Solo un admin puo' creare giocatori" }, 403);
+  }
+
+  const body = await req.json();
+  const { email, password, name, nickname, role } = body as {
+    email: string;
+    password: string;
+    name: string;
+    nickname?: string;
+    role?: "admin" | "player" | "superadmin";
+  };
+
+  if (!email || !password || !name) {
+    return json({ error: "email, password e name sono obbligatori" }, 400);
+  }
+
+  const effectiveRole = callerRole === "superadmin" ? (role ?? "player") : "player";
+
+  const { data: createData, error: createError } = await adminClient.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: false,
+  });
+
+  if (createError || !createData.user) {
+    return json({ error: createError?.message ?? "Errore creazione utente" }, 400);
+  }
+
+  const { error: insertError } = await adminClient.from("players").insert({
+    id: createData.user.id,
+    name,
+    nickname: nickname ?? null,
+    role: effectiveRole,
+    must_change_password: true,
+  });
+
+  if (insertError) {
+    await adminClient.auth.admin.deleteUser(createData.user.id);
+    return json({ error: insertError.message }, 400);
+  }
+
+  const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
+    type: "signup",
+    email,
+    options: { redirectTo: `${appUrl}/imposta-password` },
+  });
+
+  if (linkError || !linkData?.properties?.action_link) {
+    console.error("generateLink fallito:", linkError?.message);
+    return json({ id: createData.user.id, warning: "Utente creato ma email di benvenuto non inviata" });
+  }
+
+  try {
+    await sendWelcomeEmail(email, name, linkData.properties.action_link);
+  } catch (e) {
+    console.error("Errore invio email:", e);
+  }
+
+  return json({ id: createData.user.id });
+});

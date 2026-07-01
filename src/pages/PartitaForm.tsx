@@ -6,6 +6,8 @@ import { getKnownFields } from '../lib/fields'
 import { logActivity } from '../lib/activityLog'
 import type { Player, Team } from '../types/database'
 
+type Modalita = 'manuale' | 'sondaggio'
+
 export default function PartitaForm() {
   const navigate = useNavigate()
   const [players, setPlayers] = useState<Player[]>([])
@@ -13,6 +15,7 @@ export default function PartitaForm() {
   const [matchDate, setMatchDate] = useState('')
   const [matchTime, setMatchTime] = useState('')
   const [field, setField] = useState('')
+  const [modalita, setModalita] = useState<Modalita>('sondaggio')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [teams, setTeams] = useState<Record<string, Team>>({})
   const [error, setError] = useState<string | null>(null)
@@ -52,7 +55,11 @@ export default function PartitaForm() {
   const selectedIds = Array.from(selected)
   const teamACount = selectedIds.filter((id) => teams[id] === 'A').length
   const teamBCount = selectedIds.filter((id) => teams[id] === 'B').length
-  const canSubmit = matchDate && selectedIds.length === 10 && teamACount === 5 && teamBCount === 5
+
+  const canSubmit =
+    matchDate &&
+    (modalita === 'sondaggio' ||
+      (selectedIds.length === 10 && teamACount === 5 && teamBCount === 5))
 
   async function handleSubmit() {
     setError(null)
@@ -69,22 +76,26 @@ export default function PartitaForm() {
           match_time: matchTime || null,
           field: field || null,
           status: 'draft',
+          booking_open: modalita === 'sondaggio',
         })
         .select('id')
         .single()
 
       if (matchError || !match) throw new Error(matchError?.message ?? 'Errore creazione partita')
 
-      const rows = selectedIds.map((playerId) => ({
-        match_id: match.id,
-        player_id: playerId,
-        team: teams[playerId],
-      }))
+      if (modalita === 'manuale') {
+        const rows = selectedIds.map((playerId) => ({
+          match_id: match.id,
+          player_id: playerId,
+          team: teams[playerId],
+        }))
+        const { error: playersError } = await supabase.from('match_players').insert(rows)
+        if (playersError) throw new Error(playersError.message)
+        logActivity('partita_creata', { matchId: match.id, data: matchDate, campo: field || null, modalita: 'manuale' })
+      } else {
+        logActivity('sondaggio_aperto', { matchId: match.id, data: matchDate, campo: field || null })
+      }
 
-      const { error: playersError } = await supabase.from('match_players').insert(rows)
-      if (playersError) throw new Error(playersError.message)
-
-      logActivity('partita_creata', { matchId: match.id, data: matchDate, campo: field || null })
       navigate(`/partite/${match.id}`)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Errore imprevisto')
@@ -133,49 +144,94 @@ export default function PartitaForm() {
         </div>
       </div>
 
+      {/* Modalità */}
       <div className="mt-4 rounded-xl bg-white p-4 shadow">
-        <h2 className="font-medium">
-          Giocatori presenti ({selectedIds.length}/10)
-        </h2>
-        <div className="mt-2 space-y-1">
-          {players.map((p) => (
-            <label key={p.id} className="flex items-center gap-2 py-1">
-              <input
-                type="checkbox"
-                checked={selected.has(p.id)}
-                onChange={() => toggleSelected(p.id)}
-              />
-              <span>{p.name}</span>
-            </label>
-          ))}
+        <h2 className="mb-3 font-medium text-gray-800">Modalità giocatori</h2>
+        <div className="space-y-2">
+          <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-gray-200 p-3 has-[:checked]:border-field-green has-[:checked]:bg-field-green/5">
+            <input
+              type="radio"
+              name="modalita"
+              value="sondaggio"
+              checked={modalita === 'sondaggio'}
+              onChange={() => setModalita('sondaggio')}
+              className="mt-0.5 accent-field-green-dark"
+            />
+            <div>
+              <p className="font-medium text-gray-800">Apri sondaggio</p>
+              <p className="text-xs text-gray-500">
+                I giocatori si prenotano autonomamente dall'app. Le squadre verranno generate
+                automaticamente dall'admin una volta raggiunte le 10 prenotazioni.
+              </p>
+            </div>
+          </label>
+          <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-gray-200 p-3 has-[:checked]:border-field-green has-[:checked]:bg-field-green/5">
+            <input
+              type="radio"
+              name="modalita"
+              value="manuale"
+              checked={modalita === 'manuale'}
+              onChange={() => setModalita('manuale')}
+              className="mt-0.5 accent-field-green-dark"
+            />
+            <div>
+              <p className="font-medium text-gray-800">Seleziona manualmente</p>
+              <p className="text-xs text-gray-500">
+                Scegli i 10 giocatori e assegna direttamente le squadre A e B.
+              </p>
+            </div>
+          </label>
         </div>
       </div>
 
-      {selectedIds.length === 10 && (
-        <div className="mt-4 rounded-xl bg-white p-4 shadow">
-          <h2 className="font-medium">
-            Squadre (A: {teamACount}/5 — B: {teamBCount}/5)
-          </h2>
-          <div className="mt-2 space-y-1">
-            {selectedIds.map((id) => {
-              const player = players.find((p) => p.id === id)
-              return (
-                <div key={id} className="flex items-center justify-between py-1">
-                  <span>{player?.name}</span>
-                  <button
-                    type="button"
-                    onClick={() => toggleTeam(id)}
-                    className={`rounded-lg px-3 py-1 text-sm font-medium ${
-                      teams[id] === 'A' ? 'bg-field-green text-white' : 'bg-field-orange text-white'
-                    }`}
-                  >
-                    Squadra {teams[id]}
-                  </button>
-                </div>
-              )
-            })}
+      {/* Sezione selezione giocatori (solo modalità manuale) */}
+      {modalita === 'manuale' && (
+        <>
+          <div className="mt-4 rounded-xl bg-white p-4 shadow">
+            <h2 className="font-medium">
+              Giocatori presenti ({selectedIds.length}/10)
+            </h2>
+            <div className="mt-2 space-y-1">
+              {players.map((p) => (
+                <label key={p.id} className="flex items-center gap-2 py-1">
+                  <input
+                    type="checkbox"
+                    checked={selected.has(p.id)}
+                    onChange={() => toggleSelected(p.id)}
+                  />
+                  <span>{p.name}</span>
+                </label>
+              ))}
+            </div>
           </div>
-        </div>
+
+          {selectedIds.length === 10 && (
+            <div className="mt-4 rounded-xl bg-white p-4 shadow">
+              <h2 className="font-medium">
+                Squadre (A: {teamACount}/5 — B: {teamBCount}/5)
+              </h2>
+              <div className="mt-2 space-y-1">
+                {selectedIds.map((id) => {
+                  const player = players.find((p) => p.id === id)
+                  return (
+                    <div key={id} className="flex items-center justify-between py-1">
+                      <span>{player?.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => toggleTeam(id)}
+                        className={`rounded-lg px-3 py-1 text-sm font-medium ${
+                          teams[id] === 'A' ? 'bg-field-green text-white' : 'bg-field-orange text-white'
+                        }`}
+                      >
+                        Squadra {teams[id]}
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
@@ -186,7 +242,11 @@ export default function PartitaForm() {
         onClick={handleSubmit}
         className="mt-4 w-full rounded-lg bg-field-green px-4 py-2 font-medium text-white hover:bg-field-green-dark disabled:opacity-50"
       >
-        {submitting ? 'Creazione...' : 'Crea partita'}
+        {submitting
+          ? 'Creazione...'
+          : modalita === 'sondaggio'
+            ? 'Crea partita e apri sondaggio'
+            : 'Crea partita'}
       </button>
     </div>
   )

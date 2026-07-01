@@ -2,9 +2,16 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useMatchDetail } from '../../hooks/useMatchDetail'
+import { useMatchBookings } from '../../hooks/useMatchBookings'
 import { getKnownFields } from '../../lib/fields'
 import { logActivity } from '../../lib/activityLog'
-import type { Team } from '../../types/database'
+import { computeStatistiche } from '../../lib/statistiche'
+import { computeOverall, generateBalancedTeams } from '../../lib/teamGeneration'
+import { getCurrentSeasonId } from '../../lib/seasons'
+import type { Player, Team } from '../../types/database'
+import type { PlayerOverall, GeneratedTeams } from '../../lib/teamGeneration'
+
+const MAX_PLAYERS = 10
 
 interface PagellaDraft {
   voto: string
@@ -17,6 +24,11 @@ export default function MatchEdit() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { data, loading, error, refetch } = useMatchDetail(id)
+  const {
+    bookings,
+    loading: bookingsLoading,
+    refetch: refetchBookings,
+  } = useMatchBookings(id, undefined)
 
   const [scoreA, setScoreA] = useState('')
   const [scoreB, setScoreB] = useState('')
@@ -36,8 +48,27 @@ export default function MatchEdit() {
   const [publishing, setPublishing] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
+  // Sondaggio: aggiunta manuale giocatore
+  const [allPlayers, setAllPlayers] = useState<Player[]>([])
+  const [addBookingPlayer, setAddBookingPlayer] = useState('')
+  const [addingBooking, setAddingBooking] = useState(false)
+  const [closingSurvey, setClosingSurvey] = useState(false)
+
+  // Generazione squadre
+  const [generatedTeams, setGeneratedTeams] = useState<GeneratedTeams | null>(null)
+  const [generating, setGenerating] = useState(false)
+  const [confirming, setConfirming] = useState(false)
+  // Stato locale delle squadre per lo scambio manuale
+  const [draftTeamA, setDraftTeamA] = useState<PlayerOverall[]>([])
+  const [draftTeamB, setDraftTeamB] = useState<PlayerOverall[]>([])
+
   useEffect(() => {
     getKnownFields().then(setKnownFields)
+    supabase
+      .from('players')
+      .select('*')
+      .order('name')
+      .then(({ data: pd }) => setAllPlayers((pd ?? []) as Player[]))
   }, [])
 
   useEffect(() => {
@@ -70,6 +101,7 @@ export default function MatchEdit() {
   const goalsByTeam = (team: Team) => goals.filter((g) => g.team === team)
   const isPublished = pagelle.length > 0 && pagelle.every((p) => p.published_at)
 
+  // --- Azioni info partita ---
   async function handleSaveResult() {
     if (!id) return
     setSavingResult(true)
@@ -166,18 +198,147 @@ export default function MatchEdit() {
     if (!id || !confirm('Eliminare definitivamente questa partita? Risultato, marcatori e pagelle verranno rimossi.'))
       return
     setDeleting(true)
-    const { error } = await supabase.from('matches').delete().eq('id', id)
+    const { error: delErr } = await supabase.from('matches').delete().eq('id', id)
     setDeleting(false)
-    if (error) {
-      alert(error.message)
+    if (delErr) {
+      alert(delErr.message)
       return
     }
     await logActivity('partita_eliminata', { matchId: id, data: match.match_date })
     navigate('/admin/partite')
   }
 
+  // --- Azioni sondaggio ---
+  async function handleAddBooking() {
+    if (!id || !addBookingPlayer) return
+    setAddingBooking(true)
+    await supabase.from('match_bookings').insert({ match_id: id, player_id: addBookingPlayer })
+    logActivity('prenotazione_aggiunta', {
+      matchId: id,
+      giocatore: allPlayers.find(p => p.id === addBookingPlayer)?.name,
+    })
+    setAddBookingPlayer('')
+    setAddingBooking(false)
+    refetchBookings()
+  }
+
+  async function handleRemoveBooking(playerId: string, playerName: string) {
+    if (!id) return
+    await supabase.from('match_bookings').delete().eq('match_id', id).eq('player_id', playerId)
+    logActivity('prenotazione_rimossa', { matchId: id, giocatore: playerName })
+    refetchBookings()
+  }
+
+  async function handleCloseSurvey() {
+    if (!id || !confirm('Chiudere il sondaggio? I giocatori non potranno più prenotarsi.')) return
+    setClosingSurvey(true)
+    await supabase.from('matches').update({ booking_open: false }).eq('id', id)
+    logActivity('sondaggio_chiuso', { matchId: id, prenotazioni: bookings.length })
+    setClosingSurvey(false)
+    refetch()
+  }
+
+  // --- Generazione squadre ---
+  async function handleGenerateTeams() {
+    if (!id) return
+    setGenerating(true)
+    setGeneratedTeams(null)
+
+    const seasonId = await getCurrentSeasonId()
+    const allStats = seasonId ? await computeStatistiche(seasonId) : []
+
+    // Fetch rating_value (overall impostato dall'admin) per giocatori senza statistiche
+    const { data: ratingsData } = await supabase
+      .from('ratings')
+      .select('player_id, rating_value')
+      .in('player_id', bookings.map(b => b.player_id))
+    const ratingMap = new Map((ratingsData ?? []).map(r => [r.player_id, Number(r.rating_value)]))
+
+    const goalsMax = Math.max(1, ...allStats.map(s => s.golFatti))
+
+    const players: PlayerOverall[] = bookings.map(b => {
+      const stats = allStats.find(s => s.player.id === b.player_id)
+      const fallback = ratingMap.get(b.player_id) ?? 50
+      const overall = stats
+        ? computeOverall(stats, goalsMax, fallback)
+        : fallback
+      return { playerId: b.player_id, name: b.name, overall }
+    })
+
+    const result = generateBalancedTeams(players)
+    setGeneratedTeams(result)
+    setDraftTeamA(result.teamA)
+    setDraftTeamB(result.teamB)
+    setGenerating(false)
+
+    logActivity('squadre_generate', {
+      matchId: id,
+      avgA: result.avgA,
+      avgB: result.avgB,
+      diff: result.diff,
+    })
+  }
+
+  function swapPlayer(from: 'A' | 'B', playerId: string) {
+    if (from === 'A') {
+      const player = draftTeamA.find(p => p.playerId === playerId)
+      if (!player) return
+      setDraftTeamA(prev => prev.filter(p => p.playerId !== playerId))
+      setDraftTeamB(prev => [...prev, player])
+    } else {
+      const player = draftTeamB.find(p => p.playerId === playerId)
+      if (!player) return
+      setDraftTeamB(prev => prev.filter(p => p.playerId !== playerId))
+      setDraftTeamA(prev => [...prev, player])
+    }
+  }
+
+  function avgOverall(arr: PlayerOverall[]) {
+    return arr.length === 0 ? 0 : Math.round(arr.reduce((s, p) => s + p.overall, 0) / arr.length)
+  }
+
+  async function handleConfirmTeams() {
+    if (!id) return
+    setConfirming(true)
+
+    const rows = [
+      ...draftTeamA.map(p => ({ match_id: id, player_id: p.playerId, team: 'A' as Team })),
+      ...draftTeamB.map(p => ({ match_id: id, player_id: p.playerId, team: 'B' as Team })),
+    ]
+    await supabase.from('match_players').insert(rows)
+
+    // Salva overall aggiornato in ratings
+    await Promise.all(
+      [...draftTeamA, ...draftTeamB].map(p =>
+        supabase
+          .from('ratings')
+          .upsert({ player_id: p.playerId, rating_value: p.overall, fascia: overallToFascia(p.overall), updated_at: new Date().toISOString() }, { onConflict: 'player_id' })
+      )
+    )
+
+    setConfirming(false)
+    setGeneratedTeams(null)
+    refetch()
+  }
+
+  function overallToFascia(v: number): 'A' | 'B' | 'C' | 'D' {
+    if (v >= 75) return 'A'
+    if (v >= 55) return 'B'
+    if (v >= 35) return 'C'
+    return 'D'
+  }
+
+  const bookedNotInMatch = bookings.filter(
+    b => !matchPlayers.some(mp => mp.player_id === b.player_id)
+  )
+  const alreadyBookedIds = new Set(bookings.map(b => b.player_id))
+  const availableToAdd = allPlayers.filter(p => !alreadyBookedIds.has(p.id))
+
+  const canGenerate = bookings.length >= MAX_PLAYERS && matchPlayers.length === 0
+
   return (
     <div className="p-4 pb-12">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-field-green-dark">
           {new Date(match.match_date).toLocaleDateString('it-IT', {
@@ -187,6 +348,11 @@ export default function MatchEdit() {
           })}
         </h1>
         <div className="flex gap-2">
+          {match.booking_open && (
+            <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700">
+              Sondaggio aperto
+            </span>
+          )}
           <span
             className={`rounded-full px-2 py-0.5 text-xs ${
               match.status === 'completed'
@@ -204,6 +370,7 @@ export default function MatchEdit() {
         </div>
       </div>
 
+      {/* Info partita */}
       <div className="mt-2 space-y-2 rounded-xl bg-white p-3 shadow">
         <div className="grid grid-cols-2 gap-2">
           <div>
@@ -248,25 +415,212 @@ export default function MatchEdit() {
         </button>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-3">
-        <div className="rounded-xl bg-white p-3 shadow">
-          <h3 className="mb-2 font-medium text-field-green-dark">Squadra A</h3>
-          <ul className="space-y-1 text-sm">
-            {teamA.map((p) => (
-              <li key={p.id}>{p.name}</li>
-            ))}
-          </ul>
-        </div>
-        <div className="rounded-xl bg-white p-3 shadow">
-          <h3 className="mb-2 font-medium text-field-green-dark">Squadra B</h3>
-          <ul className="space-y-1 text-sm">
-            {teamB.map((p) => (
-              <li key={p.id}>{p.name}</li>
-            ))}
-          </ul>
-        </div>
-      </div>
+      {/* ===== SEZIONE SONDAGGIO ===== */}
+      {(match.booking_open || (bookedNotInMatch.length > 0 && matchPlayers.length === 0)) && !bookingsLoading && (
+        <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-4">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold text-blue-800">
+              Sondaggio prenotazioni
+            </h2>
+            <span className="text-sm font-bold text-blue-700">
+              {bookings.length}/{MAX_PLAYERS}
+            </span>
+          </div>
 
+          {/* Lista prenotati */}
+          <div className="mt-3 space-y-1">
+            {bookings.map((b) => (
+              <div key={b.id} className="flex items-center justify-between rounded-lg bg-white px-3 py-1.5">
+                <span className="text-sm font-medium">{b.name}</span>
+                <button
+                  onClick={() => handleRemoveBooking(b.player_id, b.name)}
+                  className="text-xs text-red-500 hover:text-red-700"
+                >
+                  Rimuovi
+                </button>
+              </div>
+            ))}
+            {bookings.length === 0 && (
+              <p className="text-sm text-blue-600">Nessuna prenotazione ancora.</p>
+            )}
+          </div>
+
+          {/* Aggiungi giocatore manualmente */}
+          {match.booking_open && bookings.length < MAX_PLAYERS && (
+            <div className="mt-3 flex gap-2">
+              <select
+                value={addBookingPlayer}
+                onChange={(e) => setAddBookingPlayer(e.target.value)}
+                className="flex-1 rounded-lg border border-blue-300 bg-white px-2 py-1.5 text-sm"
+              >
+                <option value="">+ Aggiungi giocatore</option>
+                {availableToAdd.map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+              <button
+                onClick={handleAddBooking}
+                disabled={!addBookingPlayer || addingBooking}
+                className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white disabled:opacity-50"
+              >
+                Aggiungi
+              </button>
+            </div>
+          )}
+
+          {/* Chiudi sondaggio */}
+          {match.booking_open && (
+            <button
+              onClick={handleCloseSurvey}
+              disabled={closingSurvey}
+              className="mt-3 w-full rounded-lg border border-blue-400 bg-white px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-50"
+            >
+              {closingSurvey ? 'Chiusura...' : 'Chiudi sondaggio'}
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* ===== GENERAZIONE SQUADRE ===== */}
+      {!match.booking_open && matchPlayers.length === 0 && bookings.length > 0 && (
+        <div className="mt-4 rounded-xl border border-field-green/30 bg-field-green/5 p-4">
+          <h2 className="font-semibold text-field-green-dark">Genera squadre bilanciate</h2>
+          <p className="mt-1 text-sm text-gray-600">
+            {bookings.length} giocatori prenotati.
+            {bookings.length < MAX_PLAYERS && (
+              <span className="text-field-orange">
+                {' '}Servono {MAX_PLAYERS - bookings.length} prenotazioni in più per generare le squadre.
+              </span>
+            )}
+          </p>
+
+          {!generatedTeams ? (
+            <button
+              onClick={handleGenerateTeams}
+              disabled={!canGenerate || generating}
+              className="mt-3 w-full rounded-lg bg-field-green px-4 py-2 text-sm font-medium text-white hover:bg-field-green-dark disabled:opacity-50"
+            >
+              {generating ? 'Generazione in corso...' : 'Genera squadre bilanciate'}
+            </button>
+          ) : (
+            <div className="mt-3">
+              {/* Anteprima squadre */}
+              <div className="grid grid-cols-2 gap-3">
+                {/* Squadra A */}
+                <div className="rounded-xl bg-white p-3 shadow">
+                  <div className="mb-2 flex items-center justify-between">
+                    <h3 className="font-semibold text-field-green-dark">Squadra A</h3>
+                    <span className="rounded-full bg-field-green/10 px-2 py-0.5 text-xs font-bold text-field-green-dark">
+                      Overall {avgOverall(draftTeamA)}
+                    </span>
+                  </div>
+                  <ul className="space-y-1">
+                    {draftTeamA.map(p => (
+                      <li key={p.playerId} className="flex items-center justify-between text-sm">
+                        <span>{p.name}</span>
+                        <div className="flex items-center gap-1">
+                          <span className="rounded bg-field-green/10 px-1.5 text-xs font-bold text-field-green-dark">
+                            {p.overall}
+                          </span>
+                          <button
+                            onClick={() => swapPlayer('A', p.playerId)}
+                            className="text-xs text-gray-400 hover:text-field-orange"
+                            title="Sposta in B"
+                          >
+                            →B
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* Squadra B */}
+                <div className="rounded-xl bg-white p-3 shadow">
+                  <div className="mb-2 flex items-center justify-between">
+                    <h3 className="font-semibold text-field-green-dark">Squadra B</h3>
+                    <span className="rounded-full bg-field-orange/10 px-2 py-0.5 text-xs font-bold text-field-orange">
+                      Overall {avgOverall(draftTeamB)}
+                    </span>
+                  </div>
+                  <ul className="space-y-1">
+                    {draftTeamB.map(p => (
+                      <li key={p.playerId} className="flex items-center justify-between text-sm">
+                        <span>{p.name}</span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => swapPlayer('B', p.playerId)}
+                            className="text-xs text-gray-400 hover:text-field-green"
+                            title="Sposta in A"
+                          >
+                            A←
+                          </button>
+                          <span className="rounded bg-field-orange/10 px-1.5 text-xs font-bold text-field-orange">
+                            {p.overall}
+                          </span>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+
+              <p className="mt-2 text-center text-xs text-gray-500">
+                Differenza overall: {Math.abs(avgOverall(draftTeamA) - avgOverall(draftTeamB))} punto/i
+                {draftTeamA.length !== 5 || draftTeamB.length !== 5 ? (
+                  <span className="ml-1 text-red-500">
+                    (le squadre devono avere 5 giocatori ciascuna)
+                  </span>
+                ) : null}
+              </p>
+
+              <div className="mt-3 flex gap-2">
+                <button
+                  onClick={() => setGeneratedTeams(null)}
+                  className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                >
+                  Rigenera
+                </button>
+                <button
+                  onClick={handleConfirmTeams}
+                  disabled={
+                    confirming ||
+                    draftTeamA.length !== 5 ||
+                    draftTeamB.length !== 5
+                  }
+                  className="flex-1 rounded-lg bg-field-green px-3 py-2 text-sm font-medium text-white hover:bg-field-green-dark disabled:opacity-50"
+                >
+                  {confirming ? 'Salvataggio...' : 'Conferma squadre'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ===== SQUADRE (già assegnate) ===== */}
+      {matchPlayers.length > 0 && (
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <div className="rounded-xl bg-white p-3 shadow">
+            <h3 className="mb-2 font-medium text-field-green-dark">Squadra A</h3>
+            <ul className="space-y-1 text-sm">
+              {teamA.map((p) => (
+                <li key={p.id}>{p.name}</li>
+              ))}
+            </ul>
+          </div>
+          <div className="rounded-xl bg-white p-3 shadow">
+            <h3 className="mb-2 font-medium text-field-green-dark">Squadra B</h3>
+            <ul className="space-y-1 text-sm">
+              {teamB.map((p) => (
+                <li key={p.id}>{p.name}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+
+      {/* ===== RISULTATO ===== */}
       <div className="mt-4 rounded-xl bg-white p-4 shadow">
         <h2 className="font-medium">Risultato</h2>
         <div className="mt-2 flex items-center gap-3">
@@ -301,121 +655,127 @@ export default function MatchEdit() {
         </p>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-3">
-        {(['A', 'B'] as Team[]).map((team) => (
-          <div key={team} className="rounded-xl bg-white p-3 shadow">
-            <h3 className="mb-2 font-medium text-field-green-dark">Marcatori Squadra {team}</h3>
-            <ul className="space-y-1 text-sm">
-              {goalsByTeam(team).map((g) => (
-                <li key={g.id} className="flex items-center justify-between">
-                  <span>
-                    ⚽ {g.name} {g.is_own_goal && <span className="text-red-600">(autogol)</span>}
-                  </span>
-                  <button onClick={() => handleRemoveGoal(g.id)} className="text-xs text-red-600">
-                    Rimuovi
-                  </button>
-                </li>
-              ))}
-            </ul>
-            <div className="mt-2 flex gap-2">
-              <select
-                value={newGoalPlayer[team]}
-                onChange={(e) => setNewGoalPlayer((prev) => ({ ...prev, [team]: e.target.value }))}
-                className="flex-1 rounded-lg border border-gray-300 px-2 py-1 text-sm"
-              >
-                <option value="">Giocatore...</option>
-                {(ownGoal[team] ? (team === 'A' ? teamB : teamA) : team === 'A' ? teamA : teamB).map((p) => (
-                  <option key={p.player_id} value={p.player_id}>
-                    {p.name}
-                  </option>
+      {/* ===== MARCATORI ===== */}
+      {matchPlayers.length > 0 && (
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          {(['A', 'B'] as Team[]).map((team) => (
+            <div key={team} className="rounded-xl bg-white p-3 shadow">
+              <h3 className="mb-2 font-medium text-field-green-dark">Marcatori Squadra {team}</h3>
+              <ul className="space-y-1 text-sm">
+                {goalsByTeam(team).map((g) => (
+                  <li key={g.id} className="flex items-center justify-between">
+                    <span>
+                      ⚽ {g.name} {g.is_own_goal && <span className="text-red-600">(autogol)</span>}
+                    </span>
+                    <button onClick={() => handleRemoveGoal(g.id)} className="text-xs text-red-600">
+                      Rimuovi
+                    </button>
+                  </li>
                 ))}
-              </select>
-              <button
-                onClick={() => handleAddGoal(team)}
-                disabled={!newGoalPlayer[team]}
-                className="rounded-lg bg-field-green px-3 py-1 text-sm text-white disabled:opacity-50"
-              >
-                + Gol
-              </button>
-            </div>
-            <label className="mt-2 flex items-center gap-1 text-xs text-red-600">
-              <input
-                type="checkbox"
-                checked={ownGoal[team]}
-                onChange={(e) => {
-                  setOwnGoal((prev) => ({ ...prev, [team]: e.target.checked }))
-                  setNewGoalPlayer((prev) => ({ ...prev, [team]: '' }))
-                }}
-              />
-              Autogol (giocatore della squadra avversaria)
-            </label>
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-4">
-        <h2 className="font-medium text-field-green-dark">Pagelle</h2>
-        <div className="mt-2 space-y-3">
-          {matchPlayers.map((mp) => {
-            const draft = drafts[mp.player_id]
-            if (!draft) return null
-            return (
-              <div key={mp.id} className="rounded-xl bg-white p-3 shadow">
-                <div className="flex items-center justify-between">
-                  <p className="font-medium">{mp.name}</p>
-                  <label className="flex items-center gap-1 text-xs text-field-orange">
-                    <input
-                      type="radio"
-                      name="mvp"
-                      checked={draft.is_mvp}
-                      onChange={() => setMvp(mp.player_id)}
-                    />
-                    MVP
-                  </label>
-                </div>
-                <div className="mt-2 flex gap-2">
-                  <input
-                    placeholder="Voto (es. 7+)"
-                    value={draft.voto}
-                    onChange={(e) => updateDraft(mp.player_id, { voto: e.target.value })}
-                    className="w-24 rounded-lg border border-gray-300 px-2 py-1 text-sm"
-                  />
-                  <input
-                    placeholder="Titolo"
-                    value={draft.titolo}
-                    onChange={(e) => updateDraft(mp.player_id, { titolo: e.target.value })}
-                    className="flex-1 rounded-lg border border-gray-300 px-2 py-1 text-sm"
-                  />
-                </div>
-                <textarea
-                  placeholder="Descrizione"
-                  value={draft.descrizione}
-                  onChange={(e) => updateDraft(mp.player_id, { descrizione: e.target.value })}
-                  className="mt-2 w-full rounded-lg border border-gray-300 px-2 py-1 text-sm"
-                  rows={2}
-                />
+              </ul>
+              <div className="mt-2 flex gap-2">
+                <select
+                  value={newGoalPlayer[team]}
+                  onChange={(e) => setNewGoalPlayer((prev) => ({ ...prev, [team]: e.target.value }))}
+                  className="flex-1 rounded-lg border border-gray-300 px-2 py-1 text-sm"
+                >
+                  <option value="">Giocatore...</option>
+                  {(ownGoal[team] ? (team === 'A' ? teamB : teamA) : team === 'A' ? teamA : teamB).map((p) => (
+                    <option key={p.player_id} value={p.player_id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => handleAddGoal(team)}
+                  disabled={!newGoalPlayer[team]}
+                  className="rounded-lg bg-field-green px-3 py-1 text-sm text-white disabled:opacity-50"
+                >
+                  + Gol
+                </button>
               </div>
-            )
-          })}
+              <label className="mt-2 flex items-center gap-1 text-xs text-red-600">
+                <input
+                  type="checkbox"
+                  checked={ownGoal[team]}
+                  onChange={(e) => {
+                    setOwnGoal((prev) => ({ ...prev, [team]: e.target.checked }))
+                    setNewGoalPlayer((prev) => ({ ...prev, [team]: '' }))
+                  }}
+                />
+                Autogol (giocatore della squadra avversaria)
+              </label>
+            </div>
+          ))}
         </div>
+      )}
 
-        <div className="mt-3 flex gap-2">
-          <button
-            onClick={handleSaveDraft}
-            disabled={savingPagelle}
-            className="flex-1 rounded-lg border border-field-green px-4 py-2 text-sm font-medium text-field-green-dark hover:bg-field-green/5 disabled:opacity-50"
-          >
-            {savingPagelle ? 'Salvataggio...' : 'Salva bozza'}
-          </button>
-          <button
-            onClick={handlePublish}
-            disabled={publishing}
-            className="flex-1 rounded-lg bg-field-orange px-4 py-2 text-sm font-medium text-white hover:bg-field-orange/90 disabled:opacity-50"
-          >
-            {publishing ? 'Pubblicazione...' : 'Pubblica pagelle'}
-          </button>
+      {/* ===== PAGELLE ===== */}
+      {matchPlayers.length > 0 && (
+        <div className="mt-4">
+          <h2 className="font-medium text-field-green-dark">Pagelle</h2>
+          <div className="mt-2 space-y-3">
+            {matchPlayers.map((mp) => {
+              const draft = drafts[mp.player_id]
+              if (!draft) return null
+              return (
+                <div key={mp.id} className="rounded-xl bg-white p-3 shadow">
+                  <div className="flex items-center justify-between">
+                    <p className="font-medium">{mp.name}</p>
+                    <label className="flex items-center gap-1 text-xs text-field-orange">
+                      <input
+                        type="radio"
+                        name="mvp"
+                        checked={draft.is_mvp}
+                        onChange={() => setMvp(mp.player_id)}
+                      />
+                      MVP
+                    </label>
+                  </div>
+                  <div className="mt-2 flex gap-2">
+                    <input
+                      placeholder="Voto (es. 7+)"
+                      value={draft.voto}
+                      onChange={(e) => updateDraft(mp.player_id, { voto: e.target.value })}
+                      className="w-24 rounded-lg border border-gray-300 px-2 py-1 text-sm"
+                    />
+                    <input
+                      placeholder="Titolo"
+                      value={draft.titolo}
+                      onChange={(e) => updateDraft(mp.player_id, { titolo: e.target.value })}
+                      className="flex-1 rounded-lg border border-gray-300 px-2 py-1 text-sm"
+                    />
+                  </div>
+                  <textarea
+                    placeholder="Descrizione"
+                    value={draft.descrizione}
+                    onChange={(e) => updateDraft(mp.player_id, { descrizione: e.target.value })}
+                    className="mt-2 w-full rounded-lg border border-gray-300 px-2 py-1 text-sm"
+                    rows={2}
+                  />
+                </div>
+              )
+            })}
+          </div>
+
+          <div className="mt-3 flex gap-2">
+            <button
+              onClick={handleSaveDraft}
+              disabled={savingPagelle}
+              className="flex-1 rounded-lg border border-field-green px-4 py-2 text-sm font-medium text-field-green-dark hover:bg-field-green/5 disabled:opacity-50"
+            >
+              {savingPagelle ? 'Salvataggio...' : 'Salva bozza'}
+            </button>
+            <button
+              onClick={handlePublish}
+              disabled={publishing}
+              className="flex-1 rounded-lg bg-field-orange px-4 py-2 text-sm font-medium text-white hover:bg-field-orange/90 disabled:opacity-50"
+            >
+              {publishing ? 'Pubblicazione...' : 'Pubblica pagelle'}
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       <button
         onClick={handleDeleteMatch}
