@@ -4,7 +4,13 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import type { Match, MatchResult } from '../types/database'
 
-type MatchWithResult = Match & { result: MatchResult | null; pagelle: { published_at: string | null }[] }
+const MAX_PLAYERS = 10
+
+type MatchWithResult = Match & {
+  result: MatchResult | null
+  pagelle: { published_at: string | null }[]
+  match_bookings: { id: string }[]
+}
 
 export default function Partite() {
   const { isAdmin } = useAuth()
@@ -16,7 +22,7 @@ export default function Partite() {
       setLoading(true)
       const { data } = await supabase
         .from('matches')
-        .select('*, result:match_results(score_a, score_b, id, match_id), pagelle(published_at)')
+        .select('*, result:match_results(score_a, score_b, id, match_id), pagelle(published_at), match_bookings(id)')
         .order('match_date', { ascending: false })
 
       setMatches(
@@ -64,6 +70,11 @@ export default function Partite() {
                 })}
               </p>
               <div className="flex gap-2">
+                {m.booking_open && (
+                  <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700">
+                    Sondaggio {m.match_bookings.length}/{MAX_PLAYERS}
+                  </span>
+                )}
                 <span
                   className={`rounded-full px-2 py-0.5 text-xs ${
                     m.status === 'completed'

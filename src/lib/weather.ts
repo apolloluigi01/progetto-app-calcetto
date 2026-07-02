@@ -34,7 +34,7 @@ export function describeWeatherCode(code: number): { label: string; icon: string
   return WEATHER_CODE_MAP[code] ?? { label: 'N/D', icon: '🌡️' }
 }
 
-async function geocodeField(query: string): Promise<{ lat: number; lon: number; name: string } | null> {
+async function geocodeQuery(query: string): Promise<{ lat: number; lon: number; name: string } | null> {
   const res = await fetch(
     `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=1&language=it&format=json`
   )
@@ -45,12 +45,31 @@ async function geocodeField(query: string): Promise<{ lat: number; lon: number; 
   return { lat: result.latitude, lon: result.longitude, name: result.name }
 }
 
+// Il campo inserito è spesso il nome dell'impianto (es. "Centro Sportivo Comunale") e non una
+// città, quindi la geocodifica sull'intera stringa fallisce quasi sempre. Come fallback si
+// prova con le ultime 1-2 parole, che di solito corrispondono al toponimo/città.
+async function geocodeField(query: string): Promise<{ lat: number; lon: number; name: string } | null> {
+  const trimmed = query.trim()
+  const words = trimmed.split(/[\s,]+/).filter(Boolean)
+  const candidates = [trimmed]
+  if (words.length > 1) {
+    candidates.push(words.slice(-2).join(' '))
+    candidates.push(words[words.length - 1])
+  }
+
+  for (const candidate of candidates) {
+    const result = await geocodeQuery(candidate)
+    if (result) return result
+  }
+  return null
+}
+
 export async function getMatchWeather(field: string, matchDate: string): Promise<WeatherForecast | null> {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
-  const target = new Date(matchDate)
+  const target = new Date(`${matchDate}T00:00:00`)
   const daysAhead = Math.round((target.getTime() - today.getTime()) / 86400000)
-  if (daysAhead < 0 || daysAhead > 15) return null
+  if (daysAhead < 0 || daysAhead > 16) return null
 
   const place = await geocodeField(field)
   if (!place) return null

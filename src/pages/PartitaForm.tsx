@@ -56,10 +56,8 @@ export default function PartitaForm() {
   const teamACount = selectedIds.filter((id) => teams[id] === 'A').length
   const teamBCount = selectedIds.filter((id) => teams[id] === 'B').length
 
-  const canSubmit =
-    matchDate &&
-    (modalita === 'sondaggio' ||
-      (selectedIds.length === 10 && teamACount === 5 && teamBCount === 5))
+  // NOTA: vincolo dei 10 giocatori temporaneamente disattivato per testing
+  const canSubmit = matchDate && (modalita === 'sondaggio' || selectedIds.length > 0)
 
   async function handleSubmit() {
     setError(null)
@@ -205,7 +203,7 @@ export default function PartitaForm() {
             </div>
           </div>
 
-          {selectedIds.length === 10 && (
+          {selectedIds.length > 0 && (
             <div className="mt-4 rounded-xl bg-white p-4 shadow">
               <h2 className="font-medium">
                 Squadre (A: {teamACount}/5 — B: {teamBCount}/5)
