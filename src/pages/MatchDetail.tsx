@@ -80,6 +80,8 @@ export default function MatchDetail() {
   const isParticipant = !!player && matchPlayers.some((mp) => mp.player_id === player.id)
   const otherParticipants = participants.filter((p) => p.player_id !== player?.id)
   const alreadyVotedAll = player ? hasVotedAll(player.id) : false
+  // Solo admin/superadmin possono votare: il conteggio va fatto sul totale degli admin partecipanti, non su tutti i giocatori.
+  const adminVoters = participants.filter((p) => p.role === 'admin' || p.role === 'superadmin')
 
   return (
     <div className="p-4 pb-12">
@@ -104,6 +106,11 @@ export default function MatchDetail() {
           {match.booking_open && (
             <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700">
               Sondaggio aperto
+            </span>
+          )}
+          {isAdmin && match.voting_open && (
+            <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs text-purple-700">
+              Votazioni in corso
             </span>
           )}
           <span
@@ -193,7 +200,7 @@ export default function MatchDetail() {
           <div className="flex items-center justify-between">
             <h3 className="font-semibold text-purple-800">🗳️ Vota i tuoi compagni</h3>
             <span className="text-xs text-purple-500">
-              {voterIds.size}/{matchPlayers.length} hanno votato
+              {voterIds.size}/{adminVoters.length} hanno votato
             </span>
           </div>
           <p className="mt-1 text-xs text-purple-500">

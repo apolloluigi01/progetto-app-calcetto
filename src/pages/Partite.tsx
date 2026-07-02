@@ -75,6 +75,11 @@ export default function Partite() {
                     Sondaggio {m.match_bookings.length}/{MAX_PLAYERS}
                   </span>
                 )}
+                {isAdmin && m.voting_open && (
+                  <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs text-purple-700">
+                    Votazioni in corso
+                  </span>
+                )}
                 <span
                   className={`rounded-full px-2 py-0.5 text-xs ${
                     m.status === 'completed'
