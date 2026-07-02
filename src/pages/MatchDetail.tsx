@@ -12,7 +12,7 @@ const MAX_PLAYERS = 10
 
 export default function MatchDetail() {
   const { id } = useParams<{ id: string }>()
-  const { player, isAdmin } = useAuth()
+  const { player, isAdmin, isSuperAdmin } = useAuth()
   const { data, loading, error } = useMatchDetail(id)
   const {
     bookings,
@@ -82,6 +82,8 @@ export default function MatchDetail() {
   const alreadyVotedAll = player ? hasVotedAll(player.id) : false
   // Solo admin/superadmin possono votare: il conteggio va fatto sul totale degli admin partecipanti, non su tutti i giocatori.
   const adminVoters = participants.filter((p) => p.role === 'admin' || p.role === 'superadmin')
+  // Un admin può votare solo se partecipa alla partita; un superadmin può votare anche partite a cui non ha giocato.
+  const canVote = isAdmin && (isParticipant || isSuperAdmin)
 
   return (
     <div className="p-4 pb-12">
@@ -195,7 +197,7 @@ export default function MatchDetail() {
       )}
 
       {/* ===== SEZIONE VOTAZIONI (solo admin/superadmin) ===== */}
-      {match.voting_open && isAdmin && isParticipant && otherParticipants.length > 0 && (
+      {match.voting_open && canVote && otherParticipants.length > 0 && (
         <div className="mt-4 rounded-xl border border-purple-200 bg-purple-50 p-4">
           <div className="flex items-center justify-between">
             <h3 className="font-semibold text-purple-800">🗳️ Vota i tuoi compagni</h3>
@@ -266,7 +268,7 @@ export default function MatchDetail() {
         </div>
       )}
 
-      {match.voting_open && isAdmin && !isParticipant && (
+      {match.voting_open && isAdmin && !isParticipant && !isSuperAdmin && (
         <div className="mt-4 rounded-xl border border-purple-100 bg-purple-50 p-3 text-center">
           <p className="text-sm text-purple-600">
             🗳️ Le votazioni sono aperte per i partecipanti a questa partita.
