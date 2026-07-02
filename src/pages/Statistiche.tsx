@@ -4,9 +4,9 @@ import { useAuth } from '../contexts/AuthContext'
 import { useStatistiche } from '../hooks/useStatistiche'
 import { STAT_CONFIG, getRanking, type StatKey } from '../lib/statistiche'
 
-const STAT_KEYS: StatKey[] = ['marcatori', 'mvp', 'winrate', 'sconfitte', 'mediavoto', 'autogol']
-const TOP_STAT_KEYS: StatKey[] = ['marcatori', 'mvp', 'winrate']
-const BOTTOM_STAT_KEYS: StatKey[] = ['sconfitte', 'mediavoto', 'autogol']
+const STAT_KEYS: StatKey[] = ['overall', 'marcatori', 'mvp', 'winrate', 'sconfitte', 'mediavoto', 'autogol']
+const TOP_STAT_KEYS: StatKey[] = ['overall', 'marcatori', 'mvp']
+const BOTTOM_STAT_KEYS: StatKey[] = ['winrate', 'sconfitte', 'mediavoto']
 
 function StatPreviewCard({ statKey, stats }: { statKey: StatKey; stats: ReturnType<typeof useStatistiche>['stats'] }) {
   const config = STAT_CONFIG[statKey]

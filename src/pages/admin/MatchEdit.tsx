@@ -6,9 +6,7 @@ import { useMatchBookings } from '../../hooks/useMatchBookings'
 import { useMatchVoting } from '../../hooks/useMatchVoting'
 import { getKnownFields } from '../../lib/fields'
 import { logActivity } from '../../lib/activityLog'
-import { computeStatistiche } from '../../lib/statistiche'
-import { computeOverall, generateBalancedTeams } from '../../lib/teamGeneration'
-import { getCurrentSeasonId } from '../../lib/seasons'
+import { computeOverallsForPlayers, generateBalancedTeams } from '../../lib/teamGeneration'
 import { formatVote } from '../../lib/voting'
 import type { Player, Team } from '../../types/database'
 import type { PlayerOverall, GeneratedTeams } from '../../lib/teamGeneration'
@@ -289,26 +287,9 @@ export default function MatchEdit() {
     setGenerating(true)
     setGeneratedTeams(null)
 
-    const seasonId = await getCurrentSeasonId()
-    const allStats = seasonId ? await computeStatistiche(seasonId) : []
-
-    // Fetch rating_value (overall impostato dall'admin) per giocatori senza statistiche
-    const { data: ratingsData } = await supabase
-      .from('ratings')
-      .select('player_id, rating_value')
-      .in('player_id', bookings.map(b => b.player_id))
-    const ratingMap = new Map((ratingsData ?? []).map(r => [r.player_id, Number(r.rating_value)]))
-
-    const goalsMax = Math.max(1, ...allStats.map(s => s.golFatti))
-
-    const players: PlayerOverall[] = bookings.map(b => {
-      const stats = allStats.find(s => s.player.id === b.player_id)
-      const fallback = ratingMap.get(b.player_id) ?? 50
-      const overall = stats
-        ? computeOverall(stats, goalsMax, fallback)
-        : fallback
-      return { playerId: b.player_id, name: b.name, overall }
-    })
+    const players = await computeOverallsForPlayers(
+      bookings.map((b) => ({ id: b.player_id, name: b.name }))
+    )
 
     const result = generateBalancedTeams(players)
     setGeneratedTeams(result)
@@ -717,8 +698,9 @@ export default function MatchEdit() {
             {!match.voting_open ? (
               <button
                 onClick={handleOpenVoting}
-                disabled={openingVoting}
-                className="flex-1 rounded-lg bg-purple-600 px-3 py-2 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50"
+                disabled={openingVoting || isPublished}
+                title={isPublished ? 'Le pagelle sono già pubblicate' : undefined}
+                className="flex-1 rounded-lg bg-purple-600 px-3 py-2 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {openingVoting ? 'Apertura...' : '🔓 Apri votazioni'}
               </button>
@@ -915,12 +897,18 @@ export default function MatchEdit() {
             </button>
             <button
               onClick={handlePublish}
-              disabled={publishing}
-              className="flex-1 rounded-lg bg-field-orange px-4 py-2 text-sm font-medium text-white hover:bg-field-orange/90 disabled:opacity-50"
+              disabled={publishing || match.voting_open}
+              title={match.voting_open ? 'Chiudi prima le votazioni prima di pubblicare' : undefined}
+              className="flex-1 rounded-lg bg-field-orange px-4 py-2 text-sm font-medium text-white hover:bg-field-orange/90 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {publishing ? 'Pubblicazione...' : 'Pubblica pagelle'}
             </button>
           </div>
+          {match.voting_open && (
+            <p className="mt-2 text-xs text-red-500">
+              ⚠️ Chiudi le votazioni prima di pubblicare le pagelle.
+            </p>
+          )}
         </div>
       )}
 

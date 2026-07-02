@@ -187,8 +187,8 @@ export default function MatchDetail() {
         </div>
       )}
 
-      {/* ===== SEZIONE VOTAZIONI (giocatore) ===== */}
-      {match.voting_open && isParticipant && otherParticipants.length > 0 && (
+      {/* ===== SEZIONE VOTAZIONI (solo admin/superadmin) ===== */}
+      {match.voting_open && isAdmin && isParticipant && otherParticipants.length > 0 && (
         <div className="mt-4 rounded-xl border border-purple-200 bg-purple-50 p-4">
           <div className="flex items-center justify-between">
             <h3 className="font-semibold text-purple-800">🗳️ Vota i tuoi compagni</h3>
@@ -251,7 +251,15 @@ export default function MatchDetail() {
         </div>
       )}
 
-      {match.voting_open && !isParticipant && !isAdmin && (
+      {match.voting_open && !isAdmin && (
+        <div className="mt-4 rounded-xl border border-purple-100 bg-purple-50 p-3 text-center">
+          <p className="text-sm text-purple-600">
+            🗳️ Le votazioni sono aperte, ma riservate ad admin e superadmin.
+          </p>
+        </div>
+      )}
+
+      {match.voting_open && isAdmin && !isParticipant && (
         <div className="mt-4 rounded-xl border border-purple-100 bg-purple-50 p-3 text-center">
           <p className="text-sm text-purple-600">
             🗳️ Le votazioni sono aperte per i partecipanti a questa partita.

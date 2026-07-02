@@ -4,7 +4,9 @@ import { supabase } from '../lib/supabase'
 import { getOrCreateCurrentSeason } from '../lib/seasons'
 import { getKnownFields } from '../lib/fields'
 import { logActivity } from '../lib/activityLog'
+import { computeOverallsForPlayers, generateBalancedTeams } from '../lib/teamGeneration'
 import type { Player, Team } from '../types/database'
+import type { GeneratedTeams } from '../lib/teamGeneration'
 
 type Modalita = 'manuale' | 'sondaggio'
 
@@ -17,9 +19,11 @@ export default function PartitaForm() {
   const [field, setField] = useState('')
   const [modalita, setModalita] = useState<Modalita>('sondaggio')
   const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [teams, setTeams] = useState<Record<string, Team>>({})
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+
+  const [generatedTeams, setGeneratedTeams] = useState<GeneratedTeams | null>(null)
+  const [generatingTeams, setGeneratingTeams] = useState(false)
 
   useEffect(() => {
     supabase
@@ -33,31 +37,39 @@ export default function PartitaForm() {
   function toggleSelected(playerId: string) {
     setSelected((prev) => {
       const next = new Set(prev)
-      if (next.has(playerId)) {
-        next.delete(playerId)
-        setTeams((t) => {
-          const copy = { ...t }
-          delete copy[playerId]
-          return copy
-        })
-      } else {
-        next.add(playerId)
-        setTeams((t) => ({ ...t, [playerId]: 'A' }))
-      }
+      if (next.has(playerId)) next.delete(playerId)
+      else next.add(playerId)
       return next
     })
   }
 
-  function toggleTeam(playerId: string) {
-    setTeams((prev) => ({ ...prev, [playerId]: prev[playerId] === 'A' ? 'B' : 'A' }))
-  }
-
   const selectedIds = Array.from(selected)
-  const teamACount = selectedIds.filter((id) => teams[id] === 'A').length
-  const teamBCount = selectedIds.filter((id) => teams[id] === 'B').length
+
+  // Le squadre vengono assegnate automaticamente dal sistema in base all'overall dei giocatori scelti.
+  useEffect(() => {
+    if (modalita !== 'manuale' || selectedIds.length === 0) {
+      setGeneratedTeams(null)
+      return
+    }
+    let cancelled = false
+    setGeneratingTeams(true)
+    const chosen = players.filter((p) => selected.has(p.id))
+    computeOverallsForPlayers(chosen.map((p) => ({ id: p.id, name: p.name }))).then((overalls) => {
+      if (cancelled) return
+      setGeneratedTeams(generateBalancedTeams(overalls))
+      setGeneratingTeams(false)
+    })
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modalita, selected, players])
 
   // NOTA: vincolo dei 10 giocatori temporaneamente disattivato per testing
-  const canSubmit = matchDate && (modalita === 'sondaggio' || selectedIds.length > 0)
+  const canSubmit =
+    matchDate &&
+    (modalita === 'sondaggio' ||
+      (selectedIds.length > 0 && generatedTeams !== null && !generatingTeams))
 
   async function handleSubmit() {
     setError(null)
@@ -82,11 +94,11 @@ export default function PartitaForm() {
       if (matchError || !match) throw new Error(matchError?.message ?? 'Errore creazione partita')
 
       if (modalita === 'manuale') {
-        const rows = selectedIds.map((playerId) => ({
-          match_id: match.id,
-          player_id: playerId,
-          team: teams[playerId],
-        }))
+        if (!generatedTeams) throw new Error('Squadre non ancora generate')
+        const rows = [
+          ...generatedTeams.teamA.map((p) => ({ match_id: match.id, player_id: p.playerId, team: 'A' as Team })),
+          ...generatedTeams.teamB.map((p) => ({ match_id: match.id, player_id: p.playerId, team: 'B' as Team })),
+        ]
         const { error: playersError } = await supabase.from('match_players').insert(rows)
         if (playersError) throw new Error(playersError.message)
         logActivity('partita_creata', { matchId: match.id, data: matchDate, campo: field || null, modalita: 'manuale' })
@@ -205,28 +217,42 @@ export default function PartitaForm() {
 
           {selectedIds.length > 0 && (
             <div className="mt-4 rounded-xl bg-white p-4 shadow">
-              <h2 className="font-medium">
-                Squadre (A: {teamACount}/5 — B: {teamBCount}/5)
-              </h2>
-              <div className="mt-2 space-y-1">
-                {selectedIds.map((id) => {
-                  const player = players.find((p) => p.id === id)
-                  return (
-                    <div key={id} className="flex items-center justify-between py-1">
-                      <span>{player?.name}</span>
-                      <button
-                        type="button"
-                        onClick={() => toggleTeam(id)}
-                        className={`rounded-lg px-3 py-1 text-sm font-medium ${
-                          teams[id] === 'A' ? 'bg-field-green text-white' : 'bg-field-orange text-white'
-                        }`}
-                      >
-                        Squadra {teams[id]}
-                      </button>
-                    </div>
-                  )
-                })}
-              </div>
+              <h2 className="font-medium text-gray-800">Squadre (generate automaticamente)</h2>
+              <p className="mt-1 text-xs text-gray-500">
+                L'assegnazione è calcolata dal sistema in base all'overall di ciascun giocatore, per
+                ottenere squadre il più possibile equilibrate.
+              </p>
+              {generatingTeams && <p className="mt-3 text-sm text-gray-500">Calcolo squadre...</p>}
+              {!generatingTeams && generatedTeams && (
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <div className="rounded-lg bg-field-green/5 p-3">
+                    <p className="text-xs font-semibold text-field-green-dark">
+                      Squadra A — Overall {generatedTeams.avgA}
+                    </p>
+                    <ul className="mt-1 space-y-1 text-sm">
+                      {generatedTeams.teamA.map((p) => (
+                        <li key={p.playerId} className="flex items-center justify-between">
+                          <span>{p.name}</span>
+                          <span className="text-xs text-gray-500">{p.overall}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div className="rounded-lg bg-field-orange/5 p-3">
+                    <p className="text-xs font-semibold text-field-orange">
+                      Squadra B — Overall {generatedTeams.avgB}
+                    </p>
+                    <ul className="mt-1 space-y-1 text-sm">
+                      {generatedTeams.teamB.map((p) => (
+                        <li key={p.playerId} className="flex items-center justify-between">
+                          <span>{p.name}</span>
+                          <span className="text-xs text-gray-500">{p.overall}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </>

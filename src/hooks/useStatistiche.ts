@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getCurrentSeasonId } from '../lib/seasons'
 import { computeStatistiche, type PlayerStats } from '../lib/statistiche'
+import { computeOverallsForPlayers } from '../lib/teamGeneration'
 
 export function useStatistiche() {
   const [stats, setStats] = useState<PlayerStats[]>([])
@@ -13,7 +14,12 @@ export function useStatistiche() {
       setError(null)
       try {
         const seasonId = await getCurrentSeasonId()
-        setStats(seasonId ? await computeStatistiche(seasonId) : [])
+        const seasonStats = seasonId ? await computeStatistiche(seasonId) : []
+        const overalls = await computeOverallsForPlayers(
+          seasonStats.map((s) => ({ id: s.player.id, name: s.player.name }))
+        )
+        const overallMap = new Map(overalls.map((o) => [o.playerId, o.overall]))
+        setStats(seasonStats.map((s) => ({ ...s, overall: overallMap.get(s.player.id) ?? null })))
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Errore nel calcolo delle statistiche')
       } finally {

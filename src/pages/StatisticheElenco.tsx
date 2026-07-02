@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { STAT_CONFIG, type StatKey } from '../lib/statistiche'
 
-const STAT_KEYS: StatKey[] = ['marcatori', 'mvp', 'winrate', 'sconfitte', 'mediavoto', 'autogol']
+const STAT_KEYS: StatKey[] = ['overall', 'marcatori', 'mvp', 'winrate', 'sconfitte', 'mediavoto', 'autogol']
 
 export default function StatisticheElenco() {
   return (

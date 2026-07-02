@@ -12,6 +12,7 @@ export interface PlayerStats {
   mvp: number
   voteAvg: number | null
   voteCount: number
+  overall: number | null
 }
 
 export function parseVoto(voto: string): number | null {
@@ -66,6 +67,7 @@ export async function computeStatistiche(seasonId: string): Promise<PlayerStats[
       mvp: 0,
       voteAvg: null,
       voteCount: 0,
+      overall: null,
     }
     statsByPlayer.set(player.id, created)
     return created
@@ -114,7 +116,7 @@ export async function computeStatistiche(seasonId: string): Promise<PlayerStats[
   return [...statsByPlayer.values()]
 }
 
-export type StatKey = 'marcatori' | 'mvp' | 'winrate' | 'sconfitte' | 'mediavoto' | 'autogol'
+export type StatKey = 'overall' | 'marcatori' | 'mvp' | 'winrate' | 'sconfitte' | 'mediavoto' | 'autogol'
 
 interface StatConfig {
   title: string
@@ -128,6 +130,15 @@ interface StatConfig {
 }
 
 export const STAT_CONFIG: Record<StatKey, StatConfig> = {
+  overall: {
+    title: 'Overall',
+    description: 'Valutazione complessiva 1-100 (stile FIFA), calcolata da % vittorie, gol fatti e media voto',
+    color: 'green',
+    sortDir: 'desc',
+    unit: '',
+    getValue: (p) => p.overall,
+    formatValue: (v) => String(v),
+  },
   marcatori: {
     title: 'Migliori Marcatori',
     description: 'Numero di gol segnati in stagione (esclusi gli autogol)',

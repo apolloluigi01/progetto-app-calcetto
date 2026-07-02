@@ -2,14 +2,16 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useStatistiche } from '../hooks/useStatistiche'
+import { useOveralls } from '../hooks/useOveralls'
 import { STAT_CONFIG, type StatKey } from '../lib/statistiche'
 import type { Player } from '../types/database'
 
-const STAT_KEYS: StatKey[] = ['marcatori', 'mvp', 'winrate', 'sconfitte', 'mediavoto', 'autogol']
+const STAT_KEYS: StatKey[] = ['overall', 'marcatori', 'mvp', 'winrate', 'sconfitte', 'mediavoto', 'autogol']
 
 export default function GiocatoreDetail() {
   const { id } = useParams<{ id: string }>()
   const { stats: seasonStats, loading: statsLoading } = useStatistiche()
+  const { overalls } = useOveralls()
 
   const [player, setPlayer] = useState<Player | null>(null)
   const [loading, setLoading] = useState(true)
@@ -39,7 +41,12 @@ export default function GiocatoreDetail() {
 
   return (
     <div className="p-4">
-      <h1 className="text-xl font-semibold text-field-green-dark">{player.name}</h1>
+      <div className="flex items-center gap-3">
+        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-field-green/10 text-lg font-bold text-field-green-dark">
+          {overalls.get(player.id) ?? '-'}
+        </span>
+        <h1 className="text-xl font-semibold text-field-green-dark">{player.name}</h1>
+      </div>
 
       <div className="mt-4 rounded-xl bg-white p-4 shadow">
         {player.nickname && <p className="text-sm text-gray-500">{player.nickname}</p>}

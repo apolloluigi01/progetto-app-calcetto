@@ -1,4 +1,6 @@
-import type { PlayerStats } from './statistiche'
+import { supabase } from './supabase'
+import { computeStatistiche, type PlayerStats } from './statistiche'
+import { getCurrentSeasonId } from './seasons'
 
 export interface PlayerOverall {
   playerId: string
@@ -39,6 +41,35 @@ export function computeOverall(
 
   const raw = winScore * 0.4 + goalsScore * 0.35 + votoScore * 0.25
   return Math.min(100, Math.max(1, Math.round(raw)))
+}
+
+/**
+ * Calcola l'overall di un insieme di giocatori (per playerId), usando le statistiche
+ * della stagione corrente e, in assenza di partite giocate, il rating_value salvato
+ * dall'admin come fallback.
+ */
+export async function computeOverallsForPlayers(
+  players: { id: string; name: string }[]
+): Promise<PlayerOverall[]> {
+  if (players.length === 0) return []
+
+  const seasonId = await getCurrentSeasonId()
+  const allStats = seasonId ? await computeStatistiche(seasonId) : []
+
+  const { data: ratingsData } = await supabase
+    .from('ratings')
+    .select('player_id, rating_value')
+    .in('player_id', players.map((p) => p.id))
+  const ratingMap = new Map((ratingsData ?? []).map((r) => [r.player_id, Number(r.rating_value)]))
+
+  const goalsMax = Math.max(1, ...allStats.map((s) => s.golFatti))
+
+  return players.map((p) => {
+    const stats = allStats.find((s) => s.player.id === p.id)
+    const fallback = ratingMap.get(p.id) ?? 50
+    const overall = stats ? computeOverall(stats, goalsMax, fallback) : fallback
+    return { playerId: p.id, name: p.name, overall }
+  })
 }
 
 /**

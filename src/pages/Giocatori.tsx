@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useOveralls } from '../hooks/useOveralls'
 import type { Player, PlayerRole } from '../types/database'
 
 const roleLabels: Record<PlayerRole, string> = {
@@ -12,6 +13,7 @@ const roleLabels: Record<PlayerRole, string> = {
 export default function Giocatori() {
   const [players, setPlayers] = useState<Player[]>([])
   const [loading, setLoading] = useState(true)
+  const { overalls } = useOveralls()
 
   useEffect(() => {
     supabase
@@ -37,9 +39,14 @@ export default function Giocatori() {
             className="block rounded-xl bg-white p-3 shadow hover:bg-gray-50"
           >
             <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium">{p.name}</p>
-                {p.nickname && <p className="text-xs text-gray-500">{p.nickname}</p>}
+              <div className="flex items-center gap-2">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-field-green/10 text-xs font-bold text-field-green-dark">
+                  {overalls.get(p.id) ?? '-'}
+                </span>
+                <div>
+                  <p className="font-medium">{p.name}</p>
+                  {p.nickname && <p className="text-xs text-gray-500">{p.nickname}</p>}
+                </div>
               </div>
               {p.role !== 'player' && (
                 <span className="rounded-full bg-field-green/10 px-2 py-0.5 text-xs text-field-green-dark">

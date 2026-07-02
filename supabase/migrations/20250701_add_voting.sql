@@ -19,16 +19,16 @@ ALTER TABLE player_votes ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "player_votes_select"
   ON player_votes FOR SELECT TO authenticated USING (true);
 
--- Ogni giocatore può inserire solo i propri voti
+-- Solo admin/superadmin possono inserire i propri voti (le votazioni sono riservate agli admin)
 CREATE POLICY "player_votes_insert"
   ON player_votes FOR INSERT TO authenticated
-  WITH CHECK (voter_id = auth.uid());
+  WITH CHECK (voter_id = auth.uid() AND is_admin());
 
--- Ogni giocatore può aggiornare solo i propri voti (per poterli modificare prima della chiusura)
+-- Solo admin/superadmin possono aggiornare i propri voti (per poterli modificare prima della chiusura)
 CREATE POLICY "player_votes_update"
   ON player_votes FOR UPDATE TO authenticated
-  USING (voter_id = auth.uid())
-  WITH CHECK (voter_id = auth.uid());
+  USING (voter_id = auth.uid() AND is_admin())
+  WITH CHECK (voter_id = auth.uid() AND is_admin());
 
 -- Gli admin possono gestire tutti i voti
 CREATE POLICY "player_votes_admin"
