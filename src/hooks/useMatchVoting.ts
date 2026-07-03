@@ -14,9 +14,15 @@ export interface VotingParticipant {
   role: PlayerRole
 }
 
+export interface VoterInfo {
+  name: string
+  role: PlayerRole
+}
+
 export function useMatchVoting(matchId: string | undefined) {
   const [votes, setVotes] = useState<VoteWithRole[]>([])
   const [participants, setParticipants] = useState<VotingParticipant[]>([])
+  const [voterInfo, setVoterInfo] = useState<Map<string, VoterInfo>>(new Map())
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
@@ -42,15 +48,30 @@ export function useMatchVoting(matchId: string | undefined) {
     }))
     setParticipants(parts)
 
-    const roleMap = new Map(parts.map((p) => [p.player_id, p.role]))
-    type RawVote = { voter_id: string; voted_id: string; vote: number }
-    const withRole: VoteWithRole[] = ((votesRes.data ?? []) as RawVote[]).map((v) => ({
+    const rawVotes = (votesRes.data ?? []) as { voter_id: string; voted_id: string; vote: number }[]
+
+    const nameRoleMap = new Map(parts.map((p) => [p.player_id, { name: p.name, role: p.role }]))
+    const missingVoterIds = [...new Set(rawVotes.map((v) => v.voter_id))].filter(
+      (id) => !nameRoleMap.has(id)
+    )
+    if (missingVoterIds.length > 0) {
+      const { data: extraPlayers } = await supabase
+        .from('players')
+        .select('id, name, role')
+        .in('id', missingVoterIds)
+      for (const p of (extraPlayers ?? []) as { id: string; name: string; role: PlayerRole }[]) {
+        nameRoleMap.set(p.id, { name: p.name, role: p.role })
+      }
+    }
+
+    const withRole: VoteWithRole[] = rawVotes.map((v) => ({
       voter_id: v.voter_id,
       voted_id: v.voted_id,
       vote: v.vote,
-      voter_role: roleMap.get(v.voter_id) ?? 'player',
+      voter_role: nameRoleMap.get(v.voter_id)?.role ?? 'player',
     }))
     setVotes(withRole)
+    setVoterInfo(nameRoleMap)
     setLoading(false)
   }, [matchId])
 
@@ -92,6 +113,7 @@ export function useMatchVoting(matchId: string | undefined) {
   return {
     votes,
     participants,
+    voterInfo,
     averages,
     provisionalMvpId,
     voterIds,

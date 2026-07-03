@@ -12,7 +12,7 @@ const MAX_PLAYERS = 10
 
 export default function MatchDetail() {
   const { id } = useParams<{ id: string }>()
-  const { player, isAdmin, isSuperAdmin } = useAuth()
+  const { player, isAdmin } = useAuth()
   const { data, loading, error } = useMatchDetail(id)
   const {
     bookings,
@@ -77,13 +77,12 @@ export default function MatchDetail() {
   const bookingCount = bookings.length
   const bookingFull = bookingCount >= MAX_PLAYERS
 
-  const isParticipant = !!player && matchPlayers.some((mp) => mp.player_id === player.id)
   const otherParticipants = participants.filter((p) => p.player_id !== player?.id)
   const alreadyVotedAll = player ? hasVotedAll(player.id) : false
   // Solo admin/superadmin possono votare: il conteggio va fatto sul totale degli admin partecipanti, non su tutti i giocatori.
   const adminVoters = participants.filter((p) => p.role === 'admin' || p.role === 'superadmin')
-  // Un admin può votare solo se partecipa alla partita; un superadmin può votare anche partite a cui non ha giocato.
-  const canVote = isAdmin && (isParticipant || isSuperAdmin)
+  // Ogni admin/superadmin può votare tutti i giocatori della partita, anche se non vi ha partecipato.
+  const canVote = isAdmin
 
   return (
     <div className="p-4 pb-12">
@@ -207,7 +206,6 @@ export default function MatchDetail() {
           </div>
           <p className="mt-1 text-xs text-purple-500">
             Dai un voto da 1 a 10 (con mezzi voti) per ogni compagno di partita.
-            I voti degli admin contano il doppio.
           </p>
 
           <div className="mt-3 space-y-3">
@@ -264,14 +262,6 @@ export default function MatchDetail() {
         <div className="mt-4 rounded-xl border border-purple-100 bg-purple-50 p-3 text-center">
           <p className="text-sm text-purple-600">
             🗳️ Le votazioni sono aperte, ma riservate ad admin e superadmin.
-          </p>
-        </div>
-      )}
-
-      {match.voting_open && isAdmin && !isParticipant && !isSuperAdmin && (
-        <div className="mt-4 rounded-xl border border-purple-100 bg-purple-50 p-3 text-center">
-          <p className="text-sm text-purple-600">
-            🗳️ Le votazioni sono aperte per i partecipanti a questa partita.
           </p>
         </div>
       )}

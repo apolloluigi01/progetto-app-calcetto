@@ -25,13 +25,13 @@ export default function AdminHome() {
 
       <div className="mt-4 space-y-2">
         <Link
-          to="/admin/stagioni"
+          to="/admin/giocatori"
           className="flex items-center gap-3 rounded-xl bg-field-green px-4 py-3 text-sm font-medium text-white hover:bg-field-green-dark"
         >
-          <span className="text-lg">🏆</span>
+          <span className="text-lg">👥</span>
           <div>
-            <p className="font-semibold">Gestione stagioni</p>
-            <p className="text-xs opacity-80">Crea e gestisci le stagioni del campionato</p>
+            <p className="font-semibold">Anagrafica giocatori</p>
+            <p className="text-xs opacity-80">Modifica dati, ruoli e overall iniziale</p>
           </div>
         </Link>
 
@@ -47,13 +47,13 @@ export default function AdminHome() {
         </Link>
 
         <Link
-          to="/admin/giocatori"
+          to="/admin/stagioni"
           className="flex items-center gap-3 rounded-xl bg-field-green px-4 py-3 text-sm font-medium text-white hover:bg-field-green-dark"
         >
-          <span className="text-lg">👥</span>
+          <span className="text-lg">🏆</span>
           <div>
-            <p className="font-semibold">Anagrafica giocatori</p>
-            <p className="text-xs opacity-80">Modifica dati, ruoli e overall iniziale</p>
+            <p className="font-semibold">Gestione stagioni</p>
+            <p className="text-xs opacity-80">Crea e gestisci le stagioni del campionato</p>
           </div>
         </Link>
 

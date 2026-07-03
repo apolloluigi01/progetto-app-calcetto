@@ -50,8 +50,9 @@ export default function MatchEdit() {
   const [openingVoting, setOpeningVoting] = useState(false)
   const [closingVoting, setClosingVoting] = useState(false)
 
-  const { averages, provisionalMvpId, voterIds, participants, refetch: refetchVoting } =
+  const { votes, voterInfo, averages, provisionalMvpId, voterIds, participants, refetch: refetchVoting } =
     useMatchVoting(id)
+  const [showVoteDetail, setShowVoteDetail] = useState(false)
 
   // Sondaggio: aggiunta manuale giocatore
   const [allPlayers, setAllPlayers] = useState<Player[]>([])
@@ -690,11 +691,7 @@ export default function MatchEdit() {
               {voterIds.size}/{matchPlayers.length} hanno votato
             </span>
           </div>
-          <p className="mt-1 text-xs text-purple-500">
-            I voti degli admin e superadmin contano il doppio nel calcolo della media.
-          </p>
-
-          <div className="mt-3 flex gap-2">
+          <div className="mt-3 flex flex-wrap gap-2">
             {!match.voting_open ? (
               <button
                 onClick={handleOpenVoting}
@@ -722,7 +719,39 @@ export default function MatchEdit() {
                 ↓ Pre-compila pagelle
               </button>
             )}
+            <button
+              onClick={() => setShowVoteDetail((v) => !v)}
+              className="rounded-lg border border-purple-300 bg-white px-3 py-2 text-sm text-purple-700 hover:bg-purple-50"
+            >
+              {showVoteDetail ? '✕ Nascondi dettaglio voti' : '📋 Dettaglio voti'}
+            </button>
           </div>
+
+          {showVoteDetail && (
+            <div className="mt-3 space-y-3 rounded-lg border border-purple-200 bg-white p-3">
+              <h3 className="text-sm font-semibold text-purple-800">Dettaglio voti per giocatore</h3>
+              {matchPlayers.map((mp) => {
+                const playerVotes = votes.filter((v) => v.voted_id === mp.player_id)
+                return (
+                  <div key={mp.id}>
+                    <p className="text-sm font-medium text-gray-800">{mp.name}</p>
+                    {playerVotes.length === 0 ? (
+                      <p className="text-xs text-gray-400">Nessun voto ancora.</p>
+                    ) : (
+                      <ul className="mt-1 space-y-0.5 text-xs text-gray-600">
+                        {playerVotes.map((v) => (
+                          <li key={v.voter_id} className="flex items-center justify-between">
+                            <span>{voterInfo.get(v.voter_id)?.name ?? 'Sconosciuto'}</span>
+                            <span className="font-semibold text-purple-700">{formatVote(v.vote)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
 
           {averages.some((a) => a.average !== null) && (
             <div className="mt-3 space-y-1.5">
