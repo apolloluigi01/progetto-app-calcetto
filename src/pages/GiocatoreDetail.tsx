@@ -45,7 +45,10 @@ export default function GiocatoreDetail() {
         <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-field-green/10 text-lg font-bold text-field-green-dark">
           {overalls.get(player.id) ?? '-'}
         </span>
-        <h1 className="text-xl font-semibold text-field-green-dark">{player.name}</h1>
+        <h1 className="text-xl font-semibold text-field-green-dark">
+          {player.name}
+          {player.surname && ` ${player.surname}`}
+        </h1>
       </div>
 
       <div className="mt-4 rounded-xl bg-white p-4 shadow">

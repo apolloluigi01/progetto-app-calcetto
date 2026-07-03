@@ -6,6 +6,7 @@ export type Fascia = 'A' | 'B' | 'C' | 'D'
 export interface Player {
   id: string
   name: string
+  surname: string | null
   nickname: string | null
   avatar_url: string | null
   role: PlayerRole

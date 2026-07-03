@@ -8,6 +8,7 @@
 create table if not exists players (
   id uuid primary key references auth.users(id) on delete cascade,
   name text not null,
+  surname text,
   nickname text,
   avatar_url text,
   role text not null default 'player' check (role in ('admin', 'player', 'superadmin')),

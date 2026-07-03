@@ -123,7 +123,7 @@ export default function Layout() {
               to={item.to}
               end={item.end ?? false}
               onClick={() => setMenuOpen(false)}
-              className={item.fanta ? 'px-6 py-3' : undefined}
+              className="px-6 py-3"
             >
               {({ isActive }) =>
                 item.fanta ? (

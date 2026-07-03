@@ -18,6 +18,7 @@ export default function GiocatoreEdit() {
   const [error, setError] = useState<string | null>(null)
 
   const [name, setName] = useState('')
+  const [surname, setSurname] = useState('')
   const [nickname, setNickname] = useState('')
   const [role, setRole] = useState<PlayerRole>('player')
   const [saving, setSaving] = useState(false)
@@ -55,6 +56,7 @@ export default function GiocatoreEdit() {
   useEffect(() => {
     if (!player) return
     setName(player.name)
+    setSurname(player.surname ?? '')
     setNickname(player.nickname ?? '')
     setRole(player.role)
   }, [player])
@@ -70,8 +72,9 @@ export default function GiocatoreEdit() {
     setSaving(true)
     setError(null)
 
-    const update: { name: string; nickname: string | null; role?: PlayerRole } = {
+    const update: { name: string; surname: string | null; nickname: string | null; role?: PlayerRole } = {
       name,
+      surname: surname || null,
       nickname: nickname || null,
     }
     if (isSuperAdmin) update.role = role
@@ -82,7 +85,7 @@ export default function GiocatoreEdit() {
       setError(error.message)
       return
     }
-    logActivity('giocatore_modificato', { nome: name, nickname: nickname || null, ruolo: isSuperAdmin ? role : undefined, playerId: id })
+    logActivity('giocatore_modificato', { nome: name, cognome: surname || null, nickname: nickname || null, ruolo: isSuperAdmin ? role : undefined, playerId: id })
     load()
   }
 
@@ -142,7 +145,10 @@ export default function GiocatoreEdit() {
 
   return (
     <div className="p-4">
-      <h1 className="text-xl font-semibold text-field-green-dark">{player.name}</h1>
+      <h1 className="text-xl font-semibold text-field-green-dark">
+        {player.name}
+        {player.surname && ` ${player.surname}`}
+      </h1>
 
       <div className="mt-4 space-y-3 rounded-xl bg-white p-4 shadow">
         {canEditDetails ? (
@@ -152,6 +158,14 @@ export default function GiocatoreEdit() {
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Cognome</label>
+              <input
+                value={surname}
+                onChange={(e) => setSurname(e.target.value)}
                 className="w-full rounded-lg border border-gray-300 px-3 py-2"
               />
             </div>

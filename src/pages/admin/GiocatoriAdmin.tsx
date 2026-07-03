@@ -21,6 +21,7 @@ export default function GiocatoriAdmin() {
   const [error, setError] = useState<string | null>(null)
 
   const [name, setName] = useState('')
+  const [surname, setSurname] = useState('')
   const [nickname, setNickname] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -48,7 +49,7 @@ export default function GiocatoriAdmin() {
     setSubmitting(true)
 
     const { error: fnError } = await supabase.functions.invoke<{ id: string }>('create-player', {
-      body: { email, password, name, nickname: nickname || undefined, role },
+      body: { email, password, name, surname: surname || undefined, nickname: nickname || undefined, role },
     })
 
     setSubmitting(false)
@@ -61,6 +62,7 @@ export default function GiocatoriAdmin() {
     setSuccess(`Giocatore creato. Puo' accedere subito con l'email ${email} e la password impostata.`)
     logActivity('giocatore_creato', { nome: name, email, ruolo: role })
     setName('')
+    setSurname('')
     setNickname('')
     setEmail('')
     setPassword('')
@@ -103,6 +105,12 @@ export default function GiocatoriAdmin() {
             required
             value={name}
             onChange={(e) => setName(e.target.value)}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2"
+          />
+          <input
+            placeholder="Cognome"
+            value={surname}
+            onChange={(e) => setSurname(e.target.value)}
             className="w-full rounded-lg border border-gray-300 px-3 py-2"
           />
           <input
@@ -163,7 +171,10 @@ export default function GiocatoriAdmin() {
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="font-medium">{p.name}</p>
+                <p className="font-medium">
+                  {p.name}
+                  {p.surname && ` ${p.surname}`}
+                </p>
                 {p.nickname && <p className="text-xs text-gray-500">{p.nickname}</p>}
               </div>
               <div className="flex items-center gap-2">

@@ -21,37 +21,34 @@ function json(body: unknown, status = 200) {
   });
 }
 
-function welcomeHtml(name: string, email: string, password: string, confirmLink: string): string {
+function welcomeHtml(name: string, email: string, confirmLink: string): string {
   return `
   <div style="font-family:sans-serif;max-width:520px;margin:0 auto;color:#1a1a1a;">
-    <h2 style="color:#2e7d32;">Benvenuto in Pavone League, ${name}! ⚽</h2>
-    <p>Il tuo account è stato creato da un amministratore. Ecco le tue credenziali:</p>
-    <div style="background:#f4f4f4;border-radius:8px;padding:16px;margin:16px 0;">
-      <p style="margin:0;"><strong>Email:</strong> ${email}</p>
-      <p style="margin:8px 0 0;"><strong>Password temporanea:</strong> <code style="background:#e8e8e8;padding:2px 6px;border-radius:4px;">${password}</code></p>
+    <div style="background:#2e7d32;border-radius:12px 12px 0 0;padding:20px 24px;">
+      <h2 style="color:white;margin:0;font-size:20px;">⚽ Benvenuto in Pavone League!</h2>
     </div>
-    <p>Prima di accedere devi confermare il tuo indirizzo email cliccando qui sotto:</p>
-    <a href="${confirmLink}"
-       style="display:inline-block;background:#2e7d32;color:white;padding:12px 28px;
-              border-radius:8px;text-decoration:none;font-weight:bold;margin:8px 0;">
-      Conferma email e accedi
-    </a>
-    <p style="margin-top:24px;color:#555;font-size:13px;">
-      Al primo accesso ti verrà chiesto di scegliere una nuova password personale.
-    </p>
-    <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">
-    <p style="color:#999;font-size:12px;">
-      Se non ti aspettavi questo messaggio, ignoralo pure.
-    </p>
+    <div style="border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;padding:20px 24px;">
+      <p>Ciao <strong>${name}</strong>,</p>
+      <p>Il tuo account è stato creato. Per attivarlo e scegliere la tua password, clicca sul pulsante qui sotto:</p>
+      <div style="text-align:center;margin:24px 0;">
+        <a href="${confirmLink}"
+           style="display:inline-block;background:#2e7d32;color:white;padding:14px 32px;
+                  border-radius:8px;text-decoration:none;font-weight:bold;font-size:16px;">
+          Attiva il tuo account
+        </a>
+      </div>
+      <p style="color:#555;font-size:13px;">
+        Accedi con questa email: <strong>${email}</strong>
+      </p>
+      <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0;">
+      <p style="color:#9ca3af;font-size:12px;margin:0;">
+        Se non ti aspettavi questo messaggio, puoi ignorarlo.
+      </p>
+    </div>
   </div>`;
 }
 
-async function sendWelcomeEmail(
-  to: string,
-  name: string,
-  password: string,
-  confirmLink: string,
-): Promise<void> {
+async function sendWelcomeEmail(to: string, name: string, confirmLink: string): Promise<void> {
   const client = new SMTPClient({
     connection: {
       hostname: "smtp.gmail.com",
@@ -64,9 +61,9 @@ async function sendWelcomeEmail(
     await client.send({
       from: `Pavone League <${gmailUser}>`,
       to,
-      subject: `Benvenuto in Pavone League, ${name}!`,
+      subject: "Attiva il tuo account Pavone League",
       content: "text/html",
-      html: welcomeHtml(name, to, password, confirmLink),
+      html: welcomeHtml(name, to, confirmLink),
     });
   } finally {
     try { await client.close(); } catch (e) { console.error("SMTP close error:", e); }
@@ -100,10 +97,11 @@ Deno.serve(async (req: Request) => {
   }
 
   const body = await req.json();
-  const { email, password, name, nickname, role } = body as {
+  const { email, password, name, surname, nickname, role } = body as {
     email: string;
     password: string;
     name: string;
+    surname?: string;
     nickname?: string;
     role?: "admin" | "player" | "superadmin";
   };
@@ -127,6 +125,7 @@ Deno.serve(async (req: Request) => {
   const { error: insertError } = await adminClient.from("players").insert({
     id: createData.user.id,
     name,
+    surname: surname ?? null,
     nickname: nickname ?? null,
     role: effectiveRole,
     must_change_password: true,
@@ -149,7 +148,7 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    await sendWelcomeEmail(email, name, password, linkData.properties.action_link);
+    await sendWelcomeEmail(email, name, linkData.properties.action_link);
   } catch (e) {
     console.error("Errore invio email:", e);
   }

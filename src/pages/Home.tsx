@@ -89,53 +89,59 @@ export default function Home() {
             </div>
             {!lastMatch && <p className="p-4 text-sm text-gray-500">Nessuna partita completata.</p>}
             {lastMatch && (
-              <Link to={`/partite/${lastMatch.match.id}`} className="block">
-                <div className="px-4 py-4 text-center">
-                  <p className="text-xs text-gray-500">{formatDate(lastMatch.match.match_date)}</p>
-                  {lastMatch.result && (
-                    <p className="mt-1 text-4xl font-extrabold text-field-green-dark">
+              <Link to={`/partite/${lastMatch.match.id}`} className="block px-4 py-4">
+                <p className="text-center text-xs text-gray-500">{formatDate(lastMatch.match.match_date)}</p>
+                {lastMatch.goals.length > 0 ? (
+                  (() => {
+                    const goalsA = lastMatch.goals.filter((g) => g.team === 'A')
+                    const goalsB = lastMatch.goals.filter((g) => g.team === 'B')
+                    return (
+                      <div className="mt-2 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+                        <div>
+                          <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-field-green-dark">
+                            Squadra A
+                          </p>
+                          {goalsA.length === 0 ? (
+                            <p className="text-sm text-gray-400">—</p>
+                          ) : (
+                            goalsA.map((g, i) => (
+                              <p key={i} className="text-sm text-gray-700">
+                                ⚽ {g.name}
+                                {g.is_own_goal && <span className="text-xs text-red-500"> (ag)</span>}
+                              </p>
+                            ))
+                          )}
+                        </div>
+                        {lastMatch.result && (
+                          <p className="whitespace-nowrap text-3xl font-extrabold text-field-green-dark">
+                            {lastMatch.result.score_a} - {lastMatch.result.score_b}
+                          </p>
+                        )}
+                        <div>
+                          <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-field-orange">
+                            Squadra B
+                          </p>
+                          {goalsB.length === 0 ? (
+                            <p className="text-sm text-gray-400">—</p>
+                          ) : (
+                            goalsB.map((g, i) => (
+                              <p key={i} className="text-sm text-gray-700">
+                                ⚽ {g.name}
+                                {g.is_own_goal && <span className="text-xs text-red-500"> (ag)</span>}
+                              </p>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })()
+                ) : (
+                  lastMatch.result && (
+                    <p className="mt-1 text-center text-4xl font-extrabold text-field-green-dark">
                       {lastMatch.result.score_a} - {lastMatch.result.score_b}
                     </p>
-                  )}
-                </div>
-                {lastMatch.goals.length > 0 && (() => {
-                  const goalsA = lastMatch.goals.filter((g) => g.team === 'A')
-                  const goalsB = lastMatch.goals.filter((g) => g.team === 'B')
-                  return (
-                    <div className="grid grid-cols-2 gap-x-3 border-t border-gray-100 px-4 pb-4 pt-3">
-                      <div>
-                        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-field-green-dark">
-                          Squadra A
-                        </p>
-                        {goalsA.length === 0 ? (
-                          <p className="text-sm text-gray-400">—</p>
-                        ) : (
-                          goalsA.map((g, i) => (
-                            <p key={i} className="text-sm text-gray-700">
-                              ⚽ {g.name}
-                              {g.is_own_goal && <span className="text-xs text-red-500"> (ag)</span>}
-                            </p>
-                          ))
-                        )}
-                      </div>
-                      <div>
-                        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-field-orange">
-                          Squadra B
-                        </p>
-                        {goalsB.length === 0 ? (
-                          <p className="text-sm text-gray-400">—</p>
-                        ) : (
-                          goalsB.map((g, i) => (
-                            <p key={i} className="text-sm text-gray-700">
-                              ⚽ {g.name}
-                              {g.is_own_goal && <span className="text-xs text-red-500"> (ag)</span>}
-                            </p>
-                          ))
-                        )}
-                      </div>
-                    </div>
                   )
-                })()}
+                )}
               </Link>
             )}
           </div>

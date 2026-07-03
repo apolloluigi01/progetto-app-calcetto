@@ -44,7 +44,10 @@ export default function Giocatori() {
                   {overalls.get(p.id) ?? '-'}
                 </span>
                 <div>
-                  <p className="font-medium">{p.name}</p>
+                  <p className="font-medium">
+                    {p.name}
+                    {p.surname && ` ${p.surname}`}
+                  </p>
                   {p.nickname && <p className="text-xs text-gray-500">{p.nickname}</p>}
                 </div>
               </div>
