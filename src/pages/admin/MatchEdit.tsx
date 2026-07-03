@@ -10,6 +10,7 @@ import { computeOverallsForPlayers, generateBalancedTeams } from '../../lib/team
 import { formatVote } from '../../lib/voting'
 import type { Player, Team } from '../../types/database'
 import type { PlayerOverall, GeneratedTeams } from '../../lib/teamGeneration'
+import type { MatchPlayerWithName } from '../../hooks/useMatchDetail'
 
 const MAX_PLAYERS = 10
 
@@ -68,6 +69,12 @@ export default function MatchEdit() {
   const [draftTeamA, setDraftTeamA] = useState<PlayerOverall[]>([])
   const [draftTeamB, setDraftTeamB] = useState<PlayerOverall[]>([])
 
+  // Modifica manuale delle squadre già confermate (solo finché la partita è in bozza)
+  const [editingTeams, setEditingTeams] = useState(false)
+  const [localTeamA, setLocalTeamA] = useState<MatchPlayerWithName[]>([])
+  const [localTeamB, setLocalTeamB] = useState<MatchPlayerWithName[]>([])
+  const [savingTeams, setSavingTeams] = useState(false)
+
   useEffect(() => {
     getKnownFields().then(setKnownFields)
     supabase
@@ -101,15 +108,19 @@ export default function MatchEdit() {
   if (loading) return <div className="p-4 text-sm text-gray-500">Caricamento...</div>
   if (error || !data) return <div className="p-4 text-sm text-red-600">{error ?? 'Partita non trovata'}</div>
 
-  const { match, matchPlayers, goals, pagelle } = data
+  const { match, matchPlayers, goals, pagelle, result } = data
   const teamA = matchPlayers.filter((p) => p.team === 'A')
   const teamB = matchPlayers.filter((p) => p.team === 'B')
   const goalsByTeam = (team: Team) => goals.filter((g) => g.team === team)
   const isPublished = pagelle.length > 0 && pagelle.every((p) => p.published_at)
+  // "In bozza" finché non è stato salvato un risultato e non sono state pubblicate le pagelle:
+  // solo in questa fase ha senso poter ancora spostare i giocatori tra le squadre.
+  const isDraft = !result && !isPublished
+  const infoComplete = !!matchDate && !!matchTime && !!field
 
   // --- Azioni info partita ---
   async function handleSaveResult() {
-    if (!id) return
+    if (!id || !infoComplete) return
     setSavingResult(true)
     await supabase
       .from('match_results')
@@ -186,6 +197,10 @@ export default function MatchEdit() {
   }
 
   async function handlePublish() {
+    if (!result) {
+      alert('Salva prima il risultato della partita: le pagelle non possono essere pubblicate senza un risultato.')
+      return
+    }
     if (
       !confirm(
         'Pubblicare le pagelle? Diventeranno visibili a tutti i giocatori e verrà inviata una mail a tutti i partecipanti con risultato, marcatori e pagelle.'
@@ -353,6 +368,49 @@ export default function MatchEdit() {
     if (v >= 55) return 'B'
     if (v >= 35) return 'C'
     return 'D'
+  }
+
+  // --- Modifica manuale squadre già confermate (solo in bozza) ---
+  function startEditingTeams() {
+    setLocalTeamA(teamA)
+    setLocalTeamB(teamB)
+    setEditingTeams(true)
+  }
+
+  function cancelEditingTeams() {
+    setEditingTeams(false)
+  }
+
+  function swapConfirmedPlayer(from: 'A' | 'B', playerId: string) {
+    if (from === 'A') {
+      const player = localTeamA.find((p) => p.player_id === playerId)
+      if (!player) return
+      setLocalTeamA((prev) => prev.filter((p) => p.player_id !== playerId))
+      setLocalTeamB((prev) => [...prev, player])
+    } else {
+      const player = localTeamB.find((p) => p.player_id === playerId)
+      if (!player) return
+      setLocalTeamB((prev) => prev.filter((p) => p.player_id !== playerId))
+      setLocalTeamA((prev) => [...prev, player])
+    }
+  }
+
+  async function handleSaveTeams() {
+    if (localTeamA.length !== 5 || localTeamB.length !== 5) return
+    setSavingTeams(true)
+
+    const changed = [
+      ...localTeamA.filter((p) => p.team !== 'A').map((p) => ({ ...p, team: 'A' as Team })),
+      ...localTeamB.filter((p) => p.team !== 'B').map((p) => ({ ...p, team: 'B' as Team })),
+    ]
+    await Promise.all(
+      changed.map((p) => supabase.from('match_players').update({ team: p.team }).eq('id', p.id))
+    )
+
+    setSavingTeams(false)
+    setEditingTeams(false)
+    logActivity('squadre_modificate', { matchId: id, data: match.match_date })
+    refetch()
   }
 
   const bookedNotInMatch = bookings.filter(
@@ -626,23 +684,98 @@ export default function MatchEdit() {
       )}
 
       {/* ===== SQUADRE (già assegnate) ===== */}
-      {matchPlayers.length > 0 && (
-        <div className="mt-4 grid grid-cols-2 gap-3">
-          <div className="rounded-xl bg-white p-3 shadow">
-            <h3 className="mb-2 font-medium text-field-green-dark">Squadra A</h3>
-            <ul className="space-y-1 text-sm">
-              {teamA.map((p) => (
-                <li key={p.id}>{p.name}</li>
-              ))}
-            </ul>
+      {matchPlayers.length > 0 && !editingTeams && (
+        <div className="mt-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-xl bg-white p-3 shadow">
+              <h3 className="mb-2 font-medium text-field-green-dark">Squadra A</h3>
+              <ul className="space-y-1 text-sm">
+                {teamA.map((p) => (
+                  <li key={p.id}>{p.name}</li>
+                ))}
+              </ul>
+            </div>
+            <div className="rounded-xl bg-white p-3 shadow">
+              <h3 className="mb-2 font-medium text-field-green-dark">Squadra B</h3>
+              <ul className="space-y-1 text-sm">
+                {teamB.map((p) => (
+                  <li key={p.id}>{p.name}</li>
+                ))}
+              </ul>
+            </div>
           </div>
-          <div className="rounded-xl bg-white p-3 shadow">
-            <h3 className="mb-2 font-medium text-field-green-dark">Squadra B</h3>
-            <ul className="space-y-1 text-sm">
-              {teamB.map((p) => (
-                <li key={p.id}>{p.name}</li>
-              ))}
-            </ul>
+          {isDraft && (
+            <button
+              onClick={startEditingTeams}
+              className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+            >
+              ✏️ Modifica squadre
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* ===== SQUADRE (modifica manuale, solo in bozza) ===== */}
+      {matchPlayers.length > 0 && editingTeams && (
+        <div className="mt-4 rounded-xl border border-field-green/30 bg-field-green/5 p-4">
+          <h2 className="font-semibold text-field-green-dark">Modifica squadre</h2>
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <div className="rounded-xl bg-white p-3 shadow">
+              <h3 className="mb-2 font-medium text-field-green-dark">Squadra A</h3>
+              <ul className="space-y-1">
+                {localTeamA.map((p) => (
+                  <li key={p.player_id} className="flex items-center justify-between text-sm">
+                    <span>{p.name}</span>
+                    <button
+                      onClick={() => swapConfirmedPlayer('A', p.player_id)}
+                      className="text-xs text-gray-400 hover:text-field-orange"
+                      title="Sposta in B"
+                    >
+                      →B
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="rounded-xl bg-white p-3 shadow">
+              <h3 className="mb-2 font-medium text-field-green-dark">Squadra B</h3>
+              <ul className="space-y-1">
+                {localTeamB.map((p) => (
+                  <li key={p.player_id} className="flex items-center justify-between text-sm">
+                    <button
+                      onClick={() => swapConfirmedPlayer('B', p.player_id)}
+                      className="text-xs text-gray-400 hover:text-field-green"
+                      title="Sposta in A"
+                    >
+                      A←
+                    </button>
+                    <span>{p.name}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+          <p className="mt-2 text-center text-xs text-gray-500">
+            {localTeamA.length !== 5 || localTeamB.length !== 5 ? (
+              <span className="text-red-500">Le squadre devono avere 5 giocatori ciascuna.</span>
+            ) : (
+              '5 giocatori per squadra'
+            )}
+          </p>
+          <div className="mt-3 flex gap-2">
+            <button
+              onClick={cancelEditingTeams}
+              className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            >
+              Annulla
+            </button>
+            <button
+              onClick={handleSaveTeams}
+              disabled={savingTeams || localTeamA.length !== 5 || localTeamB.length !== 5}
+              className="flex-1 rounded-lg bg-field-green px-3 py-2 text-sm font-medium text-white hover:bg-field-green-dark disabled:opacity-50"
+            >
+              {savingTeams ? 'Salvataggio...' : 'Salva modifiche'}
+            </button>
           </div>
         </div>
       )}
@@ -668,8 +801,9 @@ export default function MatchEdit() {
           />
           <button
             onClick={handleSaveResult}
-            disabled={savingResult}
-            className="ml-auto rounded-lg bg-field-green px-4 py-2 text-sm font-medium text-white hover:bg-field-green-dark disabled:opacity-50"
+            disabled={savingResult || !infoComplete}
+            title={!infoComplete ? 'Completa data, ora e campo prima di salvare il risultato' : undefined}
+            className="ml-auto rounded-lg bg-field-green px-4 py-2 text-sm font-medium text-white hover:bg-field-green-dark disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Salva risultato
           </button>
@@ -680,6 +814,11 @@ export default function MatchEdit() {
             ? ' (non coincide con il risultato inserito)'
             : ''}
         </p>
+        {!infoComplete && (
+          <p className="mt-1 text-xs text-red-500">
+            ⚠️ Completa data, ora e campo prima di poter salvare il risultato.
+          </p>
+        )}
       </div>
 
       {/* ===== MARCATORI ===== */}
@@ -917,23 +1056,36 @@ export default function MatchEdit() {
           </div>
 
           <div className="mt-3 flex gap-2">
-            <button
-              onClick={handleSaveDraft}
-              disabled={savingPagelle}
-              className="flex-1 rounded-lg border border-field-green px-4 py-2 text-sm font-medium text-field-green-dark hover:bg-field-green/5 disabled:opacity-50"
-            >
-              {savingPagelle ? 'Salvataggio...' : 'Salva bozza'}
-            </button>
+            {!isPublished && (
+              <button
+                onClick={handleSaveDraft}
+                disabled={savingPagelle}
+                className="flex-1 rounded-lg border border-field-green px-4 py-2 text-sm font-medium text-field-green-dark hover:bg-field-green/5 disabled:opacity-50"
+              >
+                {savingPagelle ? 'Salvataggio...' : 'Salva bozza'}
+              </button>
+            )}
             <button
               onClick={handlePublish}
-              disabled={publishing || match.voting_open}
-              title={match.voting_open ? 'Chiudi prima le votazioni prima di pubblicare' : undefined}
+              disabled={publishing || match.voting_open || !result}
+              title={
+                !result
+                  ? 'Salva prima il risultato della partita'
+                  : match.voting_open
+                  ? 'Chiudi prima le votazioni prima di pubblicare'
+                  : undefined
+              }
               className="flex-1 rounded-lg bg-field-orange px-4 py-2 text-sm font-medium text-white hover:bg-field-orange/90 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {publishing ? 'Pubblicazione...' : 'Pubblica pagelle'}
             </button>
           </div>
-          {match.voting_open && (
+          {!result && (
+            <p className="mt-2 text-xs text-red-500">
+              ⚠️ Salva il risultato della partita prima di pubblicare le pagelle.
+            </p>
+          )}
+          {result && match.voting_open && (
             <p className="mt-2 text-xs text-red-500">
               ⚠️ Chiudi le votazioni prima di pubblicare le pagelle.
             </p>

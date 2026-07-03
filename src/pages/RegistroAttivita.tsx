@@ -26,6 +26,7 @@ const actionColors: Record<ActivityAction, string> = {
   sondaggio_aperto:      'bg-blue-50 text-blue-700',
   sondaggio_chiuso:      'bg-blue-50 text-blue-700',
   squadre_generate:      'bg-field-green/10 text-field-green-dark',
+  squadre_modificate:    'bg-blue-50 text-blue-700',
   prenotazione_aggiunta: 'bg-field-green/10 text-field-green-dark',
   prenotazione_rimossa:  'bg-red-50 text-red-600',
   votazioni_aperte:      'bg-purple-50 text-purple-700',
