@@ -682,6 +682,61 @@ export default function MatchEdit() {
         </p>
       </div>
 
+      {/* ===== MARCATORI ===== */}
+      {matchPlayers.length > 0 && (
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          {(['A', 'B'] as Team[]).map((team) => (
+            <div key={team} className="rounded-xl bg-white p-3 shadow">
+              <h3 className="mb-2 font-medium text-field-green-dark">Marcatori Squadra {team}</h3>
+              <ul className="space-y-1 text-sm">
+                {goalsByTeam(team).map((g) => (
+                  <li key={g.id} className="flex items-center justify-between">
+                    <span>
+                      ⚽ {g.name} {g.is_own_goal && <span className="text-red-600">(autogol)</span>}
+                    </span>
+                    <button onClick={() => handleRemoveGoal(g.id)} className="text-xs text-red-600">
+                      Rimuovi
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-2 flex gap-2">
+                <select
+                  value={newGoalPlayer[team]}
+                  onChange={(e) => setNewGoalPlayer((prev) => ({ ...prev, [team]: e.target.value }))}
+                  className="flex-1 rounded-lg border border-gray-300 px-2 py-1 text-sm"
+                >
+                  <option value="">Giocatore...</option>
+                  {(ownGoal[team] ? (team === 'A' ? teamB : teamA) : team === 'A' ? teamA : teamB).map((p) => (
+                    <option key={p.player_id} value={p.player_id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => handleAddGoal(team)}
+                  disabled={!newGoalPlayer[team]}
+                  className="rounded-lg bg-field-green px-3 py-1 text-sm text-white disabled:opacity-50"
+                >
+                  + Gol
+                </button>
+              </div>
+              <label className="mt-2 flex items-center gap-1 text-xs text-red-600">
+                <input
+                  type="checkbox"
+                  checked={ownGoal[team]}
+                  onChange={(e) => {
+                    setOwnGoal((prev) => ({ ...prev, [team]: e.target.checked }))
+                    setNewGoalPlayer((prev) => ({ ...prev, [team]: '' }))
+                  }}
+                />
+                Autogol (giocatore della squadra avversaria)
+              </label>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* ===== VOTAZIONI (admin) ===== */}
       {matchPlayers.length > 0 && (
         <div className="mt-4 rounded-xl border border-purple-200 bg-purple-50 p-4">
@@ -796,61 +851,6 @@ export default function MatchEdit() {
               Votazioni in corso...
             </p>
           )}
-        </div>
-      )}
-
-      {/* ===== MARCATORI ===== */}
-      {matchPlayers.length > 0 && (
-        <div className="mt-4 grid grid-cols-2 gap-3">
-          {(['A', 'B'] as Team[]).map((team) => (
-            <div key={team} className="rounded-xl bg-white p-3 shadow">
-              <h3 className="mb-2 font-medium text-field-green-dark">Marcatori Squadra {team}</h3>
-              <ul className="space-y-1 text-sm">
-                {goalsByTeam(team).map((g) => (
-                  <li key={g.id} className="flex items-center justify-between">
-                    <span>
-                      ⚽ {g.name} {g.is_own_goal && <span className="text-red-600">(autogol)</span>}
-                    </span>
-                    <button onClick={() => handleRemoveGoal(g.id)} className="text-xs text-red-600">
-                      Rimuovi
-                    </button>
-                  </li>
-                ))}
-              </ul>
-              <div className="mt-2 flex gap-2">
-                <select
-                  value={newGoalPlayer[team]}
-                  onChange={(e) => setNewGoalPlayer((prev) => ({ ...prev, [team]: e.target.value }))}
-                  className="flex-1 rounded-lg border border-gray-300 px-2 py-1 text-sm"
-                >
-                  <option value="">Giocatore...</option>
-                  {(ownGoal[team] ? (team === 'A' ? teamB : teamA) : team === 'A' ? teamA : teamB).map((p) => (
-                    <option key={p.player_id} value={p.player_id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  onClick={() => handleAddGoal(team)}
-                  disabled={!newGoalPlayer[team]}
-                  className="rounded-lg bg-field-green px-3 py-1 text-sm text-white disabled:opacity-50"
-                >
-                  + Gol
-                </button>
-              </div>
-              <label className="mt-2 flex items-center gap-1 text-xs text-red-600">
-                <input
-                  type="checkbox"
-                  checked={ownGoal[team]}
-                  onChange={(e) => {
-                    setOwnGoal((prev) => ({ ...prev, [team]: e.target.checked }))
-                    setNewGoalPlayer((prev) => ({ ...prev, [team]: '' }))
-                  }}
-                />
-                Autogol (giocatore della squadra avversaria)
-              </label>
-            </div>
-          ))}
         </div>
       )}
 
