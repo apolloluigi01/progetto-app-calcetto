@@ -10,8 +10,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg'],
       manifest: {
-        name: 'Calcetto App',
-        short_name: 'Calcetto',
+        name: 'Pavone League',
+        short_name: 'Pavone League',
         description: 'Gestione partite, giocatori e statistiche del nostro calcetto.',
         theme_color: '#1b5e20',
         background_color: '#1b5e20',
