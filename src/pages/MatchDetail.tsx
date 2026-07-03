@@ -48,9 +48,8 @@ export default function MatchDetail() {
   useEffect(() => {
     if (!player?.id || participants.length === 0) return
     const existing = getMyVotes(player.id)
-    const others = participants.filter((p) => p.player_id !== player.id)
     const defaults: Record<string, number> = {}
-    for (const p of others) {
+    for (const p of participants) {
       defaults[p.player_id] = existing[p.player_id] ?? 6
     }
     setLocalVotes(defaults)
@@ -77,7 +76,6 @@ export default function MatchDetail() {
   const bookingCount = bookings.length
   const bookingFull = bookingCount >= MAX_PLAYERS
 
-  const otherParticipants = participants.filter((p) => p.player_id !== player?.id)
   const alreadyVotedAll = player ? hasVotedAll(player.id) : false
   // Solo admin/superadmin possono votare: il conteggio va fatto sul totale degli admin partecipanti, non su tutti i giocatori.
   const adminVoters = participants.filter((p) => p.role === 'admin' || p.role === 'superadmin')
@@ -196,20 +194,20 @@ export default function MatchDetail() {
       )}
 
       {/* ===== SEZIONE VOTAZIONI (solo admin/superadmin) ===== */}
-      {match.voting_open && canVote && otherParticipants.length > 0 && (
+      {match.voting_open && canVote && participants.length > 0 && (
         <div className="mt-4 rounded-xl border border-purple-200 bg-purple-50 p-4">
           <div className="flex items-center justify-between">
-            <h3 className="font-semibold text-purple-800">🗳️ Vota i tuoi compagni</h3>
+            <h3 className="font-semibold text-purple-800">🗳️ Vota i giocatori</h3>
             <span className="text-xs text-purple-500">
               {voterIds.size}/{adminVoters.length} hanno votato
             </span>
           </div>
           <p className="mt-1 text-xs text-purple-500">
-            Dai un voto da 1 a 10 (con mezzi voti) per ogni compagno di partita.
+            Dai un voto da 1 a 10 (con mezzi voti) per ogni giocatore della partita, te compreso.
           </p>
 
           <div className="mt-3 space-y-3">
-            {otherParticipants.map((p) => {
+            {participants.map((p) => {
               const v = localVotes[p.player_id] ?? 6
               return (
                 <div key={p.player_id} className="flex items-center gap-3">

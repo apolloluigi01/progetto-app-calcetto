@@ -90,10 +90,9 @@ export function useMatchVoting(matchId: string | undefined) {
   }
 
   function hasVotedAll(myId: string): boolean {
-    const others = participants.filter((p) => p.player_id !== myId)
-    if (others.length === 0) return false
+    if (participants.length === 0) return false
     const myVotedIds = new Set(votes.filter((v) => v.voter_id === myId).map((v) => v.voted_id))
-    return others.every((p) => myVotedIds.has(p.player_id))
+    return participants.every((p) => myVotedIds.has(p.player_id))
   }
 
   async function submitVotes(myId: string, myVotes: Record<string, number>): Promise<void> {
