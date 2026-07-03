@@ -33,6 +33,12 @@ export default function Layout() {
     : { to: '/impostazioni', label: 'Impostazioni' }
   const items = [...navItems, lastItem]
 
+  function handleLogout() {
+    if (confirm('Vuoi davvero uscire?')) {
+      signOut()
+    }
+  }
+
   return (
     <div className="flex min-h-svh" style={{ background: '#0a1a0f' }}>
       {/* Sidebar desktop */}
@@ -75,7 +81,7 @@ export default function Layout() {
         </nav>
 
         <button
-          onClick={signOut}
+          onClick={handleLogout}
           className="mt-auto mx-4 mb-5 px-3 py-2.5 text-left text-sm uppercase tracking-widest font-semibold text-white/40 hover:text-white/70 transition-colors duration-150"
         >
           Logout
@@ -150,7 +156,7 @@ export default function Layout() {
           <button
             onClick={() => {
               setMenuOpen(false)
-              signOut()
+              handleLogout()
             }}
             className="px-6 py-3 text-left text-sm uppercase tracking-widest font-semibold text-white/50"
           >
