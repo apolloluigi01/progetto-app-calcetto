@@ -30,75 +30,89 @@ export function useHomeDashboard() {
   const [lastMatch, setLastMatch] = useState<LastMatch | null>(null)
   const [nextMatch, setNextMatch] = useState<NextMatch | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [reloadToken, setReloadToken] = useState(0)
 
   useEffect(() => {
     async function load() {
       setLoading(true)
+      setError(null)
       const today = new Date().toISOString().slice(0, 10)
 
-      const [lastRes, nextRes] = await Promise.all([
-        supabase
-          .from('matches')
-          .select('*, result:match_results(score_a, score_b, id, match_id)')
-          .eq('status', 'completed')
-          .order('match_date', { ascending: false })
-          .limit(1)
-          .maybeSingle(),
-        supabase
-          .from('matches')
-          .select('*')
-          .gte('match_date', today)
-          .order('match_date', { ascending: true })
-          .limit(1)
-          .maybeSingle(),
-      ])
+      try {
+        const [lastRes, nextRes] = await Promise.all([
+          supabase
+            .from('matches')
+            .select('*, result:match_results(score_a, score_b, id, match_id)')
+            .eq('status', 'completed')
+            .order('match_date', { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+          supabase
+            .from('matches')
+            .select('*')
+            .gte('match_date', today)
+            .order('match_date', { ascending: true })
+            .limit(1)
+            .maybeSingle(),
+        ])
 
-      if (lastRes.data) {
-        const m = lastRes.data as Match & { result: MatchResult[] | MatchResult | null }
-        const { data: goalsData } = await supabase
-          .from('goals')
-          .select('player_id, team, is_own_goal, players(name)')
-          .eq('match_id', m.id)
+        if (lastRes.error) throw lastRes.error
+        if (nextRes.error) throw nextRes.error
 
-        type GoalJoin = { player_id: string; team: Team; is_own_goal: boolean; players: { name: string } | null }
-        setLastMatch({
-          match: m,
-          result: Array.isArray(m.result) ? m.result[0] ?? null : m.result,
-          goals: ((goalsData ?? []) as unknown as GoalJoin[]).map((g) => ({
-            player_id: g.player_id,
-            team: g.team,
-            is_own_goal: g.is_own_goal,
-            name: g.players?.name ?? '',
-          })),
-        })
-      } else {
-        setLastMatch(null)
+        if (lastRes.data) {
+          const m = lastRes.data as Match & { result: MatchResult[] | MatchResult | null }
+          const { data: goalsData, error: goalsError } = await supabase
+            .from('goals')
+            .select('player_id, team, is_own_goal, players(name)')
+            .eq('match_id', m.id)
+
+          if (goalsError) throw goalsError
+
+          type GoalJoin = { player_id: string; team: Team; is_own_goal: boolean; players: { name: string } | null }
+          setLastMatch({
+            match: m,
+            result: Array.isArray(m.result) ? m.result[0] ?? null : m.result,
+            goals: ((goalsData ?? []) as unknown as GoalJoin[]).map((g) => ({
+              player_id: g.player_id,
+              team: g.team,
+              is_own_goal: g.is_own_goal,
+              name: g.players?.name ?? '',
+            })),
+          })
+        } else {
+          setLastMatch(null)
+        }
+
+        if (nextRes.data) {
+          const m = nextRes.data as Match
+          const { data: playersData, error: playersError } = await supabase
+            .from('match_players')
+            .select('player_id, team, players(name)')
+            .eq('match_id', m.id)
+
+          if (playersError) throw playersError
+
+          type PlayerJoin = { player_id: string; team: Team; players: { name: string } | null }
+          setNextMatch({
+            match: m,
+            players: ((playersData ?? []) as unknown as PlayerJoin[]).map((p) => ({
+              player_id: p.player_id,
+              team: p.team,
+              name: p.players?.name ?? '',
+            })),
+          })
+        } else {
+          setNextMatch(null)
+        }
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Errore nel caricamento della dashboard')
+      } finally {
+        setLoading(false)
       }
-
-      if (nextRes.data) {
-        const m = nextRes.data as Match
-        const { data: playersData } = await supabase
-          .from('match_players')
-          .select('player_id, team, players(name)')
-          .eq('match_id', m.id)
-
-        type PlayerJoin = { player_id: string; team: Team; players: { name: string } | null }
-        setNextMatch({
-          match: m,
-          players: ((playersData ?? []) as unknown as PlayerJoin[]).map((p) => ({
-            player_id: p.player_id,
-            team: p.team,
-            name: p.players?.name ?? '',
-          })),
-        })
-      } else {
-        setNextMatch(null)
-      }
-
-      setLoading(false)
     }
     load()
-  }, [])
+  }, [reloadToken])
 
-  return { lastMatch, nextMatch, loading }
+  return { lastMatch, nextMatch, loading, error, reload: () => setReloadToken((t) => t + 1) }
 }

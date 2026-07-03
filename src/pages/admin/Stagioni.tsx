@@ -1,28 +1,45 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import ErrorNotice from '../../components/ErrorNotice'
 import type { Season } from '../../types/database'
 
 export default function Stagioni() {
   const [seasons, setSeasons] = useState<Season[]>([])
   const [matchCounts, setMatchCounts] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [reloadToken, setReloadToken] = useState(0)
 
   useEffect(() => {
     async function load() {
-      const { data } = await supabase
+      setLoading(true)
+      setError(null)
+      const { data, error } = await supabase
         .from('seasons')
         .select('*')
         .order('start_date', { ascending: false })
+
+      if (error) {
+        setError(error.message)
+        setLoading(false)
+        return
+      }
 
       const list = (data ?? []) as Season[]
       setSeasons(list)
 
       if (list.length > 0) {
-        const { data: counts } = await supabase
+        const { data: counts, error: countsError } = await supabase
           .from('matches')
           .select('season_id')
           .in('season_id', list.map((s) => s.id))
+
+        if (countsError) {
+          setError(countsError.message)
+          setLoading(false)
+          return
+        }
 
         const map: Record<string, number> = {}
         for (const row of (counts ?? [])) {
@@ -34,7 +51,7 @@ export default function Stagioni() {
       setLoading(false)
     }
     load()
-  }, [])
+  }, [reloadToken])
 
   const currentSeason = seasons[0]
 
@@ -56,7 +73,13 @@ export default function Stagioni() {
 
       {loading && <p className="mt-4 text-sm text-gray-500">Caricamento...</p>}
 
-      {!loading && seasons.length === 0 && (
+      {!loading && error && (
+        <div className="mt-4">
+          <ErrorNotice message={error} onRetry={() => setReloadToken((t) => t + 1)} />
+        </div>
+      )}
+
+      {!loading && !error && seasons.length === 0 && (
         <div className="mt-6 rounded-xl border border-dashed border-gray-300 p-8 text-center">
           <p className="text-sm text-gray-500">Nessuna stagione creata.</p>
           <Link

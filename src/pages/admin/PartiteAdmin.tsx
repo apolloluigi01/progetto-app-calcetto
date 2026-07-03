@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import ErrorNotice from '../../components/ErrorNotice'
 import type { Match, MatchResult } from '../../types/database'
 
 type MatchWithResult = Match & { result: MatchResult | null; pagelle: { published_at: string | null }[] }
@@ -8,14 +9,23 @@ type MatchWithResult = Match & { result: MatchResult | null; pagelle: { publishe
 export default function PartiteAdmin() {
   const [matches, setMatches] = useState<MatchWithResult[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [reloadToken, setReloadToken] = useState(0)
 
   useEffect(() => {
     async function load() {
       setLoading(true)
-      const { data } = await supabase
+      setError(null)
+      const { data, error } = await supabase
         .from('matches')
         .select('*, result:match_results(score_a, score_b, id, match_id), pagelle(published_at)')
         .order('match_date', { ascending: false })
+
+      if (error) {
+        setError(error.message)
+        setLoading(false)
+        return
+      }
 
       setMatches(
         (data ?? []).map((m) => ({
@@ -26,7 +36,7 @@ export default function PartiteAdmin() {
       setLoading(false)
     }
     load()
-  }, [])
+  }, [reloadToken])
 
   return (
     <div className="p-4">
@@ -34,7 +44,8 @@ export default function PartiteAdmin() {
 
       <div className="mt-4 space-y-2">
         {loading && <p className="text-sm text-gray-500">Caricamento...</p>}
-        {!loading && matches.length === 0 && (
+        {!loading && error && <ErrorNotice message={error} onRetry={() => setReloadToken((t) => t + 1)} />}
+        {!loading && !error && matches.length === 0 && (
           <p className="text-sm text-gray-500">Nessuna partita registrata.</p>
         )}
         {matches.map((m) => (

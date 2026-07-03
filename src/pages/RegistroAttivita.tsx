@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { actionLabels, type ActivityAction } from '../lib/activityLog'
+import ErrorNotice from '../components/ErrorNotice'
 
 interface LogEntry {
   id: string
@@ -59,19 +60,27 @@ const PAGE_SIZE = 30
 export default function RegistroAttivita() {
   const [entries, setEntries] = useState<LogEntry[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [hasMore, setHasMore] = useState(false)
   const [page, setPage] = useState(0)
 
   async function load(pageIndex: number, append = false) {
     setLoading(true)
+    setError(null)
     const from = pageIndex * PAGE_SIZE
     const to = from + PAGE_SIZE - 1
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('admin_activity_log')
       .select('*')
       .order('created_at', { ascending: false })
       .range(from, to)
+
+    if (error) {
+      setError(error.message)
+      setLoading(false)
+      return
+    }
 
     const rows = (data ?? []) as LogEntry[]
     setEntries(prev => append ? [...prev, ...rows] : rows)
@@ -95,7 +104,8 @@ export default function RegistroAttivita() {
       <p className="mt-1 text-sm text-gray-500">Tutte le azioni effettuate dagli amministratori.</p>
 
       <div className="mt-4 space-y-2">
-        {!loading && entries.length === 0 && (
+        {!loading && error && <ErrorNotice message={error} onRetry={() => load(0)} />}
+        {!loading && !error && entries.length === 0 && (
           <p className="text-sm text-gray-500">Nessuna attività registrata.</p>
         )}
 

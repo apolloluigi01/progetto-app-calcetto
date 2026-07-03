@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import ErrorNotice from '../components/ErrorNotice'
 import type { Match, MatchResult } from '../types/database'
 
 const MAX_PLAYERS = 10
@@ -16,14 +17,23 @@ export default function Partite() {
   const { isAdmin } = useAuth()
   const [matches, setMatches] = useState<MatchWithResult[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [reloadToken, setReloadToken] = useState(0)
 
   useEffect(() => {
     async function load() {
       setLoading(true)
-      const { data } = await supabase
+      setError(null)
+      const { data, error } = await supabase
         .from('matches')
         .select('*, result:match_results(score_a, score_b, id, match_id), pagelle(published_at), match_bookings(id)')
         .order('match_date', { ascending: false })
+
+      if (error) {
+        setError(error.message)
+        setLoading(false)
+        return
+      }
 
       setMatches(
         (data ?? []).map((m) => ({
@@ -34,7 +44,7 @@ export default function Partite() {
       setLoading(false)
     }
     load()
-  }, [])
+  }, [reloadToken])
 
   return (
     <div className="p-4">
@@ -52,7 +62,8 @@ export default function Partite() {
 
       <div className="mt-4 space-y-2">
         {loading && <p className="text-sm text-gray-500">Caricamento...</p>}
-        {!loading && matches.length === 0 && (
+        {!loading && error && <ErrorNotice message={error} onRetry={() => setReloadToken((t) => t + 1)} />}
+        {!loading && !error && matches.length === 0 && (
           <p className="text-sm text-gray-500">Nessuna partita registrata.</p>
         )}
         {matches.map((m) => (

@@ -30,7 +30,10 @@ export default function PartitaForm() {
       .from('players')
       .select('*')
       .order('name')
-      .then(({ data }) => setPlayers((data ?? []) as Player[]))
+      .then(({ data, error }) => {
+        if (error) setError(error.message)
+        setPlayers((data ?? []) as Player[])
+      })
     getKnownFields().then(setKnownFields)
   }, [])
 

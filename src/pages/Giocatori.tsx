@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useOveralls } from '../hooks/useOveralls'
+import ErrorNotice from '../components/ErrorNotice'
 import type { Player, PlayerRole } from '../types/database'
 
 const roleLabels: Record<PlayerRole, string> = {
@@ -13,18 +14,23 @@ const roleLabels: Record<PlayerRole, string> = {
 export default function Giocatori() {
   const [players, setPlayers] = useState<Player[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [reloadToken, setReloadToken] = useState(0)
   const { overalls } = useOveralls()
 
   useEffect(() => {
+    setLoading(true)
+    setError(null)
     supabase
       .from('players')
       .select('*')
       .order('name')
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (error) setError(error.message)
         setPlayers((data ?? []) as Player[])
         setLoading(false)
       })
-  }, [])
+  }, [reloadToken])
 
   return (
     <div className="p-4">
@@ -32,6 +38,10 @@ export default function Giocatori() {
 
       <div className="mt-4 space-y-2">
         {loading && <p className="text-sm text-gray-500">Caricamento...</p>}
+        {!loading && error && <ErrorNotice message={error} onRetry={() => setReloadToken((t) => t + 1)} />}
+        {!loading && !error && players.length === 0 && (
+          <p className="text-sm text-gray-500">Nessun giocatore registrato.</p>
+        )}
         {players.map((p) => (
           <Link
             key={p.id}

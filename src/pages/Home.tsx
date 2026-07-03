@@ -5,6 +5,7 @@ import { useCurrentSeason } from '../hooks/useCurrentSeason'
 import { useStatistiche } from '../hooks/useStatistiche'
 import { getRanking } from '../lib/statistiche'
 import { describeWeatherCode, getMatchWeather, type WeatherForecast } from '../lib/weather'
+import ErrorNotice from '../components/ErrorNotice'
 
 function formatDate(date: string) {
   return new Date(date).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })
@@ -63,9 +64,9 @@ function WeatherCard({ field, matchDate }: { field: string | null; matchDate: st
 }
 
 export default function Home() {
-  const { lastMatch, nextMatch, loading } = useHomeDashboard()
+  const { lastMatch, nextMatch, loading, error, reload } = useHomeDashboard()
   const { season } = useCurrentSeason()
-  const { stats, loading: statsLoading } = useStatistiche()
+  const { stats, loading: statsLoading, error: statsError } = useStatistiche()
   const marcatori = getRanking(stats, 'marcatori').slice(0, 5)
 
   return (
@@ -81,7 +82,13 @@ export default function Home() {
 
       {loading && <p className="mt-4 text-sm text-gray-500">Caricamento...</p>}
 
-      {!loading && (
+      {!loading && error && (
+        <div className="mt-4">
+          <ErrorNotice message={error} onRetry={reload} />
+        </div>
+      )}
+
+      {!loading && !error && (
         <div className="mt-4 space-y-4">
           <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
             <div className="border-b border-gray-200 px-4 py-3">
@@ -185,10 +192,15 @@ export default function Home() {
               <span className="text-xs text-gray-400">Vedi tutte →</span>
             </Link>
             {statsLoading && <p className="p-4 text-sm text-gray-500">Caricamento...</p>}
-            {!statsLoading && marcatori.length === 0 && (
+            {!statsLoading && statsError && (
+              <div className="p-4">
+                <ErrorNotice message={statsError} />
+              </div>
+            )}
+            {!statsLoading && !statsError && marcatori.length === 0 && (
               <p className="p-4 text-sm text-gray-500">Nessun dato disponibile per la stagione corrente.</p>
             )}
-            {!statsLoading && marcatori.length > 0 && (
+            {!statsLoading && !statsError && marcatori.length > 0 && (
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50">
