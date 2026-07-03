@@ -117,7 +117,7 @@ export default function Home() {
                             {lastMatch.result.score_a} - {lastMatch.result.score_b}
                           </p>
                         )}
-                        <div className="text-right">
+                        <div>
                           <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-field-orange">
                             Squadra B
                           </p>
@@ -126,7 +126,7 @@ export default function Home() {
                           ) : (
                             goalsB.map((g, i) => (
                               <p key={i} className="text-sm text-gray-700">
-                                {g.name} ⚽
+                                ⚽ {g.name}
                                 {g.is_own_goal && <span className="text-xs text-red-500"> (ag)</span>}
                               </p>
                             ))
