@@ -11,7 +11,7 @@ const roleLabels: Record<string, string> = {
 }
 
 export default function Impostazioni() {
-  const { player, session, signOut } = useAuth()
+  const { player, session } = useAuth()
 
   const [showForm, setShowForm] = useState(false)
   const [password, setPassword] = useState('')
@@ -137,13 +137,6 @@ export default function Impostazioni() {
       >
         Registro attività admin
       </Link>
-
-      <button
-        onClick={signOut}
-        className="mt-3 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-      >
-        Esci
-      </button>
     </div>
   )
 }

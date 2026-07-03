@@ -25,7 +25,7 @@ function NavLabel({ item, isActive }: { item: NavItem; isActive: boolean }) {
 }
 
 export default function Layout() {
-  const { isAdmin } = useAuth()
+  const { isAdmin, signOut } = useAuth()
   const [menuOpen, setMenuOpen] = useState(false)
 
   const lastItem: NavItem = isAdmin
@@ -73,6 +73,13 @@ export default function Layout() {
             </NavLink>
           ))}
         </nav>
+
+        <button
+          onClick={signOut}
+          className="mt-auto mx-4 mb-5 px-3 py-2.5 text-left text-sm uppercase tracking-widest font-semibold text-white/40 hover:text-white/70 transition-colors duration-150"
+        >
+          Logout
+        </button>
       </aside>
 
       {/* Topbar mobile */}
@@ -140,6 +147,15 @@ export default function Layout() {
               }
             </NavLink>
           ))}
+          <button
+            onClick={() => {
+              setMenuOpen(false)
+              signOut()
+            }}
+            className="px-6 py-3 text-left text-sm uppercase tracking-widest font-semibold text-white/50"
+          >
+            Logout
+          </button>
         </div>
       )}
 

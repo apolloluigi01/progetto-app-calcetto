@@ -8,7 +8,7 @@ const roleLabels: Record<string, string> = {
 }
 
 export default function AdminHome() {
-  const { player, session, signOut } = useAuth()
+  const { player, session } = useAuth()
 
   return (
     <div className="p-4">
@@ -68,13 +68,6 @@ export default function AdminHome() {
           </div>
         </Link>
       </div>
-
-      <button
-        onClick={signOut}
-        className="mt-6 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-      >
-        Esci
-      </button>
     </div>
   )
 }
