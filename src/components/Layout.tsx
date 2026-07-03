@@ -29,7 +29,7 @@ export default function Layout() {
   const [menuOpen, setMenuOpen] = useState(false)
 
   const lastItem: NavItem = isAdmin
-    ? { to: '/admin', label: 'CDA Pavone' }
+    ? { to: '/admin', label: 'CDA' }
     : { to: '/impostazioni', label: 'Impostazioni' }
   const items = [...navItems, lastItem]
 
