@@ -36,7 +36,7 @@ export default function Login() {
   return (
     <div className="flex min-h-svh items-center justify-center bg-field-green px-4">
       <div className="w-full max-w-sm rounded-2xl bg-white p-8 shadow-lg">
-        <h1 className="mb-1 text-2xl font-semibold text-field-green-dark">Calcetto App</h1>
+        <h1 className="mb-1 text-2xl font-semibold text-field-green-dark">Pavone League</h1>
         <p className="mb-6 text-sm text-gray-500">Accedi con le tue credenziali</p>
 
         <form onSubmit={handleSubmit} className="space-y-4">

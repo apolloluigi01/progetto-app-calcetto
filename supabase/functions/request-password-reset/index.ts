@@ -31,7 +31,7 @@ async function sendEmail(to: string, subject: string, html: string) {
     },
   });
   try {
-    await client.send({ from: `Calcetto App <${gmailUser}>`, to, subject, content: "text/html", html });
+    await client.send({ from: `Pavone League <${gmailUser}>`, to, subject, content: "text/html", html });
   } finally {
     // denomailer puo' lanciare un TypeError interno su close() se la connessione non si e' mai
     // stabilita (es. credenziali errate): non deve mascherare l'errore originale di send().
@@ -77,11 +77,11 @@ Deno.serve(async (req: Request) => {
   try {
     await sendEmail(
       email,
-      "Reimposta la tua password - Calcetto App",
+      "Reimposta la tua password - Pavone League",
       `
         <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
           <h2 style="color:#2e7d32;">Reimposta la tua password</h2>
-          <p>Hai richiesto di reimpostare la password del tuo account su <strong>Calcetto App</strong>. Clicca sul link qui sotto per scegliere una nuova password:</p>
+          <p>Hai richiesto di reimpostare la password del tuo account su <strong>Pavone League</strong>. Clicca sul link qui sotto per scegliere una nuova password:</p>
           <p style="text-align:center; margin: 32px 0;">
             <a href="${linkData.properties.action_link}" style="background:#2e7d32; color:#fff; padding:12px 24px; border-radius:8px; text-decoration:none; font-weight:bold;">Reimposta password</a>
           </p>
