@@ -201,6 +201,23 @@ export default function MatchEdit() {
       alert('Salva prima il risultato della partita: le pagelle non possono essere pubblicate senza un risultato.')
       return
     }
+    const incomplete = matchPlayers.filter((mp) => {
+      const d = drafts[mp.player_id]
+      return !d || !d.voto.trim() || !d.titolo.trim() || !d.descrizione.trim()
+    })
+    if (incomplete.length > 0) {
+      alert(
+        `Completa voto, titolo e descrizione per tutti i giocatori prima di pubblicare. Mancano per: ${incomplete
+          .map((mp) => mp.name)
+          .join(', ')}.`
+      )
+      return
+    }
+    const mvpCount = matchPlayers.filter((mp) => drafts[mp.player_id]?.is_mvp).length
+    if (mvpCount !== 1) {
+      alert('Seleziona un MVP prima di pubblicare le pagelle.')
+      return
+    }
     if (
       !confirm(
         'Pubblicare le pagelle? Diventeranno visibili a tutti i giocatori e verrà inviata una mail a tutti i partecipanti con risultato, marcatori e pagelle.'
