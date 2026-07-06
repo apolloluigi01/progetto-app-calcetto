@@ -90,6 +90,10 @@ Deno.serve(async (req: Request) => {
           <p style="text-align:center; margin: 32px 0;">
             <a href="${resetLink.replace(/&/g, "&amp;")}" style="background:#2e7d32; color:#fff; padding:12px 24px; border-radius:8px; text-decoration:none; font-weight:bold;">Reimposta password</a>
           </p>
+          <p style="color:#555; font-size:13px;">
+            Se il pulsante non funziona, copia questo link e incollalo nel browser:<br>
+            <a href="${resetLink.replace(/&/g, "&amp;")}" style="color:#2e7d32;word-break:break-all;">${resetLink.replace(/&/g, "&amp;")}</a>
+          </p>
           <p style="color:#888; font-size:12px;">Se non hai richiesto tu questa operazione, ignora questa email: la tua password attuale resta valida.</p>
         </div>
       `

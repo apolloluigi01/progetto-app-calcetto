@@ -38,6 +38,10 @@ function welcomeHtml(name: string, email: string, confirmLink: string): string {
         </a>
       </div>
       <p style="color:#555;font-size:13px;">
+        Se il pulsante non funziona, copia questo link e incollalo nel browser:<br>
+        <a href="${confirmLink.replace(/&/g, "&amp;")}" style="color:#2e7d32;word-break:break-all;">${confirmLink.replace(/&/g, "&amp;")}</a>
+      </p>
+      <p style="color:#555;font-size:13px;">
         Accedi con questa email: <strong>${email}</strong>
       </p>
       <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0;">
