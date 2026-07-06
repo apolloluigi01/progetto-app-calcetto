@@ -21,7 +21,7 @@ function json(body: unknown, status = 200) {
   });
 }
 
-function welcomeHtml(name: string, email: string, confirmLink: string): string {
+function welcomeHtml(name: string, email: string, password: string): string {
   return `
   <div style="font-family:sans-serif;max-width:520px;margin:0 auto;color:#1a1a1a;">
     <div style="background:#2e7d32;border-radius:12px 12px 0 0;padding:20px 24px;">
@@ -29,21 +29,18 @@ function welcomeHtml(name: string, email: string, confirmLink: string): string {
     </div>
     <div style="border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;padding:20px 24px;">
       <p>Ciao <strong>${name}</strong>,</p>
-      <p>Il tuo account è stato creato. Per attivarlo e scegliere la tua password, clicca sul pulsante qui sotto:</p>
+      <p>Il tuo account è stato creato. Accedi con queste credenziali provvisorie, al primo accesso ti verrà chiesto di scegliere una tua password personale:</p>
+      <div style="background:#f3f4f6;border-radius:8px;padding:16px;margin:20px 0;font-size:14px;">
+        <p style="margin:0 0 6px;">Email: <strong>${email}</strong></p>
+        <p style="margin:0;">Password provvisoria: <strong>${password}</strong></p>
+      </div>
       <div style="text-align:center;margin:24px 0;">
-        <a href="${confirmLink.replace(/&/g, "&amp;")}"
+        <a href="${appUrl}/login"
            style="display:inline-block;background:#2e7d32;color:white;padding:14px 32px;
                   border-radius:8px;text-decoration:none;font-weight:bold;font-size:16px;">
-          Attiva il tuo account
+          Vai al login
         </a>
       </div>
-      <p style="color:#555;font-size:13px;">
-        Se il pulsante non funziona, copia questo link e incollalo nel browser:<br>
-        <a href="${confirmLink.replace(/&/g, "&amp;")}" style="color:#2e7d32;word-break:break-all;">${confirmLink.replace(/&/g, "&amp;")}</a>
-      </p>
-      <p style="color:#555;font-size:13px;">
-        Accedi con questa email: <strong>${email}</strong>
-      </p>
       <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0;">
       <p style="color:#9ca3af;font-size:12px;margin:0;">
         Se non ti aspettavi questo messaggio, puoi ignorarlo.
@@ -52,7 +49,7 @@ function welcomeHtml(name: string, email: string, confirmLink: string): string {
   </div>`;
 }
 
-async function sendWelcomeEmail(to: string, name: string, confirmLink: string): Promise<void> {
+async function sendWelcomeEmail(to: string, name: string, password: string): Promise<void> {
   const client = new SMTPClient({
     connection: {
       hostname: "smtp.gmail.com",
@@ -65,9 +62,9 @@ async function sendWelcomeEmail(to: string, name: string, confirmLink: string): 
     await client.send({
       from: `Pavone League <${gmailUser}>`,
       to,
-      subject: "Attiva il tuo account Pavone League",
+      subject: "Il tuo account Pavone League",
       content: "text/html",
-      html: welcomeHtml(name, to, confirmLink),
+      html: welcomeHtml(name, to, password),
     });
   } finally {
     try { await client.close(); } catch (e) { console.error("SMTP close error:", e); }
@@ -116,10 +113,14 @@ Deno.serve(async (req: Request) => {
 
   const effectiveRole = callerRole === "superadmin" ? (role ?? "player") : "player";
 
+  // Nessun link di conferma: l'admin ha gia' scelto la password, quindi l'utente
+  // puo' accedere subito. Il cambio password obbligatorio al primo login (sotto)
+  // sostituisce il flusso di attivazione via email, evitando i problemi di
+  // deliverability/clickabilita' dei link nelle mail transazionali.
   const { data: createData, error: createError } = await adminClient.auth.admin.createUser({
     email,
     password,
-    email_confirm: false,
+    email_confirm: true,
   });
 
   if (createError || !createData.user) {
@@ -140,24 +141,8 @@ Deno.serve(async (req: Request) => {
     return json({ error: insertError.message }, 400);
   }
 
-  const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
-    type: "signup",
-    email,
-    options: { redirectTo: `${appUrl}/imposta-password` },
-  });
-
-  if (linkError || !linkData?.properties?.hashed_token) {
-    console.error("generateLink fallito:", linkError?.message);
-    return json({ id: createData.user.id, warning: "Utente creato ma email di benvenuto non inviata" });
-  }
-
-  // Il link punta alla nostra app (non direttamente all'endpoint di verifica di Supabase):
-  // cosi' una GET automatica di uno scanner antispam non consuma il token monouso prima
-  // che l'utente clicchi davvero. Il token viene verificato solo al submit del form password.
-  const confirmLink = `${appUrl}/imposta-password?token_hash=${linkData.properties.hashed_token}&type=signup`;
-
   try {
-    await sendWelcomeEmail(email, name, confirmLink);
+    await sendWelcomeEmail(email, name, password);
   } catch (e) {
     console.error("Errore invio email:", e);
   }

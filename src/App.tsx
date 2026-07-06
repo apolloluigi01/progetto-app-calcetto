@@ -34,9 +34,10 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/password-dimenticata" element={<PasswordDimenticata />} />
           <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/imposta-password" element={<ImpostaPassword />} />
 
           <Route element={<ProtectedRoute />}>
+            <Route path="/imposta-password" element={<ImpostaPassword />} />
+
             <Route element={<Layout />}>
               <Route path="/" element={<Home />} />
               <Route path="/giocatori" element={<Giocatori />} />
