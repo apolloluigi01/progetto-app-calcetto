@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { getOrCreateCurrentSeason } from '../lib/seasons'
+import { getSeasonIdForDate } from '../lib/seasons'
 import { getKnownFields } from '../lib/fields'
 import { logActivity } from '../lib/activityLog'
 import { computeOverallsForPlayers, generateBalancedTeams } from '../lib/teamGeneration'
@@ -79,7 +79,12 @@ export default function PartitaForm() {
     setSubmitting(true)
 
     try {
-      const seasonId = await getOrCreateCurrentSeason()
+      const seasonId = await getSeasonIdForDate(matchDate)
+      if (!seasonId) {
+        throw new Error(
+          'Nessuna stagione copre questa data. Crea o estendi una stagione che includa questa data prima di creare la partita.'
+        )
+      }
 
       const { data: match, error: matchError } = await supabase
         .from('matches')

@@ -5,6 +5,7 @@ import { useMatchDetail } from '../../hooks/useMatchDetail'
 import { useMatchBookings } from '../../hooks/useMatchBookings'
 import { useMatchVoting } from '../../hooks/useMatchVoting'
 import { getKnownFields } from '../../lib/fields'
+import { getSeasonIdForDate } from '../../lib/seasons'
 import { logActivity } from '../../lib/activityLog'
 import { computeOverallsForPlayers, generateBalancedTeams } from '../../lib/teamGeneration'
 import { formatVote } from '../../lib/voting'
@@ -40,6 +41,7 @@ export default function MatchEdit() {
   const [field, setField] = useState('')
   const [knownFields, setKnownFields] = useState<string[]>([])
   const [savingInfo, setSavingInfo] = useState(false)
+  const [infoError, setInfoError] = useState<string | null>(null)
 
   const [newGoalPlayer, setNewGoalPlayer] = useState<Record<Team, string>>({ A: '', B: '' })
   const [ownGoal, setOwnGoal] = useState<Record<Team, boolean>>({ A: false, B: false })
@@ -133,10 +135,21 @@ export default function MatchEdit() {
 
   async function handleSaveInfo() {
     if (!id) return
+    setInfoError(null)
     setSavingInfo(true)
+
+    const seasonId = await getSeasonIdForDate(matchDate)
+    if (!seasonId) {
+      setSavingInfo(false)
+      setInfoError(
+        'Nessuna stagione copre questa data. Crea o estendi una stagione che includa questa data prima di salvare.'
+      )
+      return
+    }
+
     await supabase
       .from('matches')
-      .update({ match_date: matchDate, match_time: matchTime || null, field: field || null })
+      .update({ match_date: matchDate, match_time: matchTime || null, field: field || null, season_id: seasonId })
       .eq('id', id)
     setSavingInfo(false)
     logActivity('partita_modificata', { matchId: id, data: matchDate, ora: matchTime || null, campo: field || null })
@@ -508,6 +521,7 @@ export default function MatchEdit() {
             ))}
           </datalist>
         </div>
+        {infoError && <p className="text-sm text-red-600">{infoError}</p>}
         <button
           onClick={handleSaveInfo}
           disabled={savingInfo || !matchDate}
