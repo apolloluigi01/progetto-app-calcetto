@@ -4,6 +4,7 @@ import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const appUrl = Deno.env.get("APP_URL") ?? "https://progetto-app-calcetto.vercel.app";
 const gmailUser = Deno.env.get("GMAIL_USER")!;
 const gmailAppPassword = Deno.env.get("GMAIL_APP_PASSWORD")!;
 
@@ -88,6 +89,10 @@ Deno.serve(async (req: Request) => {
           <p>Hai richiesto di reimpostare la password del tuo account su <strong>Pavone League</strong>. Inserisci questo codice nella pagina di reset:</p>
           <p style="text-align:center; margin: 32px 0;">
             <span style="display:inline-block; background:#f3f4f6; color:#1a1a1a; padding:14px 28px; border-radius:8px; font-weight:bold; font-size:28px; letter-spacing:4px;">${code}</span>
+          </p>
+          <p style="color:#555; font-size:13px;">
+            Se il link non è cliccabile, copia questo indirizzo e incollalo nel browser per aprire la pagina di reset:<br>
+            <a href="${appUrl}/reset-password" style="color:#2e7d32;word-break:break-all;">${appUrl}/reset-password</a>
           </p>
           <p style="color:#555; font-size:13px;">Il codice scade dopo pochi minuti. Se non hai richiesto tu questa operazione, ignora questa email: la tua password attuale resta valida.</p>
         </div>

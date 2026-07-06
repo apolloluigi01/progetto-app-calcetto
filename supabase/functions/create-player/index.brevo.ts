@@ -41,6 +41,10 @@ function welcomeHtml(name: string, email: string, password: string): string {
           Vai al login
         </a>
       </div>
+      <p style="color:#555;font-size:13px;">
+        Se il pulsante non è cliccabile, copia questo link e incollalo nel browser:<br>
+        <a href="${appUrl}/login" style="color:#2e7d32;word-break:break-all;">${appUrl}/login</a>
+      </p>
       <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0;">
       <p style="color:#9ca3af;font-size:12px;margin:0;">
         Se non ti aspettavi questo messaggio, puoi ignorarlo.
