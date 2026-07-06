@@ -69,10 +69,15 @@ Deno.serve(async (req: Request) => {
     options: { redirectTo: `${appUrl}/reset-password` },
   });
 
-  if (linkError || !linkData.user) {
+  if (linkError || !linkData.user || !linkData.properties?.hashed_token) {
     // Utente non trovato o altro errore: non lo comunichiamo al chiamante.
     return json(GENERIC_RESPONSE);
   }
+
+  // Il link punta alla nostra app (non direttamente all'endpoint di verifica di Supabase):
+  // cosi' una GET automatica di uno scanner antispam non consuma il token monouso prima
+  // che l'utente clicchi davvero. Il token viene verificato solo al submit del form password.
+  const resetLink = `${appUrl}/reset-password?token_hash=${linkData.properties.hashed_token}&type=recovery`;
 
   try {
     await sendEmail(
@@ -83,7 +88,7 @@ Deno.serve(async (req: Request) => {
           <h2 style="color:#2e7d32;">Reimposta la tua password</h2>
           <p>Hai richiesto di reimpostare la password del tuo account su <strong>Pavone League</strong>. Clicca sul link qui sotto per scegliere una nuova password:</p>
           <p style="text-align:center; margin: 32px 0;">
-            <a href="${linkData.properties.action_link}" style="background:#2e7d32; color:#fff; padding:12px 24px; border-radius:8px; text-decoration:none; font-weight:bold;">Reimposta password</a>
+            <a href="${resetLink}" style="background:#2e7d32; color:#fff; padding:12px 24px; border-radius:8px; text-decoration:none; font-weight:bold;">Reimposta password</a>
           </p>
           <p style="color:#888; font-size:12px;">Se non hai richiesto tu questa operazione, ignora questa email: la tua password attuale resta valida.</p>
         </div>

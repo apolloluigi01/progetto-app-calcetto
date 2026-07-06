@@ -1,10 +1,15 @@
 import { useState, type FormEvent } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { validatePassword } from '../lib/passwordPolicy'
 
 export default function ImpostaPassword() {
-  const { signOut } = useAuth()
+  const { session, loading: authLoading, signOut } = useAuth()
+  const [searchParams] = useSearchParams()
+  const tokenHash = searchParams.get('token_hash')
+  const hasValidToken = Boolean(tokenHash) && searchParams.get('type') === 'signup'
+
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -25,6 +30,22 @@ export default function ImpostaPassword() {
     }
 
     setSubmitting(true)
+
+    // Il token viene consumato solo qui, al submit del form: se il link e' stato
+    // "pre-visitato" da uno scanner antispam (che fa solo una GET sulla pagina,
+    // senza inviare il form), il token resta valido per il click reale dell'utente.
+    if (hasValidToken) {
+      const { error: verifyError } = await supabase.auth.verifyOtp({
+        token_hash: tokenHash!,
+        type: 'signup',
+      })
+      if (verifyError) {
+        setSubmitting(false)
+        setError('Il link di attivazione non e\' piu\' valido o e\' scaduto. Chiedi a un amministratore di generarne uno nuovo.')
+        return
+      }
+    }
+
     const { error: updateError } = await supabase.auth.updateUser({ password })
     if (updateError) {
       setSubmitting(false)
@@ -40,6 +61,22 @@ export default function ImpostaPassword() {
     }
 
     window.location.assign('/')
+  }
+
+  if (authLoading) {
+    return <div className="flex min-h-svh items-center justify-center">Caricamento...</div>
+  }
+
+  if (!session && !hasValidToken) {
+    return (
+      <div className="flex min-h-svh items-center justify-center bg-field-green px-4">
+        <div className="w-full max-w-sm rounded-2xl bg-white p-8 text-center shadow-lg">
+          <p className="text-sm text-gray-500">
+            Link non valido o scaduto. Chiedi a un amministratore di generarne uno nuovo.
+          </p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -90,9 +127,11 @@ export default function ImpostaPassword() {
           </button>
         </form>
 
-        <button onClick={signOut} className="mt-4 w-full text-sm text-gray-500 hover:underline">
-          Esci
-        </button>
+        {session && (
+          <button onClick={signOut} className="mt-4 w-full text-sm text-gray-500 hover:underline">
+            Esci
+          </button>
+        )}
       </div>
     </div>
   )

@@ -142,13 +142,18 @@ Deno.serve(async (req: Request) => {
     options: { redirectTo: `${appUrl}/imposta-password` },
   });
 
-  if (linkError || !linkData?.properties?.action_link) {
+  if (linkError || !linkData?.properties?.hashed_token) {
     console.error("generateLink fallito:", linkError?.message);
     return json({ id: createData.user.id, warning: "Utente creato ma email di benvenuto non inviata" });
   }
 
+  // Il link punta alla nostra app (non direttamente all'endpoint di verifica di Supabase):
+  // cosi' una GET automatica di uno scanner antispam non consuma il token monouso prima
+  // che l'utente clicchi davvero. Il token viene verificato solo al submit del form password.
+  const confirmLink = `${appUrl}/imposta-password?token_hash=${linkData.properties.hashed_token}&type=signup`;
+
   try {
-    await sendWelcomeEmail(email, name, linkData.properties.action_link);
+    await sendWelcomeEmail(email, name, confirmLink);
   } catch (e) {
     console.error("Errore invio email:", e);
   }

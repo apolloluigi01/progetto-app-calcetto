@@ -1,28 +1,19 @@
-import { useEffect, useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, type FormEvent } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { validatePassword } from '../lib/passwordPolicy'
 
 export default function ResetPassword() {
   const navigate = useNavigate()
-  const [ready, setReady] = useState(false)
+  const [searchParams] = useSearchParams()
+  const tokenHash = searchParams.get('token_hash')
+  const hasValidToken = Boolean(tokenHash) && searchParams.get('type') === 'recovery'
+
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [done, setDone] = useState(false)
-
-  useEffect(() => {
-    // Il link di recovery fa atterrare l'utente qui con i token nell'URL: il client Supabase li
-    // rileva automaticamente (detectSessionInUrl) e crea una sessione temporanea di tipo recovery.
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) setReady(true)
-    })
-    const { data: subscription } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') setReady(true)
-    })
-    return () => subscription.subscription.unsubscribe()
-  }, [])
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -39,6 +30,20 @@ export default function ResetPassword() {
     }
 
     setSubmitting(true)
+
+    // Il token viene consumato solo qui, al submit del form: se il link e' stato
+    // "pre-visitato" da uno scanner antispam (che fa solo una GET sulla pagina,
+    // senza inviare il form), il token resta valido per il click reale dell'utente.
+    const { error: verifyError } = await supabase.auth.verifyOtp({
+      token_hash: tokenHash!,
+      type: 'recovery',
+    })
+    if (verifyError) {
+      setSubmitting(false)
+      setError('Il link non e\' piu\' valido o e\' scaduto. Richiedi un nuovo link dalla pagina "Password dimenticata".')
+      return
+    }
+
     const { error: updateError } = await supabase.auth.updateUser({ password })
     if (updateError) {
       setSubmitting(false)
@@ -52,7 +57,7 @@ export default function ResetPassword() {
     setTimeout(() => navigate('/'), 1500)
   }
 
-  if (!ready) {
+  if (!hasValidToken) {
     return (
       <div className="flex min-h-svh items-center justify-center bg-field-green px-4">
         <div className="w-full max-w-sm rounded-2xl bg-white p-8 text-center shadow-lg">
