@@ -23,6 +23,8 @@ import PartiteAdmin from './pages/admin/PartiteAdmin'
 import MatchEdit from './pages/admin/MatchEdit'
 import Stagioni from './pages/admin/Stagioni'
 import StagioneEdit from './pages/admin/StagioneEdit'
+import StagioneDettaglio from './pages/admin/StagioneDettaglio'
+import StagioneStatisticaDettaglio from './pages/admin/StagioneStatisticaDettaglio'
 import Fantacalcetto from './pages/Fantacalcetto'
 import RegistroAttivita from './pages/RegistroAttivita'
 
@@ -54,7 +56,10 @@ function App() {
               <Route element={<AdminRoute />}>
                 <Route path="/admin" element={<AdminHome />} />
                 <Route path="/admin/stagioni" element={<Stagioni />} />
-                <Route path="/admin/stagioni/:id" element={<StagioneEdit />} />
+                <Route path="/admin/stagioni/nuova" element={<StagioneEdit />} />
+                <Route path="/admin/stagioni/:id" element={<StagioneDettaglio />} />
+                <Route path="/admin/stagioni/:id/modifica" element={<StagioneEdit />} />
+                <Route path="/admin/stagioni/:id/statistiche/:key" element={<StagioneStatisticaDettaglio />} />
                 <Route path="/admin/giocatori" element={<GiocatoriAdmin />} />
                 <Route path="/admin/giocatori/:id" element={<GiocatoreEdit />} />
                 <Route path="/admin/partite" element={<PartiteAdmin />} />

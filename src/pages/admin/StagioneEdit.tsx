@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import type { Season } from '../../types/database'
 
@@ -57,13 +57,18 @@ export default function StagioneEdit() {
 
     const payload = { name: name.trim(), start_date: startDate, end_date: endDate || null }
 
-    const { error: err } = isNew
-      ? await supabase.from('seasons').insert(payload)
-      : await supabase.from('seasons').update(payload).eq('id', id)
+    if (isNew) {
+      const { data, error: err } = await supabase.from('seasons').insert(payload).select('id').single()
+      setSaving(false)
+      if (err || !data) { setError(err?.message ?? 'Errore creazione stagione'); return }
+      navigate(`/admin/stagioni/${data.id}`)
+      return
+    }
 
+    const { error: err } = await supabase.from('seasons').update(payload).eq('id', id)
     setSaving(false)
     if (err) { setError(err.message); return }
-    navigate('/admin/stagioni')
+    navigate(`/admin/stagioni/${id}`)
   }
 
   async function handleDelete() {
@@ -80,7 +85,10 @@ export default function StagioneEdit() {
 
   return (
     <div className="p-4">
-      <h1 className="text-xl font-semibold text-field-green-dark">
+      <Link to={isNew ? '/admin/stagioni' : `/admin/stagioni/${id}`} className="text-sm text-field-green underline">
+        ← Torna indietro
+      </Link>
+      <h1 className="mt-2 text-xl font-semibold text-field-green-dark">
         {isNew ? 'Nuova stagione' : 'Modifica stagione'}
       </h1>
 

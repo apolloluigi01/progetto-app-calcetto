@@ -49,12 +49,13 @@ export function computeOverall(
  * dall'admin come fallback.
  */
 export async function computeOverallsForPlayers(
-  players: { id: string; name: string }[]
+  players: { id: string; name: string }[],
+  seasonId?: string
 ): Promise<PlayerOverall[]> {
   if (players.length === 0) return []
 
-  const seasonId = await getCurrentSeasonId()
-  const allStats = seasonId ? await computeStatistiche(seasonId) : []
+  const resolvedSeasonId = seasonId ?? (await getCurrentSeasonId())
+  const allStats = resolvedSeasonId ? await computeStatistiche(resolvedSeasonId) : []
 
   const { data: ratingsData } = await supabase
     .from('ratings')
