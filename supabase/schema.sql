@@ -160,11 +160,16 @@ alter table ratings enable row level security;
 alter table rating_weights enable row level security;
 alter table pagelle enable row level security;
 
--- players: tutti gli autenticati vedono il roster; solo admin scrive
+-- players: tutti gli autenticati vedono il roster; solo admin scrive.
+-- Un admin normale può modificare/eliminare solo giocatori con ruolo "player": non altri
+-- admin o superadmin. Un superadmin non ha questa restrizione (vedi
+-- supabase/migrations/20260706_admin_permissions_rework.sql per is_superadmin()).
 create policy "players_select_all" on players for select to authenticated using (true);
 create policy "players_insert_admin" on players for insert to authenticated with check (is_admin());
-create policy "players_update_admin" on players for update to authenticated using (is_admin());
-create policy "players_delete_admin" on players for delete to authenticated using (is_admin());
+create policy "players_update_admin" on players for update to authenticated using (is_admin() and role = 'player') with check (is_admin() and role = 'player');
+create policy "players_update_superadmin" on players for update to authenticated using (is_superadmin()) with check (is_superadmin());
+create policy "players_delete_admin" on players for delete to authenticated using (is_admin() and role = 'player');
+create policy "players_delete_superadmin" on players for delete to authenticated using (is_superadmin());
 
 -- seasons: lettura libera, scrittura admin
 create policy "seasons_select_all" on seasons for select to authenticated using (true);

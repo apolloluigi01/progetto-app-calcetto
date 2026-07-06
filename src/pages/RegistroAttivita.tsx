@@ -14,6 +14,7 @@ interface LogEntry {
 const actionColors: Record<ActivityAction, string> = {
   giocatore_creato:      'bg-field-green/10 text-field-green-dark',
   giocatore_modificato:  'bg-blue-50 text-blue-700',
+  overall_modificato:    'bg-blue-50 text-blue-700',
   giocatore_eliminato:   'bg-red-50 text-red-700',
   password_reimpostata:  'bg-field-yellow/20 text-field-orange',
   partita_creata:        'bg-field-green/10 text-field-green-dark',
@@ -36,6 +37,16 @@ const actionColors: Record<ActivityAction, string> = {
 
 function formatDetails(action: ActivityAction, details: Record<string, unknown>): string {
   const parts: string[] = []
+
+  if (Array.isArray(details.modifiche) && details.modifiche.length > 0) {
+    if (details.giocatore) parts.push(String(details.giocatore))
+    const changes = (details.modifiche as { campo: string; da: string; a: string }[])
+      .map((m) => `${m.campo}: ${m.da} → ${m.a}`)
+      .join(' · ')
+    parts.push(changes)
+    return parts.join(' — ')
+  }
+
   if (details.nome)      parts.push(String(details.nome))
   if (details.email)     parts.push(String(details.email))
   if (details.data)      parts.push(new Date(String(details.data)).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' }))

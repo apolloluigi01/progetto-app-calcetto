@@ -1,8 +1,15 @@
 import { supabase } from './supabase'
 
+export interface FieldChange {
+  campo: string
+  da: string
+  a: string
+}
+
 export type ActivityAction =
   | 'giocatore_creato'
   | 'giocatore_modificato'
+  | 'overall_modificato'
   | 'giocatore_eliminato'
   | 'password_reimpostata'
   | 'partita_creata'
@@ -25,6 +32,7 @@ export type ActivityAction =
 export const actionLabels: Record<ActivityAction, string> = {
   giocatore_creato:      'Giocatore creato',
   giocatore_modificato:  'Giocatore modificato',
+  overall_modificato:    'Overall modificato',
   giocatore_eliminato:   'Giocatore eliminato',
   password_reimpostata:  'Password reimpostata',
   partita_creata:        'Partita creata',

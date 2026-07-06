@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { getFunctionErrorMessage } from '../../lib/functionErrors'
-import { logActivity } from '../../lib/activityLog'
+import { logActivity, type FieldChange } from '../../lib/activityLog'
 import type { Player, PlayerRole } from '../../types/database'
 
 type PlayerWithStatus = Player & { email?: string | null; email_confirmed?: boolean }
@@ -25,6 +25,7 @@ export default function GiocatoreEdit() {
   const [deleting, setDeleting] = useState(false)
 
   const [overallValue, setOverallValue] = useState<number>(50)
+  const [initialOverall, setInitialOverall] = useState<number>(50)
   const [savingOverall, setSavingOverall] = useState(false)
   const [overallSaved, setOverallSaved] = useState(false)
 
@@ -45,7 +46,11 @@ export default function GiocatoreEdit() {
     ])
     if (listRes.error) setError(listRes.error.message)
     setPlayer(listRes.data?.players.find((p) => p.id === id) ?? null)
-    if (ratingRes.data) setOverallValue(Math.round(Number(ratingRes.data.rating_value)))
+    if (ratingRes.data) {
+      const val = Math.round(Number(ratingRes.data.rating_value))
+      setOverallValue(val)
+      setInitialOverall(val)
+    }
     setLoading(false)
   }
 
@@ -64,11 +69,19 @@ export default function GiocatoreEdit() {
   if (loading) return <div className="p-4 text-sm text-gray-500">Caricamento...</div>
   if (error || !player) return <div className="p-4 text-sm text-red-600">{error ?? 'Giocatore non trovato'}</div>
 
+  // Nome/cognome/nickname/ruolo/password: un admin normale può toccarli solo su un
+  // giocatore semplice, non su un altro admin/superadmin. L'overall invece è un valore
+  // di gioco, non un privilegio sull'account: qualunque admin lo modifica per chiunque.
   const canEditDetails = isSuperAdmin || (isAdmin && player.role === 'player')
+  const canEditOverall = isAdmin
   const canDelete = !isSelf && canEditDetails
 
+  function targetLabel(): string {
+    return `${player?.name ?? ''}${player?.surname ? ` ${player.surname}` : ''}`.trim()
+  }
+
   async function handleSave() {
-    if (!id) return
+    if (!id || !player) return
     setSaving(true)
     setError(null)
 
@@ -85,12 +98,25 @@ export default function GiocatoreEdit() {
       setError(error.message)
       return
     }
-    logActivity('giocatore_modificato', { nome: name, cognome: surname || null, nickname: nickname || null, ruolo: isSuperAdmin ? role : undefined, playerId: id })
+
+    const modifiche: FieldChange[] = []
+    if (player.name !== name) modifiche.push({ campo: 'Nome', da: player.name, a: name })
+    if ((player.surname ?? '') !== surname) {
+      modifiche.push({ campo: 'Cognome', da: player.surname || '(vuoto)', a: surname || '(vuoto)' })
+    }
+    if ((player.nickname ?? '') !== nickname) {
+      modifiche.push({ campo: 'Nickname', da: player.nickname || '(vuoto)', a: nickname || '(vuoto)' })
+    }
+    if (isSuperAdmin && player.role !== role) modifiche.push({ campo: 'Ruolo', da: player.role, a: role })
+
+    if (modifiche.length > 0) {
+      logActivity('giocatore_modificato', { playerId: id, giocatore: targetLabel(), modifiche })
+    }
     load()
   }
 
   async function handleSaveOverall() {
-    if (!id) return
+    if (!id || !player) return
     setSavingOverall(true)
     setOverallSaved(false)
     const val = Math.min(100, Math.max(1, Math.round(overallValue)))
@@ -103,6 +129,15 @@ export default function GiocatoreEdit() {
       )
     setSavingOverall(false)
     setOverallSaved(true)
+
+    if (val !== initialOverall) {
+      logActivity('overall_modificato', {
+        playerId: id,
+        giocatore: targetLabel(),
+        modifiche: [{ campo: 'Overall', da: String(initialOverall), a: String(val) }],
+      })
+      setInitialOverall(val)
+    }
   }
 
   async function handleResetPassword(e: FormEvent) {
@@ -212,13 +247,14 @@ export default function GiocatoreEdit() {
             {player.nickname && <p className="text-sm text-gray-500">{player.nickname}</p>}
             <p className="mt-1 text-xs uppercase text-field-green">{player.role}</p>
             <p className="mt-2 text-xs text-gray-400">
-              Solo un superadmin può modificare i dati di un altro admin.
+              Solo un superadmin può modificare nome, cognome, nickname, ruolo o password di un altro admin.
+              L'overall resta modificabile qui sotto.
             </p>
           </div>
         )}
       </div>
 
-      {canEditDetails && (
+      {canEditOverall && (
         <div className="mt-4 rounded-xl bg-white p-4 shadow">
           <h2 className="font-medium text-gray-800">Overall iniziale</h2>
           <p className="mt-1 text-xs text-gray-500">
