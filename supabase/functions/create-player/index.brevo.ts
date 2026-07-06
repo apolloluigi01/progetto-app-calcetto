@@ -31,7 +31,7 @@ function welcomeHtml(name: string, email: string, confirmLink: string): string {
       <p>Ciao <strong>${name}</strong>,</p>
       <p>Il tuo account è stato creato. Per attivarlo e scegliere la tua password, clicca sul pulsante qui sotto:</p>
       <div style="text-align:center;margin:24px 0;">
-        <a href="${confirmLink}"
+        <a href="${confirmLink.replace(/&/g, "&amp;")}"
            style="display:inline-block;background:#2e7d32;color:white;padding:14px 32px;
                   border-radius:8px;text-decoration:none;font-weight:bold;font-size:16px;">
           Attiva il tuo account
