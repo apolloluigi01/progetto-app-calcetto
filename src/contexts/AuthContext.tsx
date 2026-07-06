@@ -11,6 +11,7 @@ interface AuthContextValue {
   isSuperAdmin: boolean
   signIn: (email: string, password: string) => Promise<{ error: string | null }>
   signOut: () => Promise<void>
+  refreshPlayer: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
@@ -60,6 +61,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut()
   }
 
+  async function refreshPlayer() {
+    if (!session) return
+    const { data } = await supabase.from('players').select('*').eq('id', session.user.id).single()
+    setPlayer(data as Player | null)
+  }
+
   return (
     <AuthContext.Provider
       value={{
@@ -70,6 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isSuperAdmin: player?.role === 'superadmin',
         signIn,
         signOut,
+        refreshPlayer,
       }}
     >
       {children}

@@ -11,7 +11,7 @@ const roleLabels: Record<string, string> = {
 }
 
 export default function Impostazioni() {
-  const { player, session } = useAuth()
+  const { player, session, refreshPlayer } = useAuth()
 
   const [showForm, setShowForm] = useState(false)
   const [password, setPassword] = useState('')
@@ -19,6 +19,32 @@ export default function Impostazioni() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+
+  const [editingNickname, setEditingNickname] = useState(false)
+  const [nickname, setNickname] = useState(player?.nickname ?? '')
+  const [nicknameError, setNicknameError] = useState<string | null>(null)
+  const [savingNickname, setSavingNickname] = useState(false)
+
+  async function handleSaveNickname(e: FormEvent) {
+    e.preventDefault()
+    setNicknameError(null)
+
+    if (nickname.trim().length > 30) {
+      setNicknameError('Il nickname non può superare 30 caratteri.')
+      return
+    }
+
+    setSavingNickname(true)
+    const { error: rpcError } = await supabase.rpc('update_own_nickname', { new_nickname: nickname })
+    setSavingNickname(false)
+    if (rpcError) {
+      setNicknameError(rpcError.message)
+      return
+    }
+
+    await refreshPlayer()
+    setEditingNickname(false)
+  }
 
   async function handleChangePassword(e: FormEvent) {
     e.preventDefault()
@@ -56,7 +82,53 @@ export default function Impostazioni() {
       {player && (
         <div className="mt-4 rounded-xl bg-white p-4 shadow">
           <p className="font-medium">{player.name}</p>
-          {player.nickname && <p className="text-sm text-gray-500">{player.nickname}</p>}
+
+          {editingNickname ? (
+            <form onSubmit={handleSaveNickname} className="mt-2 space-y-2">
+              <input
+                autoFocus
+                value={nickname}
+                onChange={(e) => setNickname(e.target.value)}
+                placeholder="Il tuo nickname"
+                maxLength={30}
+                className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-field-green focus:outline-none"
+              />
+              {nicknameError && <p className="text-sm text-red-600">{nicknameError}</p>}
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  disabled={savingNickname}
+                  className="rounded-lg bg-field-green px-3 py-1.5 text-sm font-medium text-white hover:bg-field-green-dark disabled:opacity-60"
+                >
+                  {savingNickname ? 'Salvataggio...' : 'Salva'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingNickname(false)
+                    setNicknameError(null)
+                  }}
+                  className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100"
+                >
+                  Annulla
+                </button>
+              </div>
+            </form>
+          ) : (
+            <div className="mt-1 flex items-center gap-2">
+              <p className="text-sm text-gray-500">{player.nickname || 'Nessun nickname impostato'}</p>
+              <button
+                onClick={() => {
+                  setNickname(player.nickname ?? '')
+                  setEditingNickname(true)
+                }}
+                className="text-xs font-medium text-field-green hover:underline"
+              >
+                Modifica
+              </button>
+            </div>
+          )}
+
           {session?.user.email && <p className="mt-1 text-sm text-gray-500">{session.user.email}</p>}
           <p className="mt-2 text-xs uppercase text-field-green">{roleLabels[player.role] ?? player.role}</p>
         </div>

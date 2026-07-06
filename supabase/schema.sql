@@ -125,6 +125,26 @@ $$;
 
 grant execute on function clear_must_change_password() to authenticated;
 
+-- RPC che l'utente autenticato chiama per modificare il proprio nickname (RLS su
+-- players consente l'update solo agli admin: qui si concede solo questa singola
+-- colonna, sulla propria riga, tramite security definer).
+create or replace function update_own_nickname(new_nickname text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new_nickname is not null and length(trim(new_nickname)) > 30 then
+    raise exception 'Il nickname non puo'' superare 30 caratteri';
+  end if;
+
+  update players set nickname = nullif(trim(new_nickname), '') where id = auth.uid();
+end;
+$$;
+
+grant execute on function update_own_nickname(text) to authenticated;
+
 -- =========================================================
 -- ROW LEVEL SECURITY
 -- =========================================================
