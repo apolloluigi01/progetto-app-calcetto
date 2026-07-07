@@ -57,7 +57,7 @@ export default function PartitaForm() {
     let cancelled = false
     setGeneratingTeams(true)
     const chosen = players.filter((p) => selected.has(p.id))
-    computeOverallsForPlayers(chosen.map((p) => ({ id: p.id, name: p.name }))).then((overalls) => {
+    computeOverallsForPlayers(chosen.map((p) => ({ id: p.id, name: p.name, nickname: p.nickname }))).then((overalls) => {
       if (cancelled) return
       setGeneratedTeams(generateBalancedTeams(overalls))
       setGeneratingTeams(false)
@@ -217,7 +217,7 @@ export default function PartitaForm() {
                     checked={selected.has(p.id)}
                     onChange={() => toggleSelected(p.id)}
                   />
-                  <span>{p.name}</span>
+                  <span>{p.nickname ?? p.name}</span>
                 </label>
               ))}
             </div>
@@ -240,7 +240,7 @@ export default function PartitaForm() {
                     <ul className="mt-1 space-y-1 text-sm">
                       {generatedTeams.teamA.map((p) => (
                         <li key={p.playerId} className="flex items-center justify-between">
-                          <span>{p.name}</span>
+                          <span>{p.nickname ?? p.name}</span>
                           <span className="text-xs text-gray-500">{p.overall}</span>
                         </li>
                       ))}
@@ -253,7 +253,7 @@ export default function PartitaForm() {
                     <ul className="mt-1 space-y-1 text-sm">
                       {generatedTeams.teamB.map((p) => (
                         <li key={p.playerId} className="flex items-center justify-between">
-                          <span>{p.name}</span>
+                          <span>{p.nickname ?? p.name}</span>
                           <span className="text-xs text-gray-500">{p.overall}</span>
                         </li>
                       ))}

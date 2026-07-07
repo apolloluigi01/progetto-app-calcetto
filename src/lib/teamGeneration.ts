@@ -5,6 +5,7 @@ import { getCurrentSeasonId } from './seasons'
 export interface PlayerOverall {
   playerId: string
   name: string
+  nickname: string | null
   overall: number
 }
 
@@ -49,7 +50,7 @@ export function computeOverall(
  * dall'admin come fallback.
  */
 export async function computeOverallsForPlayers(
-  players: { id: string; name: string }[],
+  players: { id: string; name: string; nickname?: string | null }[],
   seasonId?: string
 ): Promise<PlayerOverall[]> {
   if (players.length === 0) return []
@@ -69,7 +70,7 @@ export async function computeOverallsForPlayers(
     const stats = allStats.find((s) => s.player.id === p.id)
     const fallback = ratingMap.get(p.id) ?? 50
     const overall = stats ? computeOverall(stats, goalsMax, fallback) : fallback
-    return { playerId: p.id, name: p.name, overall }
+    return { playerId: p.id, name: p.name, nickname: p.nickname ?? null, overall }
   })
 }
 

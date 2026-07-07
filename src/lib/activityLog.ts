@@ -24,6 +24,7 @@ export type ActivityAction =
   | 'sondaggio_chiuso'
   | 'squadre_generate'
   | 'squadre_modificate'
+  | 'giocatore_sostituito'
   | 'prenotazione_aggiunta'
   | 'prenotazione_rimossa'
   | 'votazioni_aperte'
@@ -47,6 +48,7 @@ export const actionLabels: Record<ActivityAction, string> = {
   sondaggio_chiuso:      'Sondaggio chiuso',
   squadre_generate:      'Squadre generate',
   squadre_modificate:    'Squadre modificate manualmente',
+  giocatore_sostituito:  'Giocatore sostituito',
   prenotazione_aggiunta: 'Prenotazione aggiunta (admin)',
   prenotazione_rimossa:  'Prenotazione rimossa (admin)',
   votazioni_aperte:      'Votazioni aperte',

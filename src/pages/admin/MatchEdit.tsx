@@ -77,6 +77,12 @@ export default function MatchEdit() {
   const [localTeamB, setLocalTeamB] = useState<MatchPlayerWithName[]>([])
   const [savingTeams, setSavingTeams] = useState(false)
 
+  // Sostituzione giocatore (solo finché la partita è in bozza)
+  const [substitutingOpen, setSubstitutingOpen] = useState(false)
+  const [subOutId, setSubOutId] = useState('')
+  const [subInId, setSubInId] = useState('')
+  const [substituting, setSubstituting] = useState(false)
+
   useEffect(() => {
     getKnownFields().then(setKnownFields)
     supabase
@@ -334,7 +340,7 @@ export default function MatchEdit() {
     setGeneratedTeams(null)
 
     const players = await computeOverallsForPlayers(
-      bookings.map((b) => ({ id: b.player_id, name: b.name }))
+      bookings.map((b) => ({ id: b.player_id, name: b.name, nickname: b.nickname }))
     )
 
     const result = generateBalancedTeams(players)
@@ -443,11 +449,67 @@ export default function MatchEdit() {
     refetch()
   }
 
+  // --- Sostituzione giocatore già assegnato con uno esterno alla partita ---
+  function startSubstitute() {
+    setSubOutId('')
+    setSubInId('')
+    setSubstitutingOpen(true)
+  }
+
+  function cancelSubstitute() {
+    setSubstitutingOpen(false)
+  }
+
+  async function handleConfirmSubstitute() {
+    if (!id || !subOutId || !subInId) return
+    setSubstituting(true)
+
+    const inPlayer = allPlayers.find((p) => p.id === subInId)
+    const outPlayer = matchPlayers.find((mp) => mp.player_id === subOutId)
+    const roster = [
+      ...matchPlayers
+        .filter((mp) => mp.player_id !== subOutId)
+        .map((mp) => ({ id: mp.player_id, name: mp.name, nickname: mp.nickname })),
+      { id: subInId, name: inPlayer?.name ?? '', nickname: inPlayer?.nickname ?? null },
+    ]
+
+    const overalls = await computeOverallsForPlayers(roster)
+    const result = generateBalancedTeams(overalls)
+
+    await supabase.from('match_players').delete().eq('match_id', id)
+    const rows = [
+      ...result.teamA.map((p) => ({ match_id: id, player_id: p.playerId, team: 'A' as Team })),
+      ...result.teamB.map((p) => ({ match_id: id, player_id: p.playerId, team: 'B' as Team })),
+    ]
+    await supabase.from('match_players').insert(rows)
+
+    await Promise.all(
+      [...result.teamA, ...result.teamB].map((p) =>
+        supabase
+          .from('ratings')
+          .upsert({ player_id: p.playerId, rating_value: p.overall, fascia: overallToFascia(p.overall), updated_at: new Date().toISOString() }, { onConflict: 'player_id' })
+      )
+    )
+
+    logActivity('giocatore_sostituito', {
+      matchId: id,
+      data: match.match_date,
+      uscito: outPlayer?.name,
+      entrato: inPlayer?.name,
+    })
+
+    setSubstituting(false)
+    setSubstitutingOpen(false)
+    refetch()
+  }
+
   const bookedNotInMatch = bookings.filter(
     b => !matchPlayers.some(mp => mp.player_id === b.player_id)
   )
   const alreadyBookedIds = new Set(bookings.map(b => b.player_id))
   const availableToAdd = allPlayers.filter(p => !alreadyBookedIds.has(p.id))
+  const inMatchIds = new Set(matchPlayers.map((mp) => mp.player_id))
+  const playersNotInMatch = allPlayers.filter((p) => !inMatchIds.has(p.id))
 
   const canGenerate = bookings.length >= MAX_PLAYERS && matchPlayers.length === 0
 
@@ -633,7 +695,7 @@ export default function MatchEdit() {
                   <ul className="space-y-1">
                     {draftTeamA.map(p => (
                       <li key={p.playerId} className="flex items-center justify-between text-sm">
-                        <span>{p.name}</span>
+                        <span>{p.nickname ?? p.name}</span>
                         <div className="flex items-center gap-1">
                           <span className="rounded bg-field-green/10 px-1.5 text-xs font-bold text-field-green-dark">
                             {p.overall}
@@ -662,7 +724,7 @@ export default function MatchEdit() {
                   <ul className="space-y-1">
                     {draftTeamB.map(p => (
                       <li key={p.playerId} className="flex items-center justify-between text-sm">
-                        <span>{p.name}</span>
+                        <span>{p.nickname ?? p.name}</span>
                         <div className="flex items-center gap-1">
                           <button
                             onClick={() => swapPlayer('B', p.playerId)}
@@ -715,14 +777,14 @@ export default function MatchEdit() {
       )}
 
       {/* ===== SQUADRE (già assegnate) ===== */}
-      {matchPlayers.length > 0 && !editingTeams && (
+      {matchPlayers.length > 0 && !editingTeams && !substitutingOpen && (
         <div className="mt-4">
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-xl bg-white p-3 shadow">
               <h3 className="mb-2 font-medium text-field-green-dark">Squadra A</h3>
               <ul className="space-y-1 text-sm">
                 {teamA.map((p) => (
-                  <li key={p.id}>{p.name}</li>
+                  <li key={p.id}>{p.nickname ?? p.name}</li>
                 ))}
               </ul>
             </div>
@@ -730,19 +792,92 @@ export default function MatchEdit() {
               <h3 className="mb-2 font-medium text-field-green-dark">Squadra B</h3>
               <ul className="space-y-1 text-sm">
                 {teamB.map((p) => (
-                  <li key={p.id}>{p.name}</li>
+                  <li key={p.id}>{p.nickname ?? p.name}</li>
                 ))}
               </ul>
             </div>
           </div>
           {isDraft && (
-            <button
-              onClick={startEditingTeams}
-              className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
-            >
-              ✏️ Modifica squadre
-            </button>
+            <div className="mt-2 flex gap-2">
+              <button
+                onClick={startEditingTeams}
+                className="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+              >
+                ✏️ Modifica squadre
+              </button>
+              <button
+                onClick={startSubstitute}
+                disabled={playersNotInMatch.length === 0}
+                className="flex-1 rounded-lg border border-field-orange/50 px-3 py-1.5 text-sm text-field-orange hover:bg-field-orange/5 disabled:opacity-50"
+                title={playersNotInMatch.length === 0 ? 'Nessun giocatore disponibile per la sostituzione' : undefined}
+              >
+                🔄 Sostituisci giocatore
+              </button>
+            </div>
           )}
+        </div>
+      )}
+
+      {/* ===== SOSTITUZIONE GIOCATORE (solo in bozza) ===== */}
+      {matchPlayers.length > 0 && substitutingOpen && (
+        <div className="mt-4 rounded-xl border border-field-orange/30 bg-field-orange/5 p-4">
+          <h2 className="font-semibold text-field-orange">Sostituisci giocatore</h2>
+          <p className="mt-1 text-xs text-gray-600">
+            Sostituisci un giocatore in campo con uno non selezionato per questa partita. Le
+            squadre verranno rigenerate automaticamente in base all'overall di tutti i giocatori,
+            incluso il nuovo entrato.
+          </p>
+          <div className="mt-3 space-y-2">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-700">
+                Giocatore da sostituire
+              </label>
+              <select
+                value={subOutId}
+                onChange={(e) => setSubOutId(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
+              >
+                <option value="">Seleziona...</option>
+                {matchPlayers.map((mp) => (
+                  <option key={mp.player_id} value={mp.player_id}>
+                    {mp.nickname ?? mp.name} (Squadra {mp.team})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-700">
+                Nuovo giocatore
+              </label>
+              <select
+                value={subInId}
+                onChange={(e) => setSubInId(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
+              >
+                <option value="">Seleziona...</option>
+                {playersNotInMatch.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.nickname ?? p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="mt-3 flex gap-2">
+            <button
+              onClick={cancelSubstitute}
+              className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            >
+              Annulla
+            </button>
+            <button
+              onClick={handleConfirmSubstitute}
+              disabled={substituting || !subOutId || !subInId}
+              className="flex-1 rounded-lg bg-field-orange px-3 py-2 text-sm font-medium text-white hover:bg-field-orange/90 disabled:opacity-50"
+            >
+              {substituting ? 'Sostituzione...' : 'Conferma sostituzione'}
+            </button>
+          </div>
         </div>
       )}
 
@@ -756,7 +891,7 @@ export default function MatchEdit() {
               <ul className="space-y-1">
                 {localTeamA.map((p) => (
                   <li key={p.player_id} className="flex items-center justify-between text-sm">
-                    <span>{p.name}</span>
+                    <span>{p.nickname ?? p.name}</span>
                     <button
                       onClick={() => swapConfirmedPlayer('A', p.player_id)}
                       className="text-xs text-gray-400 hover:text-field-orange"
@@ -780,7 +915,7 @@ export default function MatchEdit() {
                     >
                       A←
                     </button>
-                    <span>{p.name}</span>
+                    <span>{p.nickname ?? p.name}</span>
                   </li>
                 ))}
               </ul>
@@ -879,7 +1014,7 @@ export default function MatchEdit() {
                   <option value="">Giocatore...</option>
                   {(ownGoal[team] ? (team === 'A' ? teamB : teamA) : team === 'A' ? teamA : teamB).map((p) => (
                     <option key={p.player_id} value={p.player_id}>
-                      {p.name}
+                      {p.nickname ?? p.name}
                     </option>
                   ))}
                 </select>

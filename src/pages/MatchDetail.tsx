@@ -277,7 +277,7 @@ export default function MatchDetail() {
             <h3 className="mb-2 font-medium text-field-green-dark">Squadra A</h3>
             <ul className="space-y-1 text-sm">
               {teamA.map((p) => (
-                <li key={p.id}>{p.name}</li>
+                <li key={p.id}>{p.nickname ?? p.name}</li>
               ))}
             </ul>
           </div>
@@ -285,7 +285,7 @@ export default function MatchDetail() {
             <h3 className="mb-2 font-medium text-field-green-dark">Squadra B</h3>
             <ul className="space-y-1 text-sm">
               {teamB.map((p) => (
-                <li key={p.id}>{p.name}</li>
+                <li key={p.id}>{p.nickname ?? p.name}</li>
               ))}
             </ul>
           </div>

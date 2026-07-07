@@ -29,6 +29,7 @@ const actionColors: Record<ActivityAction, string> = {
   sondaggio_chiuso:      'bg-blue-50 text-blue-700',
   squadre_generate:      'bg-field-green/10 text-field-green-dark',
   squadre_modificate:    'bg-blue-50 text-blue-700',
+  giocatore_sostituito:  'bg-field-orange/10 text-field-orange',
   prenotazione_aggiunta: 'bg-field-green/10 text-field-green-dark',
   prenotazione_rimossa:  'bg-red-50 text-red-600',
   votazioni_aperte:      'bg-purple-50 text-purple-700',
@@ -53,6 +54,8 @@ function formatDetails(action: ActivityAction, details: Record<string, unknown>)
   if (details.campo)     parts.push(`Campo: ${details.campo}`)
   if (details.squadra)   parts.push(`Squadra ${details.squadra}`)
   if (details.giocatore) parts.push(String(details.giocatore))
+  if (action === 'giocatore_sostituito' && details.uscito && details.entrato)
+    parts.push(`${details.uscito} → ${details.entrato}`)
   if (action === 'risultato_salvato' && details.scoreA !== undefined)
     parts.push(`${details.scoreA} - ${details.scoreB}`)
   if (details.autogol)   parts.push('(autogol)')
