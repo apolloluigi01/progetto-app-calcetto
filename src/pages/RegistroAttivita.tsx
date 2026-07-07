@@ -35,6 +35,8 @@ const actionColors: Record<ActivityAction, string> = {
   votazioni_aperte:      'bg-purple-50 text-purple-700',
   votazioni_chiuse:      'bg-purple-50 text-purple-700',
   fanta_lega_creata:     'bg-field-yellow/20 text-field-orange',
+  fanta_giornata_calcolata: 'bg-field-yellow/20 text-field-orange',
+  fanta_calcolo_annullato:  'bg-red-50 text-red-600',
 }
 
 function formatDetails(action: ActivityAction, details: Record<string, unknown>): string {

@@ -30,6 +30,8 @@ export type ActivityAction =
   | 'votazioni_aperte'
   | 'votazioni_chiuse'
   | 'fanta_lega_creata'
+  | 'fanta_giornata_calcolata'
+  | 'fanta_calcolo_annullato'
 
 export const actionLabels: Record<ActivityAction, string> = {
   giocatore_creato:      'Giocatore creato',
@@ -55,6 +57,8 @@ export const actionLabels: Record<ActivityAction, string> = {
   votazioni_aperte:      'Votazioni aperte',
   votazioni_chiuse:      'Votazioni chiuse',
   fanta_lega_creata:     'Lega fantacalcetto creata',
+  fanta_giornata_calcolata: 'Giornata fantacalcetto calcolata',
+  fanta_calcolo_annullato:  'Calcolo giornata fantacalcetto annullato',
 }
 
 export async function logActivity(

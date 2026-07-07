@@ -36,6 +36,8 @@ export default function FantaFormazione() {
   const [savedLineup, setSavedLineup] = useState<SavedLineup | null>(null)
   // Si può schierare solo per la prossima partita da giocare (null = verifica in corso).
   const [isNextMatch, setIsNextMatch] = useState<boolean | null>(null)
+  // True se l'admin ha eseguito il "Calcola giornata" per questa partita.
+  const [isCalculated, setIsCalculated] = useState(false)
 
   // Carica l'eventuale formazione già schierata.
   useEffect(() => {
@@ -64,6 +66,24 @@ export default function FantaFormazione() {
       cancelled = true
     }
   }, [leagueId, matchId, player])
+
+  // Stato del calcolo giornata (admin): determina se mostrare il punteggio.
+  useEffect(() => {
+    if (!leagueId || !matchId) return
+    let cancelled = false
+    supabase
+      .from('fanta_calculations')
+      .select('id')
+      .eq('league_id', leagueId)
+      .eq('match_id', matchId)
+      .maybeSingle()
+      .then(({ data: row }) => {
+        if (!cancelled) setIsCalculated(!!row)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [leagueId, matchId])
 
   // Verifica che questa sia davvero la prossima partita da giocare della
   // stagione: le formazioni si possono schierare solo per quella.
@@ -167,9 +187,9 @@ export default function FantaFormazione() {
     setSavedLineup({ playerIds: [...selected], captainId })
   }
 
-  // Punteggio (solo a pagelle pubblicate)
+  // Punteggio (solo dopo che l'admin ha calcolato la giornata)
   const score =
-    locked && isPublished && selected.size > 0
+    locked && isPublished && isCalculated && selected.size > 0
       ? computeLineupScore([...selected], captainId, {
           pagelle: pagelle.map((p) => ({ player_id: p.player_id, voto: p.voto, is_mvp: p.is_mvp })),
           goals: goals.map((g) => ({
@@ -249,9 +269,11 @@ export default function FantaFormazione() {
           <p className="text-sm text-field-orange">
             {!result
               ? '🔒 Puoi schierare la formazione solo per la prossima partita in programma: questa si sbloccherà dopo quella precedente.'
-              : isPublished
-                ? 'Partita conclusa: ecco il punteggio della tua squadra.'
-                : 'Partita conclusa: il punteggio arriverà con la pubblicazione delle pagelle.'}
+              : isCalculated
+                ? 'Giornata calcolata: ecco il punteggio della tua squadra.'
+                : isPublished
+                  ? "Partita conclusa: il punteggio arriverà quando l'admin calcolerà la giornata."
+                  : 'Partita conclusa: il punteggio arriverà con la pubblicazione delle pagelle e il calcolo della giornata.'}
           </p>
         </div>
       ) : (

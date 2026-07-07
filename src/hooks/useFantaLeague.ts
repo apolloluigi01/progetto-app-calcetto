@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { computeLineupScore } from '../lib/fantacalcetto'
 import type { Match } from '../types/database'
 
 export interface FantaStanding {
@@ -23,6 +22,8 @@ export interface FantaMatchRow {
   isPublished: boolean
   /** True solo per la prossima partita da giocare: l'unica schierabile. */
   isNext: boolean
+  /** True se l'admin ha eseguito il "Calcola giornata" per questa partita. */
+  isCalculated: boolean
   myLineup: FantaLineupInfo | null
   myScore: number | null
 }
@@ -59,7 +60,7 @@ export function useFantaLeague(leagueId: string | undefined, myPlayerId: string 
     type LeagueRow = { id: string; name: string; season_id: string; seasons: { name: string } | null }
     const leagueRow = leagueRes.data as unknown as LeagueRow
 
-    const [membersRes, matchesRes, lineupsRes] = await Promise.all([
+    const [membersRes, matchesRes, lineupsRes, calcsRes] = await Promise.all([
       supabase
         .from('fanta_league_members')
         .select('player_id, players(name, nickname)')
@@ -71,31 +72,24 @@ export function useFantaLeague(leagueId: string | undefined, myPlayerId: string 
         .order('match_date', { ascending: true }),
       supabase
         .from('fanta_lineups')
-        .select('id, match_id, member_id, captain_id, fanta_lineup_players(player_id)')
+        .select('id, match_id, member_id, captain_id, score, fanta_lineup_players(player_id)')
         .eq('league_id', leagueId),
+      supabase.from('fanta_calculations').select('match_id').eq('league_id', leagueId),
     ])
 
     const matchIds = (matchesRes.data ?? []).map((m) => m.id)
 
-    const [matchPlayersRes, pagelleRes, goalsRes] = await Promise.all([
+    const [matchPlayersRes, pagelleRes] = await Promise.all([
       matchIds.length > 0
         ? supabase.from('match_players').select('match_id, player_id').in('match_id', matchIds)
         : Promise.resolve({ data: [] as { match_id: string; player_id: string }[] }),
       matchIds.length > 0
         ? supabase
             .from('pagelle')
-            .select('match_id, player_id, voto, is_mvp')
+            .select('match_id, player_id')
             .in('match_id', matchIds)
             .not('published_at', 'is', null)
-        : Promise.resolve({ data: [] as { match_id: string; player_id: string; voto: string; is_mvp: boolean }[] }),
-      matchIds.length > 0
-        ? supabase
-            .from('goals')
-            .select('match_id, player_id, is_own_goal, assist_player_id')
-            .in('match_id', matchIds)
-        : Promise.resolve({
-            data: [] as { match_id: string; player_id: string; is_own_goal: boolean; assist_player_id: string | null }[],
-          }),
+        : Promise.resolve({ data: [] as { match_id: string; player_id: string }[] }),
     ])
 
     type MemberRow = { player_id: string; players: { name: string; nickname: string | null } | null }
@@ -104,6 +98,7 @@ export function useFantaLeague(leagueId: string | undefined, myPlayerId: string 
       match_id: string
       member_id: string
       captain_id: string
+      score: number | null
       fanta_lineup_players: { player_id: string }[]
     }
 
@@ -111,7 +106,7 @@ export function useFantaLeague(leagueId: string | undefined, myPlayerId: string 
     const lineups = (lineupsRes.data ?? []) as unknown as LineupRow[]
     const matchPlayers = matchPlayersRes.data ?? []
     const pagelle = pagelleRes.data ?? []
-    const goals = goalsRes.data ?? []
+    const calculatedMatchIds = new Set((calcsRes.data ?? []).map((c) => c.match_id))
 
     const teamsCountByMatch = new Map<string, number>()
     for (const mp of matchPlayers) {
@@ -119,24 +114,13 @@ export function useFantaLeague(leagueId: string | undefined, myPlayerId: string 
     }
     const publishedMatchIds = new Set(pagelle.map((p) => p.match_id))
 
-    // Punteggi: per ogni partita con pagelle pubblicate, calcola il punteggio
-    // di ogni formazione schierata e accumula la classifica.
+    // Classifica: somma dei punteggi persistiti dal "Calcola giornata" dell'admin.
     const totals = new Map<string, { total: number; matchesScored: number }>()
-    const scoreByLineup = new Map<string, number>()
     for (const lineup of lineups) {
-      if (!publishedMatchIds.has(lineup.match_id)) continue
-      const score = computeLineupScore(
-        lineup.fanta_lineup_players.map((p) => p.player_id),
-        lineup.captain_id,
-        {
-          pagelle: pagelle.filter((p) => p.match_id === lineup.match_id),
-          goals: goals.filter((g) => g.match_id === lineup.match_id),
-        },
-      )
-      scoreByLineup.set(lineup.id, score.total)
+      if (lineup.score === null || !calculatedMatchIds.has(lineup.match_id)) continue
       const prev = totals.get(lineup.member_id) ?? { total: 0, matchesScored: 0 }
       totals.set(lineup.member_id, {
-        total: Math.round((prev.total + score.total) * 100) / 100,
+        total: Math.round((prev.total + Number(lineup.score)) * 100) / 100,
         matchesScored: prev.matchesScored + 1,
       })
     }
@@ -167,13 +151,17 @@ export function useFantaLeague(leagueId: string | undefined, myPlayerId: string 
         hasResult: !!result,
         isPublished: publishedMatchIds.has(m.id),
         isNext: m.id === nextMatchId,
+        isCalculated: calculatedMatchIds.has(m.id),
         myLineup: myLineupRow
           ? {
               playerIds: myLineupRow.fanta_lineup_players.map((p) => p.player_id),
               captainId: myLineupRow.captain_id,
             }
           : null,
-        myScore: myLineupRow ? scoreByLineup.get(myLineupRow.id) ?? null : null,
+        myScore:
+          myLineupRow && calculatedMatchIds.has(m.id) && myLineupRow.score !== null
+            ? Number(myLineupRow.score)
+            : null,
       }
     })
 
