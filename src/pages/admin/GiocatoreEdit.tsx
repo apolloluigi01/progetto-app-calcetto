@@ -37,6 +37,7 @@ export default function GiocatoreEdit() {
   const [initialOverall, setInitialOverall] = useState<number>(50)
   const [savingOverall, setSavingOverall] = useState(false)
   const [overallSaved, setOverallSaved] = useState(false)
+  const [overallError, setOverallError] = useState<string | null>(null)
 
   const [showResetPassword, setShowResetPassword] = useState(false)
   const [newPassword, setNewPassword] = useState('')
@@ -214,15 +215,20 @@ export default function GiocatoreEdit() {
     if (!id || !player) return
     setSavingOverall(true)
     setOverallSaved(false)
+    setOverallError(null)
     const val = Math.min(100, Math.max(1, Math.round(overallValue)))
     const fascia = val >= 75 ? 'A' : val >= 55 ? 'B' : val >= 35 ? 'C' : 'D'
-    await supabase
+    const { error: upsertError } = await supabase
       .from('ratings')
       .upsert(
         { player_id: id, rating_value: val, fascia, updated_at: new Date().toISOString() },
         { onConflict: 'player_id' },
       )
     setSavingOverall(false)
+    if (upsertError) {
+      setOverallError(upsertError.message)
+      return
+    }
     setOverallSaved(true)
 
     if (val !== initialOverall) {
@@ -471,6 +477,7 @@ export default function GiocatoreEdit() {
             Fascia: {overallValue >= 75 ? 'A (top)' : overallValue >= 55 ? 'B' : overallValue >= 35 ? 'C' : 'D (base)'}
           </p>
           {overallSaved && <p className="mt-1 text-xs text-green-700">Overall salvato.</p>}
+          {overallError && <p className="mt-1 text-xs text-red-600">{overallError}</p>}
           <button
             onClick={handleSaveOverall}
             disabled={savingOverall}
