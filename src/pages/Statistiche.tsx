@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useStatistiche } from '../hooks/useStatistiche'
-import { STAT_CONFIG, getRanking, type StatKey } from '../lib/statistiche'
+import { STAT_CONFIG, getRanking, playerFullName, type StatKey } from '../lib/statistiche'
 
 const STAT_KEYS: StatKey[] = ['overall', 'marcatori', 'mvp', 'winrate', 'sconfitte', 'mediavoto', 'autogol']
 const TOP_STAT_KEYS: StatKey[] = ['overall', 'marcatori', 'mvp']
@@ -33,7 +33,14 @@ function StatPreviewCard({ statKey, stats }: { statKey: StatKey; stats: ReturnTy
           {ranking.map((entry, i) => (
             <tr key={entry.stats.player.id} className="border-t border-gray-100 first:border-t-0">
               <td className="py-1.5 pl-2 pr-0.5 text-gray-400">{i + 1}</td>
-              <td className="truncate py-1.5 pr-1 font-medium text-gray-700">{entry.stats.player.name}</td>
+              <td className="truncate py-1.5 pr-1 font-medium text-gray-700">
+                {playerFullName(entry.stats.player)}
+                {entry.stats.player.nickname && (
+                  <span className="block truncate text-[9px] font-normal leading-tight text-gray-400">
+                    {entry.stats.player.nickname}
+                  </span>
+                )}
+              </td>
               <td className="py-1.5 pr-2 text-right">
                 <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 font-semibold ${valueColor} ${valueBg}`}>
                   {config.formatValue(entry.value)}

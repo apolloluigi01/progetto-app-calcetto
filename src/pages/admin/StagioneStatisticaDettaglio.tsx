@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useStatistiche } from '../../hooks/useStatistiche'
-import { STAT_CONFIG, getRanking, type RankedEntry, type StatKey } from '../../lib/statistiche'
+import { STAT_CONFIG, getRanking, playerFullName, type RankedEntry, type StatKey } from '../../lib/statistiche'
 
 type SortColumn = 'name' | 'extra' | 'value'
 
@@ -101,7 +101,12 @@ export default function StagioneStatisticaDettaglio() {
             {sorted.map((entry, i) => (
               <tr key={entry.stats.player.id} className="border-t border-gray-100 hover:bg-gray-50">
                 <td className="px-4 py-2.5 text-gray-400">{i + 1}</td>
-                <td className="px-2 py-2.5 font-medium text-gray-700">{entry.stats.player.name}</td>
+                <td className="px-2 py-2.5 font-medium text-gray-700">
+                  <p>{playerFullName(entry.stats.player)}</p>
+                  {entry.stats.player.nickname && (
+                    <p className="text-[11px] font-normal text-gray-400">{entry.stats.player.nickname}</p>
+                  )}
+                </td>
                 {config.extraColumn && (
                   <td className="px-4 py-2.5 text-right text-gray-500">
                     {config.extraColumn.getValue(entry.stats)}

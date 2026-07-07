@@ -15,6 +15,10 @@ export interface PlayerStats {
   overall: number | null
 }
 
+export function playerFullName(player: Pick<Player, 'name' | 'surname'>): string {
+  return player.surname ? `${player.name} ${player.surname}` : player.name
+}
+
 export function parseVoto(voto: string): number | null {
   const match = voto.trim().match(/^(\d+(?:\.\d+)?)\s*([+-])?$/)
   if (!match) return null

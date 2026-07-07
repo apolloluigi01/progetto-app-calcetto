@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useHomeDashboard } from '../hooks/useHomeDashboard'
 import { useCurrentSeason } from '../hooks/useCurrentSeason'
 import { useStatistiche } from '../hooks/useStatistiche'
-import { getRanking } from '../lib/statistiche'
+import { getRanking, playerFullName } from '../lib/statistiche'
 import { describeWeatherCode, getMatchWeather, type WeatherForecast } from '../lib/weather'
 import ErrorNotice from '../components/ErrorNotice'
 
@@ -219,7 +219,12 @@ export default function Home() {
                   {marcatori.map((entry, i) => (
                     <tr key={entry.stats.player.id} className="border-t border-gray-100 hover:bg-gray-50">
                       <td className="px-4 py-2 text-gray-400">{i + 1}</td>
-                      <td className="px-2 py-2 font-medium text-gray-700">{entry.stats.player.name}</td>
+                      <td className="px-2 py-2 font-medium text-gray-700">
+                        <p>{playerFullName(entry.stats.player)}</p>
+                        {entry.stats.player.nickname && (
+                          <p className="text-[11px] font-normal text-gray-400">{entry.stats.player.nickname}</p>
+                        )}
+                      </td>
                       <td className="px-4 py-2 text-right">
                         <span className="inline-flex items-center rounded-full bg-field-green/10 px-2.5 py-1 text-xs font-semibold text-field-green-dark">
                           {entry.value} gol
