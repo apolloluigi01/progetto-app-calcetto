@@ -8,6 +8,10 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      // Registrazione manuale in src/main.tsx (con controllo periodico di
+      // aggiornamenti e reload automatico): disabilitiamo quella iniettata
+      // di default per evitare una doppia registrazione del service worker.
+      injectRegister: false,
       includeAssets: ['favicon.svg'],
       manifest: {
         name: 'Pavone League',
