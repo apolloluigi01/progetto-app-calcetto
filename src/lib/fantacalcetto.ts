@@ -1,6 +1,6 @@
 import { parseVoto } from './statistiche'
 
-export const FANTA_BUDGET = 10
+export const FANTA_BUDGET = 15
 export const FANTA_TEAM_SIZE = 5
 export const CAPTAIN_MULTIPLIER = 1.2
 
