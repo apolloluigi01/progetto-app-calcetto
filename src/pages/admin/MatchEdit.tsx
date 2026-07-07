@@ -1,16 +1,14 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useMatchDetail } from '../../hooks/useMatchDetail'
 import { useMatchBookings } from '../../hooks/useMatchBookings'
 import { useMatchVoting } from '../../hooks/useMatchVoting'
-import { usePlayerRatings } from '../../hooks/usePlayerRatings'
 import { getKnownFields } from '../../lib/fields'
 import { getSeasonIdForDate } from '../../lib/seasons'
 import { logActivity } from '../../lib/activityLog'
 import { computeOverallsForPlayers, generateBalancedTeams } from '../../lib/teamGeneration'
 import { formatVote } from '../../lib/voting'
-import TeamPitch from '../../components/TeamPitch'
 import type { Player, Team } from '../../types/database'
 import type { PlayerOverall, GeneratedTeams } from '../../lib/teamGeneration'
 import type { MatchPlayerWithName } from '../../hooks/useMatchDetail'
@@ -115,22 +113,12 @@ export default function MatchEdit() {
     setDrafts(initial)
   }, [data])
 
-  const ratings = usePlayerRatings(data?.matchPlayers.map((mp) => mp.player_id) ?? [])
-
   if (loading) return <div className="p-4 text-sm text-gray-500">Caricamento...</div>
   if (error || !data) return <div className="p-4 text-sm text-red-600">{error ?? 'Partita non trovata'}</div>
 
   const { match, matchPlayers, goals, pagelle, result } = data
   const teamA = matchPlayers.filter((p) => p.team === 'A')
   const teamB = matchPlayers.filter((p) => p.team === 'B')
-  const pitchEntries = (list: MatchPlayerWithName[]) =>
-    list
-      .filter((mp): mp is MatchPlayerWithName & { player: Player } => mp.player !== null)
-      .map((mp) => ({
-        player: mp.player,
-        overall: ratings.get(mp.player_id) ?? null,
-        stats: null,
-      }))
   const goalsByTeam = (team: Team) => goals.filter((g) => g.team === team)
   const isPublished = pagelle.length > 0 && pagelle.every((p) => p.published_at)
   // "In bozza" finché non è stato salvato un risultato e non sono state pubblicate le pagelle:
@@ -828,9 +816,12 @@ export default function MatchEdit() {
             </div>
           )}
 
-          <div className="mt-3">
-            <TeamPitch teamA={pitchEntries(teamA)} teamB={pitchEntries(teamB)} />
-          </div>
+          <Link
+            to={`/partite/${id}/campetto`}
+            className="mt-3 block w-full rounded-lg border border-field-green/40 bg-field-green/5 px-3 py-1.5 text-center text-sm font-medium text-field-green-dark hover:bg-field-green/10"
+          >
+            ⚽ Visualizzazione campetto
+          </Link>
         </div>
       )}
 

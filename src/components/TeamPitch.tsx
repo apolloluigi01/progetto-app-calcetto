@@ -11,6 +11,8 @@ export interface PitchEntry {
 interface TeamPitchProps {
   teamA: PitchEntry[]
   teamB: PitchEntry[]
+  /** Versione più grande e distanziata, per la pagina dedicata a tutto schermo. */
+  large?: boolean
 }
 
 const POSITION_ORDER = ['POR', 'DIF', 'CEN', 'ATT'] as const
@@ -29,13 +31,13 @@ function buildRows(entries: PitchEntry[]): PitchEntry[][] {
   return [entries.slice(0, mid), entries.slice(mid)].filter((row) => row.length > 0)
 }
 
-function TeamRows({ rows }: { rows: PitchEntry[][] }) {
+function TeamRows({ rows, large }: { rows: PitchEntry[][]; large?: boolean }) {
   return (
-    <div className="flex flex-col items-center gap-2">
+    <div className={`flex flex-col items-center ${large ? 'gap-6' : 'gap-2'}`}>
       {rows.map((row, i) => (
-        <div key={i} className="flex justify-center gap-2">
+        <div key={i} className={`flex justify-center ${large ? 'gap-6' : 'gap-2'}`}>
           {row.map((entry) => (
-            <div key={entry.player.id} className="w-20 shrink-0">
+            <div key={entry.player.id} className={`shrink-0 ${large ? 'w-32' : 'w-20'}`}>
               <PlayerCard player={entry.player} overall={entry.overall} stats={entry.stats} compact />
             </div>
           ))}
@@ -45,7 +47,7 @@ function TeamRows({ rows }: { rows: PitchEntry[][] }) {
   )
 }
 
-export default function TeamPitch({ teamA, teamB }: TeamPitchProps) {
+export default function TeamPitch({ teamA, teamB, large = false }: TeamPitchProps) {
   // Squadra A: dal proprio portiere (in alto) verso il centrocampo.
   const rowsA = buildRows(teamA)
   // Squadra B a specchio: dal centrocampo verso il proprio portiere (in basso).
@@ -59,21 +61,31 @@ export default function TeamPitch({ teamA, teamB }: TeamPitchProps) {
       }}
     >
       {/* Area di porta squadra A (in alto) */}
-      <div className="absolute left-1/2 top-0 h-4 w-20 -translate-x-1/2 border border-t-0 border-white/70" />
+      <div
+        className={`absolute left-1/2 top-0 -translate-x-1/2 border border-t-0 border-white/70 ${large ? 'h-6 w-32' : 'h-4 w-20'}`}
+      />
       {/* Area di porta squadra B (in basso) */}
-      <div className="absolute bottom-0 left-1/2 h-4 w-20 -translate-x-1/2 border border-b-0 border-white/70" />
+      <div
+        className={`absolute bottom-0 left-1/2 -translate-x-1/2 border border-b-0 border-white/70 ${large ? 'h-6 w-32' : 'h-4 w-20'}`}
+      />
 
-      <div className="relative flex flex-col gap-3 p-3">
-        <p className="text-center text-xs font-bold uppercase tracking-wide text-white/90">Squadra A</p>
-        <TeamRows rows={rowsA} />
+      <div className={`relative flex flex-col ${large ? 'gap-6 p-6' : 'gap-3 p-3'}`}>
+        <p className={`text-center font-bold uppercase tracking-wide text-white/90 ${large ? 'text-base' : 'text-xs'}`}>
+          Squadra A
+        </p>
+        <TeamRows rows={rowsA} large={large} />
 
         {/* Linea di metà campo, in flusso normale così resta sempre a metà tra le due squadre */}
-        <div className="relative my-1 border-t-2 border-white/70">
-          <div className="absolute left-1/2 top-0 h-12 w-12 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/70" />
+        <div className={`relative border-t-2 border-white/70 ${large ? 'my-4' : 'my-1'}`}>
+          <div
+            className={`absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/70 ${large ? 'h-20 w-20' : 'h-12 w-12'}`}
+          />
         </div>
 
-        <TeamRows rows={rowsB} />
-        <p className="text-center text-xs font-bold uppercase tracking-wide text-white/90">Squadra B</p>
+        <TeamRows rows={rowsB} large={large} />
+        <p className={`text-center font-bold uppercase tracking-wide text-white/90 ${large ? 'text-base' : 'text-xs'}`}>
+          Squadra B
+        </p>
       </div>
     </div>
   )
