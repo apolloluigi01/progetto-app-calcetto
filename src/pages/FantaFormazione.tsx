@@ -20,6 +20,14 @@ interface SavedLineup {
   captainId: string
 }
 
+interface OtherLineup {
+  memberId: string
+  memberName: string
+  captainId: string
+  playerIds: string[]
+  score: number | null
+}
+
 export default function FantaFormazione() {
   const { leagueId, matchId } = useParams<{ leagueId: string; matchId: string }>()
   const { player } = useAuth()
@@ -38,6 +46,8 @@ export default function FantaFormazione() {
   const [isNextMatch, setIsNextMatch] = useState<boolean | null>(null)
   // True se l'admin ha eseguito il "Calcola giornata" per questa partita.
   const [isCalculated, setIsCalculated] = useState(false)
+  // Formazioni schierate dagli altri partecipanti alla lega.
+  const [others, setOthers] = useState<OtherLineup[]>([])
 
   // Carica l'eventuale formazione già schierata.
   useEffect(() => {
@@ -61,6 +71,42 @@ export default function FantaFormazione() {
           setSavedLineup({ playerIds: ids, captainId: r.captain_id })
         }
         setLineupLoaded(true)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [leagueId, matchId, player])
+
+  // Formazioni degli altri partecipanti alla lega per questa partita.
+  useEffect(() => {
+    if (!leagueId || !matchId || !player) return
+    let cancelled = false
+    supabase
+      .from('fanta_lineups')
+      // Due foreign key verso players (member e capitano): serve il
+      // riferimento esplicito per disambiguare l'embed.
+      .select('member_id, captain_id, score, fanta_lineup_players(player_id), member:players!fanta_lineups_member_id_fkey(name, nickname)')
+      .eq('league_id', leagueId)
+      .eq('match_id', matchId)
+      .neq('member_id', player.id)
+      .then(({ data: rows }) => {
+        if (cancelled) return
+        type Row = {
+          member_id: string
+          captain_id: string
+          score: number | null
+          fanta_lineup_players: { player_id: string }[]
+          member: { name: string; nickname: string | null } | null
+        }
+        setOthers(
+          ((rows ?? []) as unknown as Row[]).map((r) => ({
+            memberId: r.member_id,
+            memberName: r.member?.nickname ?? r.member?.name ?? '?',
+            captainId: r.captain_id,
+            playerIds: r.fanta_lineup_players.map((p) => p.player_id),
+            score: r.score !== null ? Number(r.score) : null,
+          })),
+        )
       })
     return () => {
       cancelled = true
@@ -420,6 +466,44 @@ export default function FantaFormazione() {
               </li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {/* Formazioni degli altri partecipanti */}
+      {others.length > 0 && (
+        <div className="mt-6">
+          <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-500">
+            Formazioni degli altri partecipanti
+          </h3>
+          <div className="space-y-2">
+            {others.map((o) => (
+              <div key={o.memberId} className="rounded-xl bg-white p-3 shadow">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-field-green-dark">{o.memberName}</p>
+                  {isCalculated && o.score !== null && (
+                    <span className="rounded-full bg-field-yellow/20 px-2.5 py-0.5 text-sm font-bold text-field-orange">
+                      {formatFantaPoints(o.score)} pt
+                    </span>
+                  )}
+                </div>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {o.playerIds.map((pid) => (
+                    <span
+                      key={pid}
+                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                        pid === o.captainId
+                          ? 'bg-field-orange/10 text-field-orange'
+                          : 'bg-gray-100 text-gray-600'
+                      }`}
+                    >
+                      {pid === o.captainId && 'Ⓒ '}
+                      {nameOf(pid)}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

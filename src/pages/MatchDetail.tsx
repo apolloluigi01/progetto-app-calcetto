@@ -305,20 +305,23 @@ export default function MatchDetail() {
         <div className="mt-4 rounded-xl bg-white p-3 shadow">
           <h3 className="mb-2 font-medium text-field-green-dark">Marcatori</h3>
           <div className="grid grid-cols-2 gap-3 text-sm">
-            <ul className="space-y-1">
-              {goalsByTeam('A').map((g) => (
-                <li key={g.id}>
-                  ⚽ {g.name} {g.is_own_goal && <span className="text-red-600">(autogol)</span>}
-                </li>
-              ))}
-            </ul>
-            <ul className="space-y-1">
-              {goalsByTeam('B').map((g) => (
-                <li key={g.id}>
-                  ⚽ {g.name} {g.is_own_goal && <span className="text-red-600">(autogol)</span>}
-                </li>
-              ))}
-            </ul>
+            {(['A', 'B'] as Team[]).map((team) => (
+              <ul key={team} className="space-y-1">
+                {goalsByTeam(team).map((g) => {
+                  const assist = g.assist_player_id
+                    ? matchPlayers.find((mp) => mp.player_id === g.assist_player_id)
+                    : null
+                  return (
+                    <li key={g.id}>
+                      ⚽ {g.name} {g.is_own_goal && <span className="text-red-600">(autogol)</span>}
+                      {assist && (
+                        <span className="text-xs text-gray-400"> (assist: {assist.nickname ?? assist.name})</span>
+                      )}
+                    </li>
+                  )
+                })}
+              </ul>
+            ))}
           </div>
         </div>
       )}
