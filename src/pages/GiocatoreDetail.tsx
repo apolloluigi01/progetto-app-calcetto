@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useStatistiche } from '../hooks/useStatistiche'
 import { useOveralls } from '../hooks/useOveralls'
 import { STAT_CONFIG, type StatKey } from '../lib/statistiche'
+import PlayerCard from '../components/PlayerCard'
 import type { Player } from '../types/database'
 
 const STAT_KEYS: StatKey[] = ['overall', 'marcatori', 'mvp', 'winrate', 'sconfitte', 'mediavoto', 'autogol']
@@ -41,19 +42,8 @@ export default function GiocatoreDetail() {
 
   return (
     <div className="p-4">
-      <div className="flex items-center gap-3">
-        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-field-green/10 text-lg font-bold text-field-green-dark">
-          {overalls.get(player.id) ?? '-'}
-        </span>
-        <h1 className="text-xl font-semibold text-field-green-dark">
-          {player.name}
-          {player.surname && ` ${player.surname}`}
-        </h1>
-      </div>
-
-      <div className="mt-4 rounded-xl bg-white p-4 shadow">
-        {player.nickname && <p className="text-sm text-gray-500">{player.nickname}</p>}
-        <p className="mt-1 text-xs uppercase text-field-green">{player.role}</p>
+      <div className="mx-auto max-w-[220px]">
+        <PlayerCard player={player} overall={overalls.get(player.id) ?? null} stats={playerStats} />
       </div>
 
       <h2 className="mt-6 text-lg font-semibold text-field-green-dark">Statistiche stagione</h2>

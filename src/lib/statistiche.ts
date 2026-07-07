@@ -13,6 +13,7 @@ export interface PlayerStats {
   voteAvg: number | null
   voteCount: number
   overall: number | null
+  winStreak: number
 }
 
 export function playerFullName(player: Pick<Player, 'name' | 'surname'>): string {
@@ -30,16 +31,19 @@ export function parseVoto(voto: string): number | null {
 export async function computeStatistiche(seasonId: string): Promise<PlayerStats[]> {
   const { data: matches } = await supabase
     .from('matches')
-    .select('id, result:match_results(score_a, score_b)')
+    .select('id, match_date, result:match_results(score_a, score_b)')
     .eq('season_id', seasonId)
+    .order('match_date', { ascending: true })
 
   const matchIds = (matches ?? []).map((m) => m.id)
   if (matchIds.length === 0) return []
 
   const resultByMatch = new Map<string, { score_a: number; score_b: number }>()
+  const dateByMatch = new Map<string, string>()
   for (const m of matches ?? []) {
     const result = Array.isArray(m.result) ? m.result[0] : m.result
     if (result) resultByMatch.set(m.id, result)
+    dateByMatch.set(m.id, m.match_date)
   }
 
   const [matchPlayersRes, goalsRes, pagelleRes] = await Promise.all([
@@ -72,10 +76,13 @@ export async function computeStatistiche(seasonId: string): Promise<PlayerStats[
       voteAvg: null,
       voteCount: 0,
       overall: null,
+      winStreak: 0,
     }
     statsByPlayer.set(player.id, created)
     return created
   }
+
+  const outcomesByPlayer = new Map<string, { date: string; won: boolean }[]>()
 
   type MatchPlayerJoin = { match_id: string; player_id: string; team: 'A' | 'B'; players: Player | null }
   for (const mp of (matchPlayersRes.data ?? []) as unknown as MatchPlayerJoin[]) {
@@ -87,9 +94,27 @@ export async function computeStatistiche(seasonId: string): Promise<PlayerStats[
     stats.partiteGiocate += 1
     const ownScore = mp.team === 'A' ? result.score_a : result.score_b
     const oppScore = mp.team === 'A' ? result.score_b : result.score_a
-    if (ownScore > oppScore) stats.vittorie += 1
+    const won = ownScore > oppScore
+    if (won) stats.vittorie += 1
     else if (ownScore < oppScore) stats.sconfitte += 1
     else stats.pareggi += 1
+
+    const outcomes = outcomesByPlayer.get(mp.player_id) ?? []
+    outcomes.push({ date: dateByMatch.get(mp.match_id) ?? '', won })
+    outcomesByPlayer.set(mp.player_id, outcomes)
+  }
+
+  for (const stats of statsByPlayer.values()) {
+    const outcomes = [...(outcomesByPlayer.get(stats.player.id) ?? [])].sort((a, b) =>
+      a.date.localeCompare(b.date)
+    )
+    let current = 0
+    let longest = 0
+    for (const o of outcomes) {
+      current = o.won ? current + 1 : 0
+      if (current > longest) longest = current
+    }
+    stats.winStreak = longest
   }
 
   for (const g of goalsRes.data ?? []) {

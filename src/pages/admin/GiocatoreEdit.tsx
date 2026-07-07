@@ -4,7 +4,8 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { getFunctionErrorMessage } from '../../lib/functionErrors'
 import { logActivity, type FieldChange } from '../../lib/activityLog'
-import type { Player, PlayerRole } from '../../types/database'
+import { COUNTRIES } from '../../lib/countries'
+import type { Player, PlayerRole, PlayingPosition } from '../../types/database'
 
 type PlayerWithStatus = Player & { email?: string | null; email_confirmed?: boolean }
 
@@ -21,6 +22,9 @@ export default function GiocatoreEdit() {
   const [surname, setSurname] = useState('')
   const [nickname, setNickname] = useState('')
   const [role, setRole] = useState<PlayerRole>('player')
+  const [nationality, setNationality] = useState('')
+  const [position, setPosition] = useState<PlayingPosition | ''>('')
+  const [jerseyNumber, setJerseyNumber] = useState('')
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
@@ -64,6 +68,9 @@ export default function GiocatoreEdit() {
     setSurname(player.surname ?? '')
     setNickname(player.nickname ?? '')
     setRole(player.role)
+    setNationality(player.nationality ?? '')
+    setPosition(player.position ?? '')
+    setJerseyNumber(player.jersey_number ? String(player.jersey_number) : '')
   }, [player])
 
   if (loading) return <div className="p-4 text-sm text-gray-500">Caricamento...</div>
@@ -85,10 +92,23 @@ export default function GiocatoreEdit() {
     setSaving(true)
     setError(null)
 
-    const update: { name: string; surname: string | null; nickname: string | null; role?: PlayerRole } = {
+    const parsedJerseyNumber = jerseyNumber ? Number(jerseyNumber) : null
+
+    const update: {
+      name: string
+      surname: string | null
+      nickname: string | null
+      role?: PlayerRole
+      nationality: string | null
+      position: PlayingPosition | null
+      jersey_number: number | null
+    } = {
       name,
       surname: surname || null,
       nickname: nickname || null,
+      nationality: nationality || null,
+      position: position || null,
+      jersey_number: parsedJerseyNumber,
     }
     if (isSuperAdmin) update.role = role
 
@@ -108,6 +128,19 @@ export default function GiocatoreEdit() {
       modifiche.push({ campo: 'Nickname', da: player.nickname || '(vuoto)', a: nickname || '(vuoto)' })
     }
     if (isSuperAdmin && player.role !== role) modifiche.push({ campo: 'Ruolo', da: player.role, a: role })
+    if ((player.nationality ?? '') !== nationality) {
+      modifiche.push({ campo: 'Nazionalità', da: player.nationality || '(vuoto)', a: nationality || '(vuoto)' })
+    }
+    if ((player.position ?? '') !== position) {
+      modifiche.push({ campo: 'Ruolo di gioco', da: player.position || '(vuoto)', a: position || '(vuoto)' })
+    }
+    if ((player.jersey_number ?? null) !== parsedJerseyNumber) {
+      modifiche.push({
+        campo: 'Numero maglia',
+        da: player.jersey_number ? String(player.jersey_number) : '(vuoto)',
+        a: parsedJerseyNumber ? String(parsedJerseyNumber) : '(vuoto)',
+      })
+    }
 
     if (modifiche.length > 0) {
       logActivity('giocatore_modificato', { playerId: id, giocatore: targetLabel(), modifiche })
@@ -226,6 +259,54 @@ export default function GiocatoreEdit() {
                 </select>
               </div>
             )}
+
+            <div className="border-t border-gray-100 pt-3">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                Carta giocatore
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Nazionalità</label>
+                  <select
+                    value={nationality}
+                    onChange={(e) => setNationality(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2"
+                  >
+                    <option value="">-</option>
+                    {COUNTRIES.map((c) => (
+                      <option key={c.code} value={c.code}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Ruolo di gioco</label>
+                  <select
+                    value={position}
+                    onChange={(e) => setPosition(e.target.value as PlayingPosition | '')}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2"
+                  >
+                    <option value="">-</option>
+                    <option value="POR">Portiere (POR)</option>
+                    <option value="DIF">Difensore (DIF)</option>
+                    <option value="CEN">Centrocampista (CEN)</option>
+                    <option value="ATT">Attaccante (ATT)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Numero maglia</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={99}
+                    value={jerseyNumber}
+                    onChange={(e) => setJerseyNumber(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2"
+                  />
+                </div>
+              </div>
+            </div>
             {player.email && (
               <p className="text-xs text-gray-500">
                 {player.email} — {player.email_confirmed ? 'email confermata' : 'in attesa di conferma'}

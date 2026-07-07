@@ -2,6 +2,7 @@ export type PlayerRole = 'superadmin' | 'admin' | 'player'
 export type MatchStatus = 'draft' | 'completed'
 export type Team = 'A' | 'B'
 export type Fascia = 'A' | 'B' | 'C' | 'D'
+export type PlayingPosition = 'POR' | 'DIF' | 'CEN' | 'ATT'
 
 export interface Player {
   id: string
@@ -10,6 +11,9 @@ export interface Player {
   nickname: string | null
   avatar_url: string | null
   role: PlayerRole
+  nationality: string | null
+  position: PlayingPosition | null
+  jersey_number: number | null
   must_change_password: boolean
   created_at: string
 }

@@ -12,6 +12,9 @@ create table if not exists players (
   nickname text,
   avatar_url text,
   role text not null default 'player' check (role in ('admin', 'player', 'superadmin')),
+  nationality text,
+  position text check (position in ('POR', 'DIF', 'CEN', 'ATT')),
+  jersey_number integer check (jersey_number between 1 and 99),
   must_change_password boolean not null default true,
   created_at timestamptz not null default now()
 );

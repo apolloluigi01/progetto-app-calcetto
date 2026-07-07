@@ -61,21 +61,21 @@ export default function StagioneStatisticaDettaglio() {
       <p className="text-sm text-gray-500">{config.description}</p>
 
       <div className="mt-4 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-        <table className="w-full text-sm">
+        <table className="w-full text-base">
           <thead>
             <tr className="bg-gray-50">
-              <th className="w-10 px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+              <th className="w-10 px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                 #
               </th>
               <th
-                className="cursor-pointer select-none px-2 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500"
+                className="cursor-pointer select-none px-2 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-gray-500"
                 onClick={() => handleSort('name')}
               >
                 Giocatore{arrow('name')}
               </th>
               {config.extraColumn && (
                 <th
-                  className="cursor-pointer select-none px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wide text-gray-500"
+                  className="cursor-pointer select-none px-4 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-gray-500"
                   onClick={() => handleSort('extra')}
                 >
                   {config.extraColumn.label}
@@ -83,7 +83,7 @@ export default function StagioneStatisticaDettaglio() {
                 </th>
               )}
               <th
-                className="cursor-pointer select-none px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wide text-gray-500"
+                className="cursor-pointer select-none px-4 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-gray-500"
                 onClick={() => handleSort('value')}
               >
                 Valore{arrow('value')}
@@ -100,20 +100,20 @@ export default function StagioneStatisticaDettaglio() {
             )}
             {sorted.map((entry, i) => (
               <tr key={entry.stats.player.id} className="border-t border-gray-100 hover:bg-gray-50">
-                <td className="px-4 py-2.5 text-gray-400">{i + 1}</td>
-                <td className="px-2 py-2.5 font-medium text-gray-700">
+                <td className="px-4 py-3 text-gray-400">{i + 1}</td>
+                <td className="px-2 py-3 font-medium text-gray-700">
                   <p>{playerFullName(entry.stats.player)}</p>
                   {entry.stats.player.nickname && (
-                    <p className="text-[11px] font-normal text-gray-400">{entry.stats.player.nickname}</p>
+                    <p className="text-xs font-normal text-gray-400">{entry.stats.player.nickname}</p>
                   )}
                 </td>
                 {config.extraColumn && (
-                  <td className="px-4 py-2.5 text-right text-gray-500">
+                  <td className="px-4 py-3 text-right text-gray-500">
                     {config.extraColumn.getValue(entry.stats)}
                   </td>
                 )}
-                <td className="px-4 py-2.5 text-right">
-                  <span className={`inline-flex items-center rounded-full px-2.5 py-1 font-semibold ${valueColor} ${valueBg}`}>
+                <td className="px-4 py-3 text-right">
+                  <span className={`inline-flex items-center rounded-full px-3 py-1 font-semibold ${valueColor} ${valueBg}`}>
                     {config.formatValue(entry.value)}
                   </span>
                 </td>

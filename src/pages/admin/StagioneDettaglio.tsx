@@ -23,29 +23,29 @@ function StatPreviewCard({ statKey, stats, seasonId }: { statKey: StatKey; stats
       to={`/admin/stagioni/${seasonId}/statistiche/${statKey}`}
       className="block overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm transition hover:shadow-md"
     >
-      <h2 className="truncate border-b border-gray-200 px-2 py-1.5 text-[11px] font-semibold text-field-green-dark">
+      <h2 className="truncate border-b border-gray-200 px-2 py-2 text-xs font-semibold text-field-green-dark">
         {config.title}
       </h2>
-      <table className="w-full text-[11px]">
+      <table className="w-full text-xs">
         <tbody>
           {ranking.length === 0 && (
             <tr>
-              <td className="px-2 py-1.5 text-gray-400">-</td>
+              <td className="px-2 py-2 text-gray-400">-</td>
             </tr>
           )}
           {ranking.map((entry, i) => (
             <tr key={entry.stats.player.id} className="border-t border-gray-100 first:border-t-0">
-              <td className="py-1.5 pl-2 pr-0.5 text-gray-400">{i + 1}</td>
-              <td className="truncate py-1.5 pr-1 font-medium text-gray-700">
+              <td className="py-2 pl-2 pr-0.5 text-gray-400">{i + 1}</td>
+              <td className="truncate py-2 pr-1 font-medium text-gray-700">
                 {playerFullName(entry.stats.player)}
                 {entry.stats.player.nickname && (
-                  <span className="block truncate text-[9px] font-normal leading-tight text-gray-400">
+                  <span className="block truncate text-[10px] font-normal leading-tight text-gray-400">
                     {entry.stats.player.nickname}
                   </span>
                 )}
               </td>
-              <td className="py-1.5 pr-2 text-right">
-                <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 font-semibold ${valueColor} ${valueBg}`}>
+              <td className="py-2 pr-2 text-right">
+                <span className={`inline-flex items-center rounded-full px-2 py-1 font-semibold ${valueColor} ${valueBg}`}>
                   {config.formatValue(entry.value)}
                 </span>
               </td>
