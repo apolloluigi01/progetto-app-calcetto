@@ -15,7 +15,15 @@ function formatTime(time: string | null) {
   return time ? time.slice(0, 5) : null
 }
 
-function WeatherCard({ field, matchDate }: { field: string | null; matchDate: string }) {
+function WeatherCard({
+  field,
+  matchDate,
+  matchTime,
+}: {
+  field: string | null
+  matchDate: string
+  matchTime: string | null
+}) {
   const [weather, setWeather] = useState<WeatherForecast | null>(null)
   const [status, setStatus] = useState<'loading' | 'ready' | 'unavailable'>(field ? 'loading' : 'unavailable')
 
@@ -23,7 +31,7 @@ function WeatherCard({ field, matchDate }: { field: string | null; matchDate: st
     if (!field) return
     let cancelled = false
     setStatus('loading')
-    getMatchWeather(field, matchDate)
+    getMatchWeather(field, matchDate, matchTime)
       .then((w) => {
         if (cancelled) return
         setWeather(w)
@@ -35,7 +43,7 @@ function WeatherCard({ field, matchDate }: { field: string | null; matchDate: st
     return () => {
       cancelled = true
     }
-  }, [field, matchDate])
+  }, [field, matchDate, matchTime])
 
   return (
     <div className="rounded-xl bg-white p-4 shadow">
@@ -181,7 +189,13 @@ export default function Home() {
             )}
           </div>
 
-          {nextMatch && <WeatherCard field={nextMatch.match.field} matchDate={nextMatch.match.match_date} />}
+          {nextMatch && (
+        <WeatherCard
+          field={nextMatch.match.field}
+          matchDate={nextMatch.match.match_date}
+          matchTime={nextMatch.match.match_time}
+        />
+      )}
 
           <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
             <Link

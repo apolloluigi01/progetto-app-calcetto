@@ -64,7 +64,11 @@ async function geocodeField(query: string): Promise<{ lat: number; lon: number; 
   return null
 }
 
-export async function getMatchWeather(field: string, matchDate: string): Promise<WeatherForecast | null> {
+export async function getMatchWeather(
+  field: string,
+  matchDate: string,
+  matchTime?: string | null,
+): Promise<WeatherForecast | null> {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const target = new Date(`${matchDate}T00:00:00`)
@@ -77,6 +81,7 @@ export async function getMatchWeather(field: string, matchDate: string): Promise
   const res = await fetch(
     `https://api.open-meteo.com/v1/forecast?latitude=${place.lat}&longitude=${place.lon}` +
       `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max` +
+      `&hourly=weather_code,precipitation_probability` +
       `&timezone=auto&start_date=${matchDate}&end_date=${matchDate}`
   )
   if (!res.ok) return null
@@ -84,11 +89,27 @@ export async function getMatchWeather(field: string, matchDate: string): Promise
   const daily = data?.daily
   if (!daily?.weather_code?.length) return null
 
+  let weatherCode: number = daily.weather_code[0]
+  let precipitationProbability: number | null = daily.precipitation_probability_max?.[0] ?? null
+
+  // Se si conosce l'ora della partita, usa la previsione di QUELL'ORA: il
+  // codice giornaliero rappresenta il fenomeno più severo dell'intera
+  // giornata (es. un temporale al mattino), fuorviante per una partita serale.
+  if (matchTime) {
+    const hour = matchTime.slice(0, 2)
+    const hourly = data?.hourly
+    const idx = hourly?.time?.findIndex((t: string) => t === `${matchDate}T${hour}:00`) ?? -1
+    if (idx >= 0) {
+      weatherCode = hourly.weather_code[idx]
+      precipitationProbability = hourly.precipitation_probability?.[idx] ?? precipitationProbability
+    }
+  }
+
   return {
-    weatherCode: daily.weather_code[0],
+    weatherCode,
     tempMax: daily.temperature_2m_max[0],
     tempMin: daily.temperature_2m_min[0],
-    precipitationProbability: daily.precipitation_probability_max?.[0] ?? null,
+    precipitationProbability,
     locationName: place.name,
   }
 }

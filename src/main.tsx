@@ -24,8 +24,16 @@ registerSW({
   },
 })
 
+let hadController = !!navigator.serviceWorker?.controller
 let refreshingAfterUpdate = false
 navigator.serviceWorker?.addEventListener('controllerchange', () => {
+  // Primo insediamento del service worker (clientsClaim alla prima visita):
+  // non c'è nessuna nuova versione da applicare, quindi niente reload —
+  // cancellerebbe ad esempio il form di login appena compilato.
+  if (!hadController) {
+    hadController = true
+    return
+  }
   if (refreshingAfterUpdate) return
   refreshingAfterUpdate = true
   window.location.reload()
