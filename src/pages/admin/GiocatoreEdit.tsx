@@ -1,4 +1,4 @@
-import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
@@ -27,11 +27,6 @@ export default function GiocatoreEdit() {
   const [jerseyNumber, setJerseyNumber] = useState('')
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
-
-  const [avatarFile, setAvatarFile] = useState<File | null>(null)
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
-  const [uploadingAvatar, setUploadingAvatar] = useState(false)
-  const [avatarError, setAvatarError] = useState<string | null>(null)
 
   const [overallValue, setOverallValue] = useState<number>(50)
   const [initialOverall, setInitialOverall] = useState<number>(50)
@@ -91,63 +86,6 @@ export default function GiocatoreEdit() {
 
   function targetLabel(): string {
     return `${player?.name ?? ''}${player?.surname ? ` ${player.surname}` : ''}`.trim()
-  }
-
-  function handleAvatarFileChange(e: ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0] ?? null
-    setAvatarError(null)
-    if (!file) {
-      setAvatarFile(null)
-      setAvatarPreview(null)
-      return
-    }
-    if (!file.type.startsWith('image/')) {
-      setAvatarError('Seleziona un file immagine (jpg, png, webp...).')
-      return
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      setAvatarError("L'immagine non può superare i 5 MB.")
-      return
-    }
-    setAvatarFile(file)
-    setAvatarPreview(URL.createObjectURL(file))
-  }
-
-  async function handleUploadAvatar() {
-    if (!id || !avatarFile) return
-    setUploadingAvatar(true)
-    setAvatarError(null)
-
-    const ext = avatarFile.name.split('.').pop() ?? 'jpg'
-    const path = `${id}/${Date.now()}.${ext}`
-    const { error: uploadError } = await supabase.storage
-      .from('avatars')
-      .upload(path, avatarFile, { contentType: avatarFile.type })
-    if (uploadError) {
-      setUploadingAvatar(false)
-      setAvatarError(uploadError.message)
-      return
-    }
-
-    const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path)
-    const { error: updateError } = await supabase
-      .from('players')
-      .update({ avatar_url: urlData.publicUrl })
-      .eq('id', id)
-    setUploadingAvatar(false)
-    if (updateError) {
-      setAvatarError(updateError.message)
-      return
-    }
-
-    logActivity('giocatore_modificato', {
-      playerId: id,
-      giocatore: targetLabel(),
-      modifiche: [{ campo: 'Foto profilo', da: player?.avatar_url ? 'presente' : '(vuota)', a: 'aggiornata' }],
-    })
-    setAvatarFile(null)
-    setAvatarPreview(null)
-    load()
   }
 
   async function handleSave() {
@@ -332,41 +270,10 @@ export default function GiocatoreEdit() {
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
                 Carta giocatore
               </p>
-
-              <div className="mb-3 flex items-center gap-3">
-                {avatarPreview || player.avatar_url ? (
-                  <img
-                    src={avatarPreview ?? player.avatar_url ?? undefined}
-                    alt=""
-                    className="h-16 w-16 rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-field-green/10 text-lg font-bold text-field-green-dark">
-                    {player.name.charAt(0).toUpperCase()}
-                    {player.surname ? player.surname.charAt(0).toUpperCase() : ''}
-                  </div>
-                )}
-                <div className="flex-1">
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Foto profilo</label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleAvatarFileChange}
-                    className="w-full text-xs text-gray-600"
-                  />
-                  {avatarError && <p className="mt-1 text-xs text-red-600">{avatarError}</p>}
-                  {avatarFile && (
-                    <button
-                      type="button"
-                      onClick={handleUploadAvatar}
-                      disabled={uploadingAvatar}
-                      className="mt-2 rounded-lg bg-field-green px-3 py-1.5 text-xs font-medium text-white hover:bg-field-green-dark disabled:opacity-60"
-                    >
-                      {uploadingAvatar ? 'Caricamento...' : 'Carica foto'}
-                    </button>
-                  )}
-                </div>
-              </div>
+              <p className="mb-3 text-xs text-gray-400">
+                La foto profilo si carica solo dalla propria pagina "Impostazioni" — ogni utente può
+                caricare esclusivamente la propria.
+              </p>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>

@@ -136,26 +136,27 @@ export default function Impostazioni() {
       {player && (
         <div className="mt-4 rounded-xl bg-white p-4 shadow">
           <div className="flex items-center gap-3">
-            {avatarPreview || player.avatar_url ? (
-              <img
-                src={avatarPreview ?? player.avatar_url ?? undefined}
-                alt=""
-                className="h-16 w-16 rounded-full object-cover"
-              />
-            ) : (
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-field-green/10 text-lg font-bold text-field-green-dark">
-                {player.name.charAt(0).toUpperCase()}
-                {player.surname ? player.surname.charAt(0).toUpperCase() : ''}
-              </div>
-            )}
+            <label className="relative block shrink-0 cursor-pointer" title="Cambia foto profilo">
+              {avatarPreview || player.avatar_url ? (
+                <img
+                  src={avatarPreview ?? player.avatar_url ?? undefined}
+                  alt=""
+                  className="h-16 w-16 rounded-full object-cover"
+                />
+              ) : (
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-field-green/10 text-lg font-bold text-field-green-dark">
+                  {player.name.charAt(0).toUpperCase()}
+                  {player.surname ? player.surname.charAt(0).toUpperCase() : ''}
+                </div>
+              )}
+              <span className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-field-green text-xs text-white shadow ring-2 ring-white">
+                📷
+              </span>
+              <input type="file" accept="image/*" onChange={handleAvatarFileChange} className="hidden" />
+            </label>
             <div className="flex-1">
-              <label className="mb-1 block text-sm font-medium text-gray-700">Foto profilo</label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleAvatarFileChange}
-                className="w-full text-xs text-gray-600"
-              />
+              <p className="text-sm font-medium text-gray-700">Foto profilo</p>
+              <p className="text-xs text-gray-500">Tocca l'immagine per sceglierne una nuova</p>
               {avatarError && <p className="mt-1 text-xs text-red-600">{avatarError}</p>}
               {avatarFile && (
                 <button
