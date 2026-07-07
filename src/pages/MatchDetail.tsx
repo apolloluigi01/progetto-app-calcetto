@@ -5,8 +5,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useMatchDetail } from '../hooks/useMatchDetail'
 import { useMatchBookings } from '../hooks/useMatchBookings'
 import { useMatchVoting } from '../hooks/useMatchVoting'
-import { useOveralls } from '../hooks/useOveralls'
-import { useStatistiche } from '../hooks/useStatistiche'
+import { usePlayerRatings } from '../hooks/usePlayerRatings'
 import { formatVote } from '../lib/voting'
 import TeamPitch from '../components/TeamPitch'
 import type { Player, Team } from '../types/database'
@@ -32,8 +31,7 @@ export default function MatchDetail() {
 
   const { participants, voterIds, getMyVotes, hasVotedAll, submitVotes } =
     useMatchVoting(id)
-  const { overalls } = useOveralls()
-  const { stats } = useStatistiche()
+  const ratings = usePlayerRatings(data?.matchPlayers.map((mp) => mp.player_id) ?? [])
 
   async function handleBook() {
     if (!id || !player) return
@@ -82,8 +80,8 @@ export default function MatchDetail() {
       .filter((mp): mp is MatchPlayerWithName & { player: Player } => mp.player !== null)
       .map((mp) => ({
         player: mp.player,
-        overall: overalls.get(mp.player_id) ?? null,
-        stats: stats.find((s) => s.player.id === mp.player_id) ?? null,
+        overall: ratings.get(mp.player_id) ?? null,
+        stats: null,
       }))
   const goalsByTeam = (team: Team) => goals.filter((g) => g.team === team)
   const isPublished = pagelle.length > 0 && pagelle.every((p) => p.published_at)

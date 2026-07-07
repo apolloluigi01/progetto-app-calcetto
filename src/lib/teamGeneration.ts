@@ -48,15 +48,19 @@ export function computeOverall(
  * Calcola l'overall di un insieme di giocatori (per playerId), usando le statistiche
  * della stagione corrente e, in assenza di partite giocate, il rating_value salvato
  * dall'admin come fallback.
+ *
+ * Se il chiamante ha già calcolato le statistiche di stagione (es. `useStatistiche`),
+ * può passarle in `precomputedStats` per evitare di ricalcolarle da zero qui dentro.
  */
 export async function computeOverallsForPlayers(
   players: { id: string; name: string; nickname?: string | null }[],
-  seasonId?: string
+  seasonId?: string,
+  precomputedStats?: PlayerStats[]
 ): Promise<PlayerOverall[]> {
   if (players.length === 0) return []
 
   const resolvedSeasonId = seasonId ?? (await getCurrentSeasonId())
-  const allStats = resolvedSeasonId ? await computeStatistiche(resolvedSeasonId) : []
+  const allStats = precomputedStats ?? (resolvedSeasonId ? await computeStatistiche(resolvedSeasonId) : [])
 
   const { data: ratingsData } = await supabase
     .from('ratings')
