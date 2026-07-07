@@ -117,31 +117,45 @@ export default function FantaLega() {
                 squadre.
               </p>
             )}
-            {upcoming.map((m) => (
-              <Link
-                key={m.match.id}
-                to={`/fantacalcetto/${league.id}/partite/${m.match.id}`}
-                className="block rounded-xl bg-white p-4 shadow hover:bg-gray-50"
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">{formatDate(m.match.match_date)}</p>
-                    <p className="text-xs text-gray-500">
-                      {m.myLineup ? '✓ Formazione schierata — tocca per modificarla' : 'Formazione da schierare'}
-                    </p>
+            {upcoming.map((m) =>
+              m.isNext ? (
+                <Link
+                  key={m.match.id}
+                  to={`/fantacalcetto/${league.id}/partite/${m.match.id}`}
+                  className="block rounded-xl bg-white p-4 shadow hover:bg-gray-50"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">{formatDate(m.match.match_date)}</p>
+                      <p className="text-xs text-gray-500">
+                        {m.myLineup ? '✓ Formazione schierata — tocca per modificarla' : 'Formazione da schierare'}
+                      </p>
+                    </div>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs ${
+                        m.myLineup
+                          ? 'bg-field-green/10 text-field-green-dark'
+                          : 'bg-field-yellow/20 text-field-orange'
+                      }`}
+                    >
+                      {m.myLineup ? 'Schierata' : 'Da fare'}
+                    </span>
                   </div>
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-xs ${
-                      m.myLineup
-                        ? 'bg-field-green/10 text-field-green-dark'
-                        : 'bg-field-yellow/20 text-field-orange'
-                    }`}
-                  >
-                    {m.myLineup ? 'Schierata' : 'Da fare'}
-                  </span>
+                </Link>
+              ) : (
+                <div key={m.match.id} className="rounded-xl bg-white p-4 opacity-60 shadow">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">{formatDate(m.match.match_date)}</p>
+                      <p className="text-xs text-gray-500">
+                        Si potrà schierare solo dopo la partita precedente.
+                      </p>
+                    </div>
+                    <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">🔒 Bloccata</span>
+                  </div>
                 </div>
-              </Link>
-            ))}
+              ),
+            )}
           </div>
         </>
       )}

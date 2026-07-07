@@ -21,6 +21,8 @@ export interface FantaMatchRow {
   hasTeams: boolean
   hasResult: boolean
   isPublished: boolean
+  /** True solo per la prossima partita da giocare: l'unica schierabile. */
+  isNext: boolean
   myLineup: FantaLineupInfo | null
   myScore: number | null
 }
@@ -150,7 +152,13 @@ export function useFantaLeague(leagueId: string | undefined, myPlayerId: string 
       .sort((a, b) => b.total - a.total)
 
     type MatchWithResult = Match & { result: { id: string }[] | { id: string } | null }
-    const matches: FantaMatchRow[] = ((matchesRes.data ?? []) as unknown as MatchWithResult[]).map((m) => {
+    const matchRows = (matchesRes.data ?? []) as unknown as MatchWithResult[]
+    // La prossima partita da giocare (in ordine di data, senza risultato):
+    // è l'unica per cui si può schierare la formazione.
+    const nextMatchId =
+      matchRows.find((m) => !(Array.isArray(m.result) ? m.result[0] ?? null : m.result))?.id ?? null
+
+    const matches: FantaMatchRow[] = matchRows.map((m) => {
       const result = Array.isArray(m.result) ? m.result[0] ?? null : m.result
       const myLineupRow = lineups.find((l) => l.match_id === m.id && l.member_id === myPlayerId) ?? null
       return {
@@ -158,6 +166,7 @@ export function useFantaLeague(leagueId: string | undefined, myPlayerId: string 
         hasTeams: (teamsCountByMatch.get(m.id) ?? 0) > 0,
         hasResult: !!result,
         isPublished: publishedMatchIds.has(m.id),
+        isNext: m.id === nextMatchId,
         myLineup: myLineupRow
           ? {
               playerIds: myLineupRow.fanta_lineup_players.map((p) => p.player_id),

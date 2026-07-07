@@ -34,6 +34,8 @@ export default function FantaFormazione() {
   const [saved, setSaved] = useState(false)
   // Ultima formazione salvata sul server: alimenta il campetto.
   const [savedLineup, setSavedLineup] = useState<SavedLineup | null>(null)
+  // Si può schierare solo per la prossima partita da giocare (null = verifica in corso).
+  const [isNextMatch, setIsNextMatch] = useState<boolean | null>(null)
 
   // Carica l'eventuale formazione già schierata.
   useEffect(() => {
@@ -63,7 +65,30 @@ export default function FantaFormazione() {
     }
   }, [leagueId, matchId, player])
 
-  if (loading || ratingsLoading || !lineupLoaded)
+  // Verifica che questa sia davvero la prossima partita da giocare della
+  // stagione: le formazioni si possono schierare solo per quella.
+  useEffect(() => {
+    if (!data) return
+    let cancelled = false
+    supabase
+      .from('matches')
+      .select('id, result:match_results(id)')
+      .eq('season_id', data.match.season_id)
+      .order('match_date', { ascending: true })
+      .then(({ data: rows }) => {
+        if (cancelled) return
+        type Row = { id: string; result: { id: string }[] | { id: string } | null }
+        const next = ((rows ?? []) as unknown as Row[]).find(
+          (r) => !(Array.isArray(r.result) ? r.result[0] ?? null : r.result),
+        )
+        setIsNextMatch(next?.id === data.match.id)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [data])
+
+  if (loading || ratingsLoading || !lineupLoaded || isNextMatch === null)
     return <div className="p-4 text-sm text-gray-500">Caricamento...</div>
   if (error || !data) return <div className="p-4 text-sm text-red-600">{error ?? 'Partita non trovata'}</div>
 
@@ -71,7 +96,8 @@ export default function FantaFormazione() {
   const teamA = matchPlayers.filter((p) => p.team === 'A')
   const teamB = matchPlayers.filter((p) => p.team === 'B')
   const isPublished = pagelle.length > 0 && pagelle.every((p) => p.published_at)
-  const locked = !!result
+  // Bloccata se la partita è conclusa oppure se non è la prossima in programma.
+  const locked = !!result || !isNextMatch
 
   const costOf = (playerId: string) => creditCost(ratings.get(playerId) ?? null)
   const budgetUsed = [...selected].reduce((s, id) => s + costOf(id), 0)
@@ -221,9 +247,11 @@ export default function FantaFormazione() {
       {locked ? (
         <div className="mt-3 rounded-xl border border-field-orange/30 bg-field-orange/5 p-3">
           <p className="text-sm text-field-orange">
-            {isPublished
-              ? 'Partita conclusa: ecco il punteggio della tua squadra.'
-              : 'Partita conclusa: il punteggio arriverà con la pubblicazione delle pagelle.'}
+            {!result
+              ? '🔒 Puoi schierare la formazione solo per la prossima partita in programma: questa si sbloccherà dopo quella precedente.'
+              : isPublished
+                ? 'Partita conclusa: ecco il punteggio della tua squadra.'
+                : 'Partita conclusa: il punteggio arriverà con la pubblicazione delle pagelle.'}
           </p>
         </div>
       ) : (
@@ -255,7 +283,11 @@ export default function FantaFormazione() {
 
       {/* Selezione giocatori */}
       {selected.size === 0 && locked ? (
-        <p className="mt-4 text-sm text-gray-500">Non avevi schierato nessuna formazione per questa partita.</p>
+        <p className="mt-4 text-sm text-gray-500">
+          {result
+            ? 'Non avevi schierato nessuna formazione per questa partita.'
+            : 'Le squadre di questa partita saranno schierabili quando sarà il suo turno.'}
+        </p>
       ) : (
         <div className="mt-4 grid grid-cols-2 gap-3">
           {renderTeam(teamA, 'Squadra A', countA)}
