@@ -3,6 +3,7 @@ export type MatchStatus = 'draft' | 'completed'
 export type Team = 'A' | 'B'
 export type Fascia = 'A' | 'B' | 'C' | 'D'
 export type PlayingPosition = 'POR' | 'DIF' | 'CEN' | 'ATT'
+export type CardType = 'gold' | 'special' | 'blue'
 
 export interface Player {
   id: string
@@ -14,6 +15,7 @@ export interface Player {
   nationality: string | null
   position: PlayingPosition | null
   jersey_number: number | null
+  card_type: CardType
   must_change_password: boolean
   created_at: string
 }

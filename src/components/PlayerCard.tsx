@@ -1,6 +1,6 @@
 import { countryFlag, countryName } from '../lib/countries'
 import { playerFullName, type PlayerStats } from '../lib/statistiche'
-import type { Player } from '../types/database'
+import type { CardType, Player } from '../types/database'
 
 interface PlayerCardProps {
   player: Player
@@ -15,7 +15,53 @@ const positionLabels: Record<string, string> = {
   ATT: 'Attaccante',
 }
 
+interface CardStyle {
+  label: string
+  border: string
+  bg: string
+  text: string
+  sub: string
+  accent: string
+  divider: string
+  avatarBg: string
+}
+
+const CARD_STYLES: Record<CardType, CardStyle> = {
+  gold: {
+    label: 'Oro',
+    border: 'bg-gradient-to-b from-amber-200 via-yellow-500 to-amber-700',
+    bg: 'bg-gradient-to-br from-amber-100 via-yellow-400 to-amber-500',
+    text: 'text-stone-900',
+    sub: 'text-stone-700',
+    accent: 'text-stone-900',
+    divider: 'border-stone-900/20',
+    avatarBg: 'bg-stone-900/10',
+  },
+  special: {
+    label: 'Speciale',
+    border: 'bg-gradient-to-b from-yellow-300 via-yellow-500 to-yellow-700',
+    bg: 'bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900',
+    text: 'text-yellow-300',
+    sub: 'text-yellow-100/70',
+    accent: 'text-yellow-300',
+    divider: 'border-yellow-300/25',
+    avatarBg: 'bg-yellow-300/10',
+  },
+  blue: {
+    label: 'Competizione',
+    border: 'bg-gradient-to-b from-sky-300 via-blue-500 to-blue-800',
+    bg: 'bg-gradient-to-br from-blue-950 via-indigo-800 to-blue-950',
+    text: 'text-white',
+    sub: 'text-sky-100/70',
+    accent: 'text-sky-300',
+    divider: 'border-sky-300/25',
+    avatarBg: 'bg-white/10',
+  },
+}
+
 export default function PlayerCard({ player, overall, stats }: PlayerCardProps) {
+  const style = CARD_STYLES[player.card_type] ?? CARD_STYLES.gold
+
   const winPercentage =
     stats && stats.partiteGiocate > 0 ? Math.round((stats.vittorie / stats.partiteGiocate) * 100) : null
 
@@ -29,50 +75,71 @@ export default function PlayerCard({ player, overall, stats }: PlayerCardProps) 
   ]
 
   return (
-    <div className="relative w-full overflow-hidden rounded-2xl border border-field-yellow/40 bg-gradient-to-b from-field-green-dark via-field-green to-field-green-dark p-3 text-white shadow-lg">
-      <div className="flex items-start justify-between">
-        <div className="text-center leading-none">
-          <p className="text-3xl font-extrabold text-field-yellow">{overall ?? '-'}</p>
-          <p
-            className="mt-1 text-xs font-bold tracking-wide text-white/90"
-            title={player.position ? positionLabels[player.position] : undefined}
-          >
-            {player.position ?? '-'}
-          </p>
-        </div>
-        <div className="flex flex-col items-end gap-1 text-right">
-          <span className="text-xl leading-none" title={countryName(player.nationality) || undefined}>
-            {countryFlag(player.nationality)}
-          </span>
-          <span className="text-xs font-semibold text-white/80">
-            {player.jersey_number ? `#${player.jersey_number}` : ''}
-          </span>
-        </div>
-      </div>
+    <div className="box-border w-full overflow-hidden rounded-2xl shadow-lg" style={{ aspectRatio: '5 / 7' }}>
+      <div className={`box-border h-full overflow-hidden rounded-2xl p-[3px] ${style.border}`}>
+        <div className={`relative box-border flex h-full flex-col overflow-hidden rounded-[14px] p-2.5 ${style.bg} ${style.text}`}>
+          {/* Riflessi diagonali */}
+          <div
+            className="pointer-events-none absolute inset-0 opacity-20"
+            style={{
+              background:
+                'repeating-linear-gradient(115deg, transparent, transparent 10px, white 10px, white 12px)',
+            }}
+          />
 
-      <div className="mt-1 flex justify-center">
-        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white/15 text-xl font-bold text-white">
-          {player.name.charAt(0).toUpperCase()}
-          {player.surname ? player.surname.charAt(0).toUpperCase() : ''}
-        </div>
-      </div>
-
-      <p className="mt-1 truncate text-center text-sm font-bold uppercase tracking-wide">
-        {playerFullName(player)}
-      </p>
-      {player.nickname && (
-        <p className="truncate text-center text-[11px] text-white/70">{player.nickname}</p>
-      )}
-
-      <div className="mt-2 border-t border-white/20" />
-
-      <div className="mt-2 grid grid-cols-2 gap-x-2 gap-y-1.5 text-[11px]">
-        {statItems.map((item) => (
-          <div key={item.label} className="flex items-center justify-between gap-1">
-            <span className="font-bold text-field-yellow">{item.value}</span>
-            <span className="truncate text-white/70">{item.label}</span>
+          <div className="relative flex items-start justify-between">
+            <div className="text-center leading-none">
+              <p className="text-3xl font-extrabold">{overall ?? '-'}</p>
+              <p
+                className="mt-1 text-xs font-bold tracking-wide"
+                title={player.position ? positionLabels[player.position] : undefined}
+              >
+                {player.position ?? '-'}
+              </p>
+            </div>
+            <div className="flex flex-col items-end gap-1 text-right">
+              <span className="text-xl leading-none" title={countryName(player.nationality) || undefined}>
+                {countryFlag(player.nationality)}
+              </span>
+              <span className={`text-xs font-semibold ${style.sub}`}>
+                {player.jersey_number ? `#${player.jersey_number}` : ''}
+              </span>
+            </div>
           </div>
-        ))}
+
+          <div className="relative mt-1 flex justify-center">
+            {player.avatar_url ? (
+              <img
+                src={player.avatar_url}
+                alt=""
+                className="h-16 w-16 rounded-full object-cover"
+              />
+            ) : (
+              <div className={`flex h-16 w-16 items-center justify-center rounded-full text-xl font-bold ${style.avatarBg}`}>
+                {player.name.charAt(0).toUpperCase()}
+                {player.surname ? player.surname.charAt(0).toUpperCase() : ''}
+              </div>
+            )}
+          </div>
+
+          <p className="relative mt-1 truncate text-center text-sm font-bold uppercase tracking-wide">
+            {playerFullName(player)}
+          </p>
+          {player.nickname && (
+            <p className={`relative truncate text-center text-[11px] ${style.sub}`}>{player.nickname}</p>
+          )}
+
+          <div className={`relative mt-2 border-t ${style.divider}`} />
+
+          <div className="relative mt-2 grid flex-1 grid-cols-2 content-center gap-x-2 gap-y-1.5 text-[11px]">
+            {statItems.map((item) => (
+              <div key={item.label} className="flex items-center justify-between gap-1">
+                <span className={`font-bold ${style.accent}`}>{item.value}</span>
+                <span className={`truncate ${style.sub}`}>{item.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   )
