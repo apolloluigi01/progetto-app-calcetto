@@ -29,6 +29,7 @@ export type ActivityAction =
   | 'prenotazione_rimossa'
   | 'votazioni_aperte'
   | 'votazioni_chiuse'
+  | 'fanta_lega_creata'
 
 export const actionLabels: Record<ActivityAction, string> = {
   giocatore_creato:      'Giocatore creato',
@@ -53,6 +54,7 @@ export const actionLabels: Record<ActivityAction, string> = {
   prenotazione_rimossa:  'Prenotazione rimossa (admin)',
   votazioni_aperte:      'Votazioni aperte',
   votazioni_chiuse:      'Votazioni chiuse',
+  fanta_lega_creata:     'Lega fantacalcetto creata',
 }
 
 export async function logActivity(

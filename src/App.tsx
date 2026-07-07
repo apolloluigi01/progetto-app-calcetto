@@ -27,6 +27,8 @@ import StagioneEdit from './pages/admin/StagioneEdit'
 import StagioneDettaglio from './pages/admin/StagioneDettaglio'
 import StagioneStatisticaDettaglio from './pages/admin/StagioneStatisticaDettaglio'
 import Fantacalcetto from './pages/Fantacalcetto'
+import FantaLega from './pages/FantaLega'
+import FantaFormazione from './pages/FantaFormazione'
 import RegistroAttivita from './pages/RegistroAttivita'
 
 function App() {
@@ -53,6 +55,8 @@ function App() {
               <Route path="/statistiche/:key" element={<StatisticaDettaglio />} />
               <Route path="/impostazioni" element={<Impostazioni />} />
               <Route path="/fantacalcetto" element={<Fantacalcetto />} />
+              <Route path="/fantacalcetto/:leagueId" element={<FantaLega />} />
+              <Route path="/fantacalcetto/:leagueId/partite/:matchId" element={<FantaFormazione />} />
               <Route path="/registro-attivita" element={<RegistroAttivita />} />
 
               <Route element={<AdminRoute />}>

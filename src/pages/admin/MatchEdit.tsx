@@ -44,6 +44,7 @@ export default function MatchEdit() {
   const [infoError, setInfoError] = useState<string | null>(null)
 
   const [newGoalPlayer, setNewGoalPlayer] = useState<Record<Team, string>>({ A: '', B: '' })
+  const [newGoalAssist, setNewGoalAssist] = useState<Record<Team, string>>({ A: '', B: '' })
   const [ownGoal, setOwnGoal] = useState<Record<Team, boolean>>({ A: false, B: false })
 
   const [drafts, setDrafts] = useState<Record<string, PagellaDraft>>({})
@@ -166,10 +167,17 @@ export default function MatchEdit() {
     if (!id || !newGoalPlayer[team]) return
     await supabase
       .from('goals')
-      .insert({ match_id: id, player_id: newGoalPlayer[team], team, is_own_goal: ownGoal[team] })
+      .insert({
+        match_id: id,
+        player_id: newGoalPlayer[team],
+        team,
+        is_own_goal: ownGoal[team],
+        assist_player_id: !ownGoal[team] && newGoalAssist[team] ? newGoalAssist[team] : null,
+      })
     const playerName = matchPlayers.find(p => p.player_id === newGoalPlayer[team])?.name
     logActivity('gol_aggiunto', { matchId: id, data: match.match_date, squadra: team, giocatore: playerName, autogol: ownGoal[team] })
     setNewGoalPlayer((prev) => ({ ...prev, [team]: '' }))
+    setNewGoalAssist((prev) => ({ ...prev, [team]: '' }))
     setOwnGoal((prev) => ({ ...prev, [team]: false }))
     refetch()
   }
@@ -1001,16 +1009,23 @@ export default function MatchEdit() {
             <div key={team} className="rounded-xl bg-white p-3 shadow">
               <h3 className="mb-2 font-medium text-field-green-dark">Marcatori Squadra {team}</h3>
               <ul className="space-y-1 text-sm">
-                {goalsByTeam(team).map((g) => (
-                  <li key={g.id} className="flex items-center justify-between">
-                    <span>
-                      ⚽ {g.name} {g.is_own_goal && <span className="text-red-600">(autogol)</span>}
-                    </span>
-                    <button onClick={() => handleRemoveGoal(g.id)} className="text-xs text-red-600">
-                      Rimuovi
-                    </button>
-                  </li>
-                ))}
+                {goalsByTeam(team).map((g) => {
+                  const assistName = g.assist_player_id
+                    ? matchPlayers.find((mp) => mp.player_id === g.assist_player_id)?.nickname ??
+                      matchPlayers.find((mp) => mp.player_id === g.assist_player_id)?.name
+                    : null
+                  return (
+                    <li key={g.id} className="flex items-center justify-between">
+                      <span>
+                        ⚽ {g.name} {g.is_own_goal && <span className="text-red-600">(autogol)</span>}
+                        {assistName && <span className="text-xs text-gray-400"> (assist: {assistName})</span>}
+                      </span>
+                      <button onClick={() => handleRemoveGoal(g.id)} className="text-xs text-red-600">
+                        Rimuovi
+                      </button>
+                    </li>
+                  )
+                })}
               </ul>
               <div className="mt-2 flex gap-2">
                 <select
@@ -1033,6 +1048,22 @@ export default function MatchEdit() {
                   + Gol
                 </button>
               </div>
+              {!ownGoal[team] && (
+                <select
+                  value={newGoalAssist[team]}
+                  onChange={(e) => setNewGoalAssist((prev) => ({ ...prev, [team]: e.target.value }))}
+                  className="mt-2 w-full rounded-lg border border-gray-300 px-2 py-1 text-sm text-gray-600"
+                >
+                  <option value="">Assist (opzionale)...</option>
+                  {(team === 'A' ? teamA : teamB)
+                    .filter((p) => p.player_id !== newGoalPlayer[team])
+                    .map((p) => (
+                      <option key={p.player_id} value={p.player_id}>
+                        {p.nickname ?? p.name}
+                      </option>
+                    ))}
+                </select>
+              )}
               <label className="mt-2 flex items-center gap-1 text-xs text-red-600">
                 <input
                   type="checkbox"
