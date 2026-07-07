@@ -42,7 +42,7 @@ export default function GiocatoreDetail() {
 
   return (
     <div className="p-4">
-      <div className="mx-auto max-w-[220px]">
+      <div className="mx-auto max-w-[140px]">
         <PlayerCard player={player} overall={overalls.get(player.id) ?? null} stats={playerStats} />
       </div>
 

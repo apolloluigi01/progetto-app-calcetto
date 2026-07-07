@@ -75,9 +75,9 @@ export default function PlayerCard({ player, overall, stats }: PlayerCardProps) 
   ]
 
   return (
-    <div className="box-border w-full overflow-hidden rounded-2xl shadow-lg" style={{ aspectRatio: '5 / 7' }}>
-      <div className={`box-border h-full overflow-hidden rounded-2xl p-[3px] ${style.border}`}>
-        <div className={`relative box-border flex h-full flex-col overflow-hidden rounded-[14px] p-2.5 ${style.bg} ${style.text}`}>
+    <div className="box-border w-full overflow-hidden rounded-xl shadow-md" style={{ aspectRatio: '5 / 7' }}>
+      <div className={`box-border h-full overflow-hidden rounded-xl p-[2px] ${style.border}`}>
+        <div className={`relative box-border flex h-full flex-col overflow-hidden rounded-[10px] p-1.5 ${style.bg} ${style.text}`}>
           {/* Riflessi diagonali */}
           <div
             className="pointer-events-none absolute inset-0 opacity-20"
@@ -89,49 +89,49 @@ export default function PlayerCard({ player, overall, stats }: PlayerCardProps) 
 
           <div className="relative flex items-start justify-between">
             <div className="text-center leading-none">
-              <p className="text-3xl font-extrabold">{overall ?? '-'}</p>
+              <p className="text-xl font-extrabold">{overall ?? '-'}</p>
               <p
-                className="mt-1 text-xs font-bold tracking-wide"
+                className="mt-0.5 text-[10px] font-bold tracking-wide"
                 title={player.position ? positionLabels[player.position] : undefined}
               >
                 {player.position ?? '-'}
               </p>
             </div>
-            <div className="flex flex-col items-end gap-1 text-right">
-              <span className="text-xl leading-none" title={countryName(player.nationality) || undefined}>
+            <div className="flex flex-col items-end gap-0.5 text-right">
+              <span className="text-sm leading-none" title={countryName(player.nationality) || undefined}>
                 {countryFlag(player.nationality)}
               </span>
-              <span className={`text-xs font-semibold ${style.sub}`}>
+              <span className={`text-[10px] font-semibold ${style.sub}`}>
                 {player.jersey_number ? `#${player.jersey_number}` : ''}
               </span>
             </div>
           </div>
 
-          <div className="relative mt-1 flex justify-center">
+          <div className="relative mt-0.5 flex justify-center">
             {player.avatar_url ? (
               <img
                 src={player.avatar_url}
                 alt=""
-                className="h-16 w-16 rounded-full object-cover"
+                className="h-9 w-9 rounded-full object-cover"
               />
             ) : (
-              <div className={`flex h-16 w-16 items-center justify-center rounded-full text-xl font-bold ${style.avatarBg}`}>
+              <div className={`flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold ${style.avatarBg}`}>
                 {player.name.charAt(0).toUpperCase()}
                 {player.surname ? player.surname.charAt(0).toUpperCase() : ''}
               </div>
             )}
           </div>
 
-          <p className="relative mt-1 truncate text-center text-sm font-bold uppercase tracking-wide">
+          <p className="relative mt-0.5 truncate text-center text-[11px] font-bold uppercase tracking-wide">
             {playerFullName(player)}
           </p>
           {player.nickname && (
-            <p className={`relative truncate text-center text-[11px] ${style.sub}`}>{player.nickname}</p>
+            <p className={`relative truncate text-center text-[9px] ${style.sub}`}>{player.nickname}</p>
           )}
 
-          <div className={`relative mt-2 border-t ${style.divider}`} />
+          <div className={`relative mt-1 border-t ${style.divider}`} />
 
-          <div className="relative mt-2 grid flex-1 grid-cols-2 content-center gap-x-2 gap-y-1.5 text-[11px]">
+          <div className="relative mt-1 grid flex-1 grid-cols-2 content-center gap-x-1.5 gap-y-1 text-[9px]">
             {statItems.map((item) => (
               <div key={item.label} className="flex items-center justify-between gap-1">
                 <span className={`font-bold ${style.accent}`}>{item.value}</span>
