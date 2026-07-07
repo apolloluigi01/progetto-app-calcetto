@@ -15,7 +15,6 @@ create table if not exists players (
   nationality text,
   position text check (position in ('POR', 'DIF', 'CEN', 'ATT')),
   jersey_number integer check (jersey_number between 1 and 99),
-  card_type text not null default 'gold' check (card_type in ('gold', 'special', 'blue')),
   must_change_password boolean not null default true,
   created_at timestamptz not null default now()
 );

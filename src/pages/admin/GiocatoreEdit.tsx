@@ -5,13 +5,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { getFunctionErrorMessage } from '../../lib/functionErrors'
 import { logActivity, type FieldChange } from '../../lib/activityLog'
 import { COUNTRIES } from '../../lib/countries'
-import type { CardType, Player, PlayerRole, PlayingPosition } from '../../types/database'
-
-const cardTypeLabels: Record<CardType, string> = {
-  gold: 'Oro',
-  special: 'Speciale (scura/oro)',
-  blue: 'Competizione (blu)',
-}
+import type { Player, PlayerRole, PlayingPosition } from '../../types/database'
 
 type PlayerWithStatus = Player & { email?: string | null; email_confirmed?: boolean }
 
@@ -31,7 +25,6 @@ export default function GiocatoreEdit() {
   const [nationality, setNationality] = useState('')
   const [position, setPosition] = useState<PlayingPosition | ''>('')
   const [jerseyNumber, setJerseyNumber] = useState('')
-  const [cardType, setCardType] = useState<CardType>('gold')
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
@@ -83,7 +76,6 @@ export default function GiocatoreEdit() {
     setNationality(player.nationality ?? '')
     setPosition(player.position ?? '')
     setJerseyNumber(player.jersey_number ? String(player.jersey_number) : '')
-    setCardType(player.card_type ?? 'gold')
   }, [player])
 
   if (loading) return <div className="p-4 text-sm text-gray-500">Caricamento...</div>
@@ -172,7 +164,6 @@ export default function GiocatoreEdit() {
       nationality: string | null
       position: PlayingPosition | null
       jersey_number: number | null
-      card_type: CardType
     } = {
       name,
       surname: surname || null,
@@ -180,7 +171,6 @@ export default function GiocatoreEdit() {
       nationality: nationality || null,
       position: position || null,
       jersey_number: parsedJerseyNumber,
-      card_type: cardType,
     }
     if (isSuperAdmin) update.role = role
 
@@ -212,9 +202,6 @@ export default function GiocatoreEdit() {
         da: player.jersey_number ? String(player.jersey_number) : '(vuoto)',
         a: parsedJerseyNumber ? String(parsedJerseyNumber) : '(vuoto)',
       })
-    }
-    if (player.card_type !== cardType) {
-      modifiche.push({ campo: 'Tipo carta', da: cardTypeLabels[player.card_type], a: cardTypeLabels[cardType] })
     }
 
     if (modifiche.length > 0) {
@@ -416,21 +403,11 @@ export default function GiocatoreEdit() {
                     className="w-full rounded-lg border border-gray-300 px-3 py-2"
                   />
                 </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Tipo carta</label>
-                  <select
-                    value={cardType}
-                    onChange={(e) => setCardType(e.target.value as CardType)}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2"
-                  >
-                    {(Object.keys(cardTypeLabels) as CardType[]).map((ct) => (
-                      <option key={ct} value={ct}>
-                        {cardTypeLabels[ct]}
-                      </option>
-                    ))}
-                  </select>
-                </div>
               </div>
+              <p className="mt-2 text-xs text-gray-400">
+                Lo stile della carta (bronzo/argento/oro/speciale/blu) è determinato automaticamente
+                dall'overall del giocatore.
+              </p>
             </div>
             {player.email && (
               <p className="text-xs text-gray-500">

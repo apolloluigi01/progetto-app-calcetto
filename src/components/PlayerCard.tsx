@@ -1,6 +1,23 @@
 import { countryFlag, countryName } from '../lib/countries'
 import { playerFullName, type PlayerStats } from '../lib/statistiche'
-import type { CardType, Player } from '../types/database'
+import type { Player } from '../types/database'
+
+type CardTier = 'bronze' | 'silver' | 'gold' | 'special' | 'blue'
+
+// Il template della carta è determinato dall'overall, non da una scelta manuale:
+//   1-34  -> Bronzo
+//   35-55 -> Argento
+//   56-74 -> Oro
+//   75-89 -> Speciale (scura/oro)
+//   90-100 -> Competizione (blu)
+function cardTierForOverall(overall: number | null): CardTier {
+  const v = overall ?? 0
+  if (v >= 90) return 'blue'
+  if (v >= 75) return 'special'
+  if (v >= 56) return 'gold'
+  if (v >= 35) return 'silver'
+  return 'bronze'
+}
 
 interface PlayerCardProps {
   player: Player
@@ -28,7 +45,27 @@ interface CardStyle {
   avatarBg: string
 }
 
-const CARD_STYLES: Record<CardType, CardStyle> = {
+const CARD_STYLES: Record<CardTier, CardStyle> = {
+  bronze: {
+    label: 'Bronzo',
+    border: 'bg-gradient-to-b from-orange-200 via-orange-400 to-orange-800',
+    bg: 'bg-gradient-to-br from-orange-200 via-orange-400 to-orange-600',
+    text: 'text-orange-950',
+    sub: 'text-orange-900/70',
+    accent: 'text-orange-950',
+    divider: 'border-orange-950/20',
+    avatarBg: 'bg-orange-950/10',
+  },
+  silver: {
+    label: 'Argento',
+    border: 'bg-gradient-to-b from-gray-100 via-gray-300 to-gray-500',
+    bg: 'bg-gradient-to-br from-gray-100 via-gray-300 to-gray-400',
+    text: 'text-gray-900',
+    sub: 'text-gray-700',
+    accent: 'text-gray-900',
+    divider: 'border-gray-900/20',
+    avatarBg: 'bg-gray-900/10',
+  },
   gold: {
     label: 'Oro',
     border: 'bg-gradient-to-b from-amber-200 via-yellow-500 to-amber-700',
@@ -62,7 +99,7 @@ const CARD_STYLES: Record<CardType, CardStyle> = {
 }
 
 export default function PlayerCard({ player, overall, stats, compact = false }: PlayerCardProps) {
-  const style = CARD_STYLES[player.card_type] ?? CARD_STYLES.gold
+  const style = CARD_STYLES[cardTierForOverall(overall)]
 
   const winPercentage =
     stats && stats.partiteGiocate > 0 ? Math.round((stats.vittorie / stats.partiteGiocate) * 100) : null
