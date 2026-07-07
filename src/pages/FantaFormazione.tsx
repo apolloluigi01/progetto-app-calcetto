@@ -11,7 +11,14 @@ import {
   creditCost,
   formatFantaPoints,
 } from '../lib/fantacalcetto'
+import FantaPitch from '../components/FantaPitch'
 import type { MatchPlayerWithName } from '../hooks/useMatchDetail'
+import type { Player } from '../types/database'
+
+interface SavedLineup {
+  playerIds: string[]
+  captainId: string
+}
 
 export default function FantaFormazione() {
   const { leagueId, matchId } = useParams<{ leagueId: string; matchId: string }>()
@@ -25,6 +32,8 @@ export default function FantaFormazione() {
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
+  // Ultima formazione salvata sul server: alimenta il campetto.
+  const [savedLineup, setSavedLineup] = useState<SavedLineup | null>(null)
 
   // Carica l'eventuale formazione già schierata.
   useEffect(() => {
@@ -42,8 +51,10 @@ export default function FantaFormazione() {
         type Row = { captain_id: string; fanta_lineup_players: { player_id: string }[] }
         if (row) {
           const r = row as unknown as Row
-          setSelected(new Set(r.fanta_lineup_players.map((p) => p.player_id)))
+          const ids = r.fanta_lineup_players.map((p) => p.player_id)
+          setSelected(new Set(ids))
           setCaptainId(r.captain_id)
+          setSavedLineup({ playerIds: ids, captainId: r.captain_id })
         }
         setLineupLoaded(true)
       })
@@ -127,6 +138,7 @@ export default function FantaFormazione() {
       return
     }
     setSaved(true)
+    setSavedLineup({ playerIds: [...selected], captainId })
   }
 
   // Punteggio (solo a pagelle pubblicate)
@@ -306,6 +318,26 @@ export default function FantaFormazione() {
             {saving ? 'Salvataggio...' : 'Salva formazione'}
           </button>
         </>
+      )}
+
+      {/* Campetto con la squadra schierata */}
+      {savedLineup && (
+        <div className="mt-4">
+          <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-500">
+            La tua squadra schierata
+          </h3>
+          <FantaPitch
+            entries={savedLineup.playerIds
+              .map((pid) => matchPlayers.find((mp) => mp.player_id === pid))
+              .filter((mp): mp is MatchPlayerWithName & { player: Player } => !!mp && mp.player !== null)
+              .map((mp) => ({
+                player: mp.player,
+                overall: ratings.get(mp.player_id) ?? null,
+                stats: null,
+              }))}
+            captainId={savedLineup.captainId}
+          />
+        </div>
       )}
 
       {/* Punteggio dettagliato */}
