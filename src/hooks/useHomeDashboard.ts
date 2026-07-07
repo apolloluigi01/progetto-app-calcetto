@@ -13,6 +13,7 @@ export interface DashboardMatchPlayer {
   player_id: string
   team: Team
   name: string
+  nickname: string | null
 }
 
 export interface LastMatch {
@@ -88,18 +89,19 @@ export function useHomeDashboard() {
           const m = nextRes.data as Match
           const { data: playersData, error: playersError } = await supabase
             .from('match_players')
-            .select('player_id, team, players(name)')
+            .select('player_id, team, players(name, nickname)')
             .eq('match_id', m.id)
 
           if (playersError) throw playersError
 
-          type PlayerJoin = { player_id: string; team: Team; players: { name: string } | null }
+          type PlayerJoin = { player_id: string; team: Team; players: { name: string; nickname: string | null } | null }
           setNextMatch({
             match: m,
             players: ((playersData ?? []) as unknown as PlayerJoin[]).map((p) => ({
               player_id: p.player_id,
               team: p.team,
               name: p.players?.name ?? '',
+              nickname: p.players?.nickname ?? null,
             })),
           })
         } else {

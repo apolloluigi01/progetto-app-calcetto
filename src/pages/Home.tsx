@@ -172,7 +172,7 @@ export default function Home() {
                           p.team === 'A' ? 'bg-field-green/10 text-field-green-dark' : 'bg-field-orange/10 text-field-orange'
                         }`}
                       >
-                        {p.name}
+                        {p.nickname ?? p.name}
                       </li>
                     ))}
                   </ul>
