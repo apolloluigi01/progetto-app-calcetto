@@ -8,9 +8,9 @@ import type { MatchPlayerWithName } from '../hooks/useMatchDetail'
 export default function MatchPitch() {
   const { id } = useParams<{ id: string }>()
   const { data, loading, error } = useMatchDetail(id)
-  const ratings = usePlayerRatings(data?.matchPlayers.map((mp) => mp.player_id) ?? [])
+  const { ratings, loading: ratingsLoading } = usePlayerRatings(data?.matchPlayers.map((mp) => mp.player_id))
 
-  if (loading) return <div className="p-4 text-sm text-gray-500">Caricamento...</div>
+  if (loading || ratingsLoading) return <div className="p-4 text-sm text-gray-500">Caricamento...</div>
   if (error || !data) return <div className="p-4 text-sm text-red-600">{error ?? 'Partita non trovata'}</div>
 
   const { match, matchPlayers } = data

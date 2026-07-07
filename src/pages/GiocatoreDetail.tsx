@@ -12,7 +12,7 @@ const STAT_KEYS: StatKey[] = ['overall', 'marcatori', 'mvp', 'winrate', 'sconfit
 export default function GiocatoreDetail() {
   const { id } = useParams<{ id: string }>()
   const { stats: seasonStats, loading: statsLoading } = useStatistiche()
-  const { overalls } = useOveralls()
+  const { overalls, loading: overallsLoading } = useOveralls()
 
   const [player, setPlayer] = useState<Player | null>(null)
   const [loading, setLoading] = useState(true)
@@ -43,7 +43,11 @@ export default function GiocatoreDetail() {
   return (
     <div className="p-4">
       <div className="mx-auto max-w-[200px]">
-        <PlayerCard player={player} overall={overalls.get(player.id) ?? null} stats={playerStats} />
+        {overallsLoading ? (
+          <div className="animate-pulse rounded-xl bg-gray-200" style={{ aspectRatio: '5 / 7' }} />
+        ) : (
+          <PlayerCard player={player} overall={overalls.get(player.id) ?? null} stats={playerStats} />
+        )}
       </div>
 
       <h2 className="mt-6 text-lg font-semibold text-field-green-dark">Statistiche stagione</h2>
