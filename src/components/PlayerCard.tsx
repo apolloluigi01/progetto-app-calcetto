@@ -154,7 +154,7 @@ export default function PlayerCard({ player, overall, stats, compact = false }: 
             style={compact ? undefined : { aspectRatio: '4 / 3' }}
           >
             {player.avatar_url ? (
-              <img src={player.avatar_url} alt="" className="h-full w-full object-cover" />
+              <img src={player.avatar_url} alt="" className="h-full w-full object-contain object-bottom" />
             ) : (
               <div
                 className={`flex h-full w-full items-center justify-center font-bold ${compact ? 'text-base' : 'text-3xl'} ${style.avatarBg}`}
