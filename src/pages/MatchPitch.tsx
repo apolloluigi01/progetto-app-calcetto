@@ -1,6 +1,7 @@
 import { Link, useParams } from 'react-router-dom'
 import { useMatchDetail } from '../hooks/useMatchDetail'
 import { usePlayerRatings } from '../hooks/usePlayerRatings'
+import { useStatistiche } from '../hooks/useStatistiche'
 import TeamPitch from '../components/TeamPitch'
 import type { Player } from '../types/database'
 import type { MatchPlayerWithName } from '../hooks/useMatchDetail'
@@ -9,6 +10,7 @@ export default function MatchPitch() {
   const { id } = useParams<{ id: string }>()
   const { data, loading, error } = useMatchDetail(id)
   const { ratings, loading: ratingsLoading } = usePlayerRatings(data?.matchPlayers.map((mp) => mp.player_id))
+  const { stats } = useStatistiche(data?.match.season_id)
 
   if (loading || ratingsLoading) return <div className="p-4 text-sm text-gray-500">Caricamento...</div>
   if (error || !data) return <div className="p-4 text-sm text-red-600">{error ?? 'Partita non trovata'}</div>
@@ -23,7 +25,7 @@ export default function MatchPitch() {
       .map((mp) => ({
         player: mp.player,
         overall: ratings.get(mp.player_id) ?? null,
-        stats: null,
+        stats: stats.find((s) => s.player.id === mp.player_id) ?? null,
       }))
 
   return (
@@ -41,10 +43,12 @@ export default function MatchPitch() {
         </p>
       </div>
 
+      <p className="mt-3 text-center text-xs text-gray-400">Tocca una carta per vederla per intero</p>
+
       {matchPlayers.length === 0 ? (
         <p className="mt-4 text-sm text-gray-500">Le squadre non sono ancora state assegnate.</p>
       ) : (
-        <div className="mt-4">
+        <div className="mt-2">
           <TeamPitch teamA={pitchEntries(teamA)} teamB={pitchEntries(teamB)} large />
         </div>
       )}

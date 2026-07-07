@@ -102,10 +102,12 @@ export default function StagioneStatisticaDettaglio() {
               <tr key={entry.stats.player.id} className="border-t border-gray-100 hover:bg-gray-50">
                 <td className="px-4 py-3 text-gray-400">{i + 1}</td>
                 <td className="px-2 py-3 font-medium text-gray-700">
-                  <p>{playerFullName(entry.stats.player)}</p>
-                  {entry.stats.player.nickname && (
-                    <p className="text-xs font-normal text-gray-400">{entry.stats.player.nickname}</p>
-                  )}
+                  <Link to={`/giocatori/${entry.stats.player.id}`} className="hover:underline">
+                    <p>{playerFullName(entry.stats.player)}</p>
+                    {entry.stats.player.nickname && (
+                      <p className="text-xs font-normal text-gray-400">{entry.stats.player.nickname}</p>
+                    )}
+                  </Link>
                 </td>
                 {config.extraColumn && (
                   <td className="px-4 py-3 text-right text-gray-500">

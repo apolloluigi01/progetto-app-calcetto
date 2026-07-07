@@ -220,10 +220,12 @@ export default function Home() {
                     <tr key={entry.stats.player.id} className="border-t border-gray-100 hover:bg-gray-50">
                       <td className="px-4 py-2 text-gray-400">{i + 1}</td>
                       <td className="px-2 py-2 font-medium text-gray-700">
-                        <p>{playerFullName(entry.stats.player)}</p>
-                        {entry.stats.player.nickname && (
-                          <p className="text-[11px] font-normal text-gray-400">{entry.stats.player.nickname}</p>
-                        )}
+                        <Link to={`/giocatori/${entry.stats.player.id}`} className="hover:underline">
+                          <p>{playerFullName(entry.stats.player)}</p>
+                          {entry.stats.player.nickname && (
+                            <p className="text-[11px] font-normal text-gray-400">{entry.stats.player.nickname}</p>
+                          )}
+                        </Link>
                       </td>
                       <td className="px-4 py-2 text-right">
                         <span className="inline-flex items-center rounded-full bg-field-green/10 px-2.5 py-1 text-xs font-semibold text-field-green-dark">
