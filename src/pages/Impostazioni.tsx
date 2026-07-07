@@ -25,19 +25,21 @@ export default function Impostazioni() {
   const [nicknameError, setNicknameError] = useState<string | null>(null)
   const [savingNickname, setSavingNickname] = useState(false)
 
-  const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [avatarError, setAvatarError] = useState<string | null>(null)
+  const [avatarSaved, setAvatarSaved] = useState(false)
 
-  function handleAvatarFileChange(e: ChangeEvent<HTMLInputElement>) {
+  // Il caricamento parte subito alla scelta del file: il flusso in due passi
+  // (anteprima + pulsante separato "Carica foto") traeva in inganno, perché
+  // l'anteprima locale sembrava già la foto salvata mentre sul server non
+  // era ancora arrivato nulla.
+  async function handleAvatarFileChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0] ?? null
+    e.target.value = ''
     setAvatarError(null)
-    if (!file) {
-      setAvatarFile(null)
-      setAvatarPreview(null)
-      return
-    }
+    setAvatarSaved(false)
+    if (!file) return
     if (!file.type.startsWith('image/')) {
       setAvatarError('Seleziona un file immagine (jpg, png, webp...).')
       return
@@ -46,22 +48,19 @@ export default function Impostazioni() {
       setAvatarError("L'immagine non può superare i 5 MB.")
       return
     }
-    setAvatarFile(file)
+    if (!session) return
+
     setAvatarPreview(URL.createObjectURL(file))
-  }
-
-  async function handleUploadAvatar() {
-    if (!session || !avatarFile) return
     setUploadingAvatar(true)
-    setAvatarError(null)
 
-    const ext = avatarFile.name.split('.').pop() ?? 'jpg'
+    const ext = file.name.split('.').pop() ?? 'jpg'
     const path = `${session.user.id}/${Date.now()}.${ext}`
     const { error: uploadError } = await supabase.storage
       .from('avatars')
-      .upload(path, avatarFile, { contentType: avatarFile.type })
+      .upload(path, file, { contentType: file.type })
     if (uploadError) {
       setUploadingAvatar(false)
+      setAvatarPreview(null)
       setAvatarError(uploadError.message)
       return
     }
@@ -70,13 +69,14 @@ export default function Impostazioni() {
     const { error: rpcError } = await supabase.rpc('update_own_avatar', { new_avatar_url: urlData.publicUrl })
     setUploadingAvatar(false)
     if (rpcError) {
+      setAvatarPreview(null)
       setAvatarError(rpcError.message)
       return
     }
 
     await refreshPlayer()
-    setAvatarFile(null)
     setAvatarPreview(null)
+    setAvatarSaved(true)
   }
 
   async function handleSaveNickname(e: FormEvent) {
@@ -156,18 +156,14 @@ export default function Impostazioni() {
             </label>
             <div className="flex-1">
               <p className="text-sm font-medium text-gray-700">Foto profilo</p>
-              <p className="text-xs text-gray-500">Tocca l'immagine per sceglierne una nuova</p>
-              {avatarError && <p className="mt-1 text-xs text-red-600">{avatarError}</p>}
-              {avatarFile && (
-                <button
-                  type="button"
-                  onClick={handleUploadAvatar}
-                  disabled={uploadingAvatar}
-                  className="mt-2 rounded-lg bg-field-green px-3 py-1.5 text-xs font-medium text-white hover:bg-field-green-dark disabled:opacity-60"
-                >
-                  {uploadingAvatar ? 'Caricamento...' : 'Carica foto'}
-                </button>
+              <p className="text-xs text-gray-500">
+                Tocca l'immagine per sceglierne una nuova: viene salvata subito.
+              </p>
+              {uploadingAvatar && <p className="mt-1 text-xs text-field-green-dark">Caricamento in corso...</p>}
+              {avatarSaved && !uploadingAvatar && (
+                <p className="mt-1 text-xs text-green-700">✓ Foto salvata.</p>
               )}
+              {avatarError && <p className="mt-1 text-xs text-red-600">{avatarError}</p>}
             </div>
           </div>
 
