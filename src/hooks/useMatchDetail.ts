@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import type { Match, MatchResult, Team } from '../types/database'
+import type { Match, MatchResult, Player, Team } from '../types/database'
 
 export interface MatchPlayerWithName {
   id: string
@@ -8,6 +8,7 @@ export interface MatchPlayerWithName {
   team: Team
   name: string
   nickname: string | null
+  player: Player | null
 }
 
 export interface GoalWithName {
@@ -51,7 +52,7 @@ export function useMatchDetail(matchId: string | undefined) {
       supabase.from('matches').select('*').eq('id', matchId).single(),
       supabase
         .from('match_players')
-        .select('id, player_id, team, players(name, nickname)')
+        .select('id, player_id, team, players(*)')
         .eq('match_id', matchId),
       supabase.from('goals').select('id, player_id, team, is_own_goal, players(name)').eq('match_id', matchId),
       supabase.from('match_results').select('*').eq('match_id', matchId).maybeSingle(),
@@ -68,15 +69,17 @@ export function useMatchDetail(matchId: string | undefined) {
     }
 
     type PlayerJoin = { players: { name: string; nickname?: string | null } | null }
+    type FullPlayerJoin = { players: Player | null }
 
     setData({
       match: matchRes.data as Match,
-      matchPlayers: ((playersRes.data ?? []) as unknown as (MatchPlayerWithName & PlayerJoin)[]).map((p) => ({
+      matchPlayers: ((playersRes.data ?? []) as unknown as (MatchPlayerWithName & FullPlayerJoin)[]).map((p) => ({
         id: p.id,
         player_id: p.player_id,
         team: p.team,
         name: p.players?.name ?? '',
         nickname: p.players?.nickname ?? null,
+        player: p.players ?? null,
       })),
       goals: ((goalsRes.data ?? []) as unknown as (GoalWithName & PlayerJoin)[]).map((g) => ({
         id: g.id,

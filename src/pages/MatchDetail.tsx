@@ -5,8 +5,12 @@ import { useAuth } from '../contexts/AuthContext'
 import { useMatchDetail } from '../hooks/useMatchDetail'
 import { useMatchBookings } from '../hooks/useMatchBookings'
 import { useMatchVoting } from '../hooks/useMatchVoting'
+import { useOveralls } from '../hooks/useOveralls'
+import { useStatistiche } from '../hooks/useStatistiche'
 import { formatVote } from '../lib/voting'
-import type { Team } from '../types/database'
+import TeamPitch from '../components/TeamPitch'
+import type { Player, Team } from '../types/database'
+import type { MatchPlayerWithName } from '../hooks/useMatchDetail'
 
 const MAX_PLAYERS = 10
 
@@ -28,6 +32,8 @@ export default function MatchDetail() {
 
   const { participants, voterIds, getMyVotes, hasVotedAll, submitVotes } =
     useMatchVoting(id)
+  const { overalls } = useOveralls()
+  const { stats } = useStatistiche()
 
   async function handleBook() {
     if (!id || !player) return
@@ -71,6 +77,14 @@ export default function MatchDetail() {
   const { match, matchPlayers, goals, result, pagelle } = data
   const teamA = matchPlayers.filter((p) => p.team === 'A')
   const teamB = matchPlayers.filter((p) => p.team === 'B')
+  const pitchEntries = (list: MatchPlayerWithName[]) =>
+    list
+      .filter((mp): mp is MatchPlayerWithName & { player: Player } => mp.player !== null)
+      .map((mp) => ({
+        player: mp.player,
+        overall: overalls.get(mp.player_id) ?? null,
+        stats: stats.find((s) => s.player.id === mp.player_id) ?? null,
+      }))
   const goalsByTeam = (team: Team) => goals.filter((g) => g.team === team)
   const isPublished = pagelle.length > 0 && pagelle.every((p) => p.published_at)
   const bookingCount = bookings.length
@@ -289,6 +303,12 @@ export default function MatchDetail() {
               ))}
             </ul>
           </div>
+        </div>
+      )}
+
+      {matchPlayers.length > 0 && (
+        <div className="mt-4">
+          <TeamPitch teamA={pitchEntries(teamA)} teamB={pitchEntries(teamB)} />
         </div>
       )}
 

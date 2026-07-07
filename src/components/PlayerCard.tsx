@@ -6,6 +6,8 @@ interface PlayerCardProps {
   player: Player
   overall: number | null
   stats: PlayerStats | null
+  /** Versione ridotta senza statistiche, per l'uso su schieramenti/campetto. */
+  compact?: boolean
 }
 
 const positionLabels: Record<string, string> = {
@@ -59,7 +61,7 @@ const CARD_STYLES: Record<CardType, CardStyle> = {
   },
 }
 
-export default function PlayerCard({ player, overall, stats }: PlayerCardProps) {
+export default function PlayerCard({ player, overall, stats, compact = false }: PlayerCardProps) {
   const style = CARD_STYLES[player.card_type] ?? CARD_STYLES.gold
 
   const winPercentage =
@@ -73,6 +75,8 @@ export default function PlayerCard({ player, overall, stats }: PlayerCardProps) 
     { label: 'MVP', value: stats ? String(stats.mvp) : '-' },
     { label: 'Serie vittorie', value: stats ? String(stats.winStreak) : '-' },
   ]
+
+  const initials = `${player.name.charAt(0).toUpperCase()}${player.surname ? player.surname.charAt(0).toUpperCase() : ''}`
 
   return (
     <div className="box-border w-full overflow-hidden rounded-xl shadow-md" style={{ aspectRatio: '5 / 7' }}>
@@ -107,38 +111,42 @@ export default function PlayerCard({ player, overall, stats }: PlayerCardProps) 
             </div>
           </div>
 
-          <div className="relative mt-0.5 flex justify-center">
+          {/* Foto: occupa una porzione ampia della carta senza sovrapporsi al resto */}
+          <div
+            className={`relative mt-1 w-full overflow-hidden rounded-lg ${compact ? 'flex-1' : ''}`}
+            style={compact ? undefined : { aspectRatio: '4 / 3' }}
+          >
             {player.avatar_url ? (
-              <img
-                src={player.avatar_url}
-                alt=""
-                className="h-9 w-9 rounded-full object-cover"
-              />
+              <img src={player.avatar_url} alt="" className="h-full w-full object-cover" />
             ) : (
-              <div className={`flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold ${style.avatarBg}`}>
-                {player.name.charAt(0).toUpperCase()}
-                {player.surname ? player.surname.charAt(0).toUpperCase() : ''}
+              <div className={`flex h-full w-full items-center justify-center text-3xl font-bold ${style.avatarBg}`}>
+                {initials}
               </div>
             )}
           </div>
 
-          <p className="relative mt-0.5 truncate text-center text-[11px] font-bold uppercase tracking-wide">
+          <p className="relative mt-1 truncate text-center text-[11px] font-bold uppercase tracking-wide">
             {playerFullName(player)}
           </p>
-          {player.nickname && (
-            <p className={`relative truncate text-center text-[9px] ${style.sub}`}>{player.nickname}</p>
-          )}
 
-          <div className={`relative mt-1 border-t ${style.divider}`} />
+          {!compact && (
+            <>
+              {player.nickname && (
+                <p className={`relative truncate text-center text-[9px] ${style.sub}`}>{player.nickname}</p>
+              )}
 
-          <div className="relative mt-1 grid flex-1 grid-cols-2 content-center gap-x-1.5 gap-y-1 text-[9px]">
-            {statItems.map((item) => (
-              <div key={item.label} className="flex items-center justify-between gap-1">
-                <span className={`font-bold ${style.accent}`}>{item.value}</span>
-                <span className={`truncate ${style.sub}`}>{item.label}</span>
+              <div className={`relative mt-1 border-t ${style.divider}`} />
+
+              <div className="relative mt-1 grid flex-1 grid-cols-2 content-center gap-x-1.5 gap-y-1 text-[9px]">
+                {statItems.map((item) => (
+                  <div key={item.label} className="flex items-center justify-between gap-1">
+                    <span className={`font-bold ${style.accent}`}>{item.value}</span>
+                    <span className={`truncate ${style.sub}`}>{item.label}</span>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </>
+          )}
         </div>
       </div>
     </div>

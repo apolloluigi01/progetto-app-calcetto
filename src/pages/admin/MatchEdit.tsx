@@ -4,11 +4,14 @@ import { supabase } from '../../lib/supabase'
 import { useMatchDetail } from '../../hooks/useMatchDetail'
 import { useMatchBookings } from '../../hooks/useMatchBookings'
 import { useMatchVoting } from '../../hooks/useMatchVoting'
+import { useOveralls } from '../../hooks/useOveralls'
+import { useStatistiche } from '../../hooks/useStatistiche'
 import { getKnownFields } from '../../lib/fields'
 import { getSeasonIdForDate } from '../../lib/seasons'
 import { logActivity } from '../../lib/activityLog'
 import { computeOverallsForPlayers, generateBalancedTeams } from '../../lib/teamGeneration'
 import { formatVote } from '../../lib/voting'
+import TeamPitch from '../../components/TeamPitch'
 import type { Player, Team } from '../../types/database'
 import type { PlayerOverall, GeneratedTeams } from '../../lib/teamGeneration'
 import type { MatchPlayerWithName } from '../../hooks/useMatchDetail'
@@ -56,6 +59,8 @@ export default function MatchEdit() {
   const { votes, voterInfo, averages, provisionalMvpId, voterIds, participants, refetch: refetchVoting } =
     useMatchVoting(id)
   const [showVoteDetail, setShowVoteDetail] = useState(false)
+  const { overalls } = useOveralls()
+  const { stats } = useStatistiche()
 
   // Sondaggio: aggiunta manuale giocatore
   const [allPlayers, setAllPlayers] = useState<Player[]>([])
@@ -119,6 +124,14 @@ export default function MatchEdit() {
   const { match, matchPlayers, goals, pagelle, result } = data
   const teamA = matchPlayers.filter((p) => p.team === 'A')
   const teamB = matchPlayers.filter((p) => p.team === 'B')
+  const pitchEntries = (list: MatchPlayerWithName[]) =>
+    list
+      .filter((mp): mp is MatchPlayerWithName & { player: Player } => mp.player !== null)
+      .map((mp) => ({
+        player: mp.player,
+        overall: overalls.get(mp.player_id) ?? null,
+        stats: stats.find((s) => s.player.id === mp.player_id) ?? null,
+      }))
   const goalsByTeam = (team: Team) => goals.filter((g) => g.team === team)
   const isPublished = pagelle.length > 0 && pagelle.every((p) => p.published_at)
   // "In bozza" finché non è stato salvato un risultato e non sono state pubblicate le pagelle:
@@ -815,6 +828,10 @@ export default function MatchEdit() {
               </button>
             </div>
           )}
+
+          <div className="mt-3">
+            <TeamPitch teamA={pitchEntries(teamA)} teamB={pitchEntries(teamB)} />
+          </div>
         </div>
       )}
 
@@ -1043,7 +1060,8 @@ export default function MatchEdit() {
       )}
 
       {/* ===== VOTAZIONI (admin) ===== */}
-      {matchPlayers.length > 0 && (
+      {/* Visibili solo dopo aver salvato il risultato della partita. */}
+      {matchPlayers.length > 0 && result && (
         <div className="mt-4 rounded-xl border border-purple-200 bg-purple-50 p-4">
           <div className="flex items-center justify-between">
             <h2 className="font-semibold text-purple-800">🗳️ Votazioni</h2>
@@ -1160,7 +1178,8 @@ export default function MatchEdit() {
       )}
 
       {/* ===== PAGELLE ===== */}
-      {matchPlayers.length > 0 && (
+      {/* Visibile solo dopo aver salvato il risultato della partita. */}
+      {matchPlayers.length > 0 && result && (
         <div className="mt-4">
           <h2 className="font-medium text-field-green-dark">Pagelle</h2>
           <div className="mt-2 space-y-3">
@@ -1233,25 +1252,14 @@ export default function MatchEdit() {
             )}
             <button
               onClick={handlePublish}
-              disabled={publishing || match.voting_open || !result}
-              title={
-                !result
-                  ? 'Salva prima il risultato della partita'
-                  : match.voting_open
-                  ? 'Chiudi prima le votazioni prima di pubblicare'
-                  : undefined
-              }
+              disabled={publishing || match.voting_open}
+              title={match.voting_open ? 'Chiudi prima le votazioni prima di pubblicare' : undefined}
               className="flex-1 rounded-lg bg-field-orange px-4 py-2 text-sm font-medium text-white hover:bg-field-orange/90 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {publishing ? 'Pubblicazione...' : 'Pubblica pagelle'}
             </button>
           </div>
-          {!result && (
-            <p className="mt-2 text-xs text-red-500">
-              ⚠️ Salva il risultato della partita prima di pubblicare le pagelle.
-            </p>
-          )}
-          {result && match.voting_open && (
+          {match.voting_open && (
             <p className="mt-2 text-xs text-red-500">
               ⚠️ Chiudi le votazioni prima di pubblicare le pagelle.
             </p>
