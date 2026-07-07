@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useState, type ChangeEvent, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -24,6 +24,60 @@ export default function Impostazioni() {
   const [nickname, setNickname] = useState(player?.nickname ?? '')
   const [nicknameError, setNicknameError] = useState<string | null>(null)
   const [savingNickname, setSavingNickname] = useState(false)
+
+  const [avatarFile, setAvatarFile] = useState<File | null>(null)
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  const [avatarError, setAvatarError] = useState<string | null>(null)
+
+  function handleAvatarFileChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0] ?? null
+    setAvatarError(null)
+    if (!file) {
+      setAvatarFile(null)
+      setAvatarPreview(null)
+      return
+    }
+    if (!file.type.startsWith('image/')) {
+      setAvatarError('Seleziona un file immagine (jpg, png, webp...).')
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setAvatarError("L'immagine non può superare i 5 MB.")
+      return
+    }
+    setAvatarFile(file)
+    setAvatarPreview(URL.createObjectURL(file))
+  }
+
+  async function handleUploadAvatar() {
+    if (!session || !avatarFile) return
+    setUploadingAvatar(true)
+    setAvatarError(null)
+
+    const ext = avatarFile.name.split('.').pop() ?? 'jpg'
+    const path = `${session.user.id}/${Date.now()}.${ext}`
+    const { error: uploadError } = await supabase.storage
+      .from('avatars')
+      .upload(path, avatarFile, { contentType: avatarFile.type })
+    if (uploadError) {
+      setUploadingAvatar(false)
+      setAvatarError(uploadError.message)
+      return
+    }
+
+    const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path)
+    const { error: rpcError } = await supabase.rpc('update_own_avatar', { new_avatar_url: urlData.publicUrl })
+    setUploadingAvatar(false)
+    if (rpcError) {
+      setAvatarError(rpcError.message)
+      return
+    }
+
+    await refreshPlayer()
+    setAvatarFile(null)
+    setAvatarPreview(null)
+  }
 
   async function handleSaveNickname(e: FormEvent) {
     e.preventDefault()
@@ -81,7 +135,42 @@ export default function Impostazioni() {
 
       {player && (
         <div className="mt-4 rounded-xl bg-white p-4 shadow">
-          <p className="font-medium">{player.name}</p>
+          <div className="flex items-center gap-3">
+            {avatarPreview || player.avatar_url ? (
+              <img
+                src={avatarPreview ?? player.avatar_url ?? undefined}
+                alt=""
+                className="h-16 w-16 rounded-full object-cover"
+              />
+            ) : (
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-field-green/10 text-lg font-bold text-field-green-dark">
+                {player.name.charAt(0).toUpperCase()}
+                {player.surname ? player.surname.charAt(0).toUpperCase() : ''}
+              </div>
+            )}
+            <div className="flex-1">
+              <label className="mb-1 block text-sm font-medium text-gray-700">Foto profilo</label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarFileChange}
+                className="w-full text-xs text-gray-600"
+              />
+              {avatarError && <p className="mt-1 text-xs text-red-600">{avatarError}</p>}
+              {avatarFile && (
+                <button
+                  type="button"
+                  onClick={handleUploadAvatar}
+                  disabled={uploadingAvatar}
+                  className="mt-2 rounded-lg bg-field-green px-3 py-1.5 text-xs font-medium text-white hover:bg-field-green-dark disabled:opacity-60"
+                >
+                  {uploadingAvatar ? 'Caricamento...' : 'Carica foto'}
+                </button>
+              )}
+            </div>
+          </div>
+
+          <p className="mt-3 font-medium">{player.name}</p>
 
           {editingNickname ? (
             <form onSubmit={handleSaveNickname} className="mt-2 space-y-2">

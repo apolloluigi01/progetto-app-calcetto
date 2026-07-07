@@ -148,6 +148,22 @@ $$;
 
 grant execute on function update_own_nickname(text) to authenticated;
 
+-- Stesso principio per la foto profilo: l'utente carica il file nel bucket
+-- storage "avatars" (vedi supabase/migrations/20260716_allow_self_avatar_upload.sql
+-- per le relative policy su storage.objects) e poi salva l'URL sulla propria riga.
+create or replace function update_own_avatar(new_avatar_url text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update players set avatar_url = nullif(trim(new_avatar_url), '') where id = auth.uid();
+end;
+$$;
+
+grant execute on function update_own_avatar(text) to authenticated;
+
 -- =========================================================
 -- ROW LEVEL SECURITY
 -- =========================================================
