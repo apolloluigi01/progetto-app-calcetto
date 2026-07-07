@@ -28,10 +28,9 @@ export default function Layout() {
   const { isAdmin, signOut } = useAuth()
   const [menuOpen, setMenuOpen] = useState(false)
 
-  const lastItem: NavItem = isAdmin
-    ? { to: '/admin', label: 'CDA' }
-    : { to: '/impostazioni', label: 'Impostazioni' }
-  const items = [...navItems, lastItem]
+  const items = isAdmin
+    ? [...navItems, { to: '/admin', label: 'CDA' }, { to: '/impostazioni', label: 'Impostazioni' }]
+    : [...navItems, { to: '/impostazioni', label: 'Impostazioni' }]
 
   function handleLogout() {
     if (confirm('Vuoi davvero uscire?')) {
