@@ -47,7 +47,7 @@ export default function Layout() {
       >
         <div className="px-5 pt-7 pb-5 flex flex-col items-center gap-2">
           <img
-            src="/icons/pavone_logo.png"
+            src="/icons/pavone_logo-v2.png"
             alt="Pavone League"
             className="h-14 w-14 rounded-2xl object-cover shadow-lg"
             onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
@@ -94,7 +94,7 @@ export default function Layout() {
       >
         <div className="flex items-center gap-2">
           <img
-            src="/icons/pavone_logo.png"
+            src="/icons/pavone_logo-v2.png"
             alt=""
             className="h-7 w-7 rounded-lg object-cover"
             onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
