@@ -55,7 +55,7 @@ export default function MatchEdit() {
   const [openingVoting, setOpeningVoting] = useState(false)
   const [closingVoting, setClosingVoting] = useState(false)
 
-  const { votes, voterInfo, averages, mvpTally, provisionalMvpId, voterIds, participants, refetch: refetchVoting } =
+  const { votes, voterInfo, averages, provisionalMvpId, voterIds, participants, refetch: refetchVoting } =
     useMatchVoting(id)
   const [showVoteDetail, setShowVoteDetail] = useState(false)
 
@@ -1203,32 +1203,9 @@ export default function MatchEdit() {
                     </div>
                   )
                 })}
-            </div>
-          )}
-
-          {/* Spoglio voti MVP */}
-          {mvpTally.counts.size > 0 && (
-            <div className="mt-3 rounded-lg bg-white px-3 py-2">
-              <p className="text-xs font-semibold uppercase tracking-wide text-purple-500">🏆 Voti MVP</p>
-              <p className="mt-1 text-sm text-gray-700">
-                {[...mvpTally.counts.entries()]
-                  .sort((a, b) => b[1] - a[1])
-                  .map(([pid, count]) => {
-                    const p = participants.find((x) => x.player_id === pid)
-                    return `${p ? p.nickname ?? p.name : '?'} (${count})`
-                  })
-                  .join(' · ')}
-              </p>
-              {mvpTally.top.length > 1 && (
+              {provisionalMvpId === null && averages.filter((a) => a.average !== null).length > 1 && (
                 <p className="mt-1 text-xs text-yellow-600">
-                  ⚠️ Parimerito MVP tra{' '}
-                  {mvpTally.top
-                    .map((pid) => {
-                      const p = participants.find((x) => x.player_id === pid)
-                      return p ? p.nickname ?? p.name : '?'
-                    })
-                    .join(', ')}
-                  : scegli tu l'MVP nelle pagelle prima di pubblicare.
+                  ⚠️ MVP: parimerito sulla media voto — scegli tu l'MVP nelle pagelle prima di pubblicare.
                 </p>
               )}
             </div>
