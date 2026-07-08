@@ -169,7 +169,7 @@ export default function FantaFormazione() {
     return <div className="p-4 text-sm text-gray-500">Caricamento...</div>
   if (error || !data) return <div className="p-4 text-sm text-red-600">{error ?? 'Partita non trovata'}</div>
 
-  const { match, matchPlayers, pagelle, goals, result } = data
+  const { match, matchPlayers, pagelle, goals, assists, result } = data
   const teamA = matchPlayers.filter((p) => p.team === 'A')
   const teamB = matchPlayers.filter((p) => p.team === 'B')
   const isPublished = pagelle.length > 0 && pagelle.every((p) => p.published_at)
@@ -256,11 +256,8 @@ export default function FantaFormazione() {
           captainId,
           {
             pagelle: pagelle.map((p) => ({ player_id: p.player_id, voto: p.voto, is_mvp: p.is_mvp })),
-            goals: goals.map((g) => ({
-              player_id: g.player_id,
-              is_own_goal: g.is_own_goal,
-              assist_player_id: g.assist_player_id,
-            })),
+            goals: goals.map((g) => ({ player_id: g.player_id, is_own_goal: g.is_own_goal })),
+            assists: assists.map((a) => ({ player_id: a.player_id })),
           },
           settings,
         )

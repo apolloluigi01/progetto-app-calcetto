@@ -44,8 +44,9 @@ export default function MatchEdit() {
   const [infoError, setInfoError] = useState<string | null>(null)
 
   const [newGoalPlayer, setNewGoalPlayer] = useState<Record<Team, string>>({ A: '', B: '' })
-  const [newGoalAssist, setNewGoalAssist] = useState<Record<Team, string>>({ A: '', B: '' })
   const [ownGoal, setOwnGoal] = useState<Record<Team, boolean>>({ A: false, B: false })
+  // Assist censiti in modo indipendente dai gol.
+  const [newAssistPlayer, setNewAssistPlayer] = useState<Record<Team, string>>({ A: '', B: '' })
 
   const [drafts, setDrafts] = useState<Record<string, PagellaDraft>>({})
   const [savingPagelle, setSavingPagelle] = useState(false)
@@ -117,10 +118,11 @@ export default function MatchEdit() {
   if (loading) return <div className="p-4 text-sm text-gray-500">Caricamento...</div>
   if (error || !data) return <div className="p-4 text-sm text-red-600">{error ?? 'Partita non trovata'}</div>
 
-  const { match, matchPlayers, goals, pagelle, result } = data
+  const { match, matchPlayers, goals, assists, pagelle, result } = data
   const teamA = matchPlayers.filter((p) => p.team === 'A')
   const teamB = matchPlayers.filter((p) => p.team === 'B')
   const goalsByTeam = (team: Team) => goals.filter((g) => g.team === team)
+  const assistsByTeam = (team: Team) => assists.filter((a) => a.team === team)
   const isPublished = pagelle.length > 0 && pagelle.every((p) => p.published_at)
   // "In bozza" finché non è stato salvato un risultato e non sono state pubblicate le pagelle:
   // solo in questa fase ha senso poter ancora spostare i giocatori tra le squadre.
@@ -172,12 +174,10 @@ export default function MatchEdit() {
         player_id: newGoalPlayer[team],
         team,
         is_own_goal: ownGoal[team],
-        assist_player_id: !ownGoal[team] && newGoalAssist[team] ? newGoalAssist[team] : null,
       })
     const playerName = matchPlayers.find(p => p.player_id === newGoalPlayer[team])?.name
     logActivity('gol_aggiunto', { matchId: id, data: match.match_date, squadra: team, giocatore: playerName, autogol: ownGoal[team] })
     setNewGoalPlayer((prev) => ({ ...prev, [team]: '' }))
-    setNewGoalAssist((prev) => ({ ...prev, [team]: '' }))
     setOwnGoal((prev) => ({ ...prev, [team]: false }))
     refetch()
   }
@@ -186,6 +186,24 @@ export default function MatchEdit() {
     const goal = goals.find(g => g.id === goalId)
     await supabase.from('goals').delete().eq('id', goalId)
     logActivity('gol_rimosso', { matchId: id, data: match.match_date, giocatore: goal?.name })
+    refetch()
+  }
+
+  async function handleAddAssist(team: Team) {
+    if (!id || !newAssistPlayer[team]) return
+    await supabase
+      .from('assists')
+      .insert({ match_id: id, player_id: newAssistPlayer[team], team })
+    const playerName = matchPlayers.find((p) => p.player_id === newAssistPlayer[team])?.name
+    logActivity('assist_aggiunto', { matchId: id, data: match.match_date, squadra: team, giocatore: playerName })
+    setNewAssistPlayer((prev) => ({ ...prev, [team]: '' }))
+    refetch()
+  }
+
+  async function handleRemoveAssist(assistId: string) {
+    const assist = assists.find((a) => a.id === assistId)
+    await supabase.from('assists').delete().eq('id', assistId)
+    logActivity('assist_rimosso', { matchId: id, data: match.match_date, giocatore: assist?.name })
     refetch()
   }
 
@@ -985,32 +1003,26 @@ export default function MatchEdit() {
         )}
       </div>
 
-      {/* ===== MARCATORI ===== */}
-      {/* Una colonna su mobile, due su schermi larghi: i controlli (select +
-          bottone) sono impilati a tutta larghezza per evitare sovrapposizioni. */}
+      {/* ===== MARCATORI E ASSIST ===== */}
+      {/* Gol e assist si censiscono in modo indipendente: nessun legame tra i due.
+          Una colonna su mobile, due su schermi larghi; controlli impilati a tutta
+          larghezza per evitare sovrapposizioni. */}
       {matchPlayers.length > 0 && (
         <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
           {(['A', 'B'] as Team[]).map((team) => (
             <div key={team} className="min-w-0 rounded-xl bg-white p-3 shadow">
               <h3 className="mb-2 font-medium text-field-green-dark">Marcatori Squadra {team}</h3>
               <ul className="space-y-1 text-sm">
-                {goalsByTeam(team).map((g) => {
-                  const assistName = g.assist_player_id
-                    ? matchPlayers.find((mp) => mp.player_id === g.assist_player_id)?.nickname ??
-                      matchPlayers.find((mp) => mp.player_id === g.assist_player_id)?.name
-                    : null
-                  return (
-                    <li key={g.id} className="flex items-center justify-between gap-2">
-                      <span className="min-w-0">
-                        ⚽ {g.name} {g.is_own_goal && <span className="text-red-600">(autogol)</span>}
-                        {assistName && <span className="text-xs text-gray-400"> (assist: {assistName})</span>}
-                      </span>
-                      <button onClick={() => handleRemoveGoal(g.id)} className="shrink-0 text-xs text-red-600">
-                        Rimuovi
-                      </button>
-                    </li>
-                  )
-                })}
+                {goalsByTeam(team).map((g) => (
+                  <li key={g.id} className="flex items-center justify-between gap-2">
+                    <span className="min-w-0">
+                      ⚽ {g.name} {g.is_own_goal && <span className="text-red-600">(autogol)</span>}
+                    </span>
+                    <button onClick={() => handleRemoveGoal(g.id)} className="shrink-0 text-xs text-red-600">
+                      Rimuovi
+                    </button>
+                  </li>
+                ))}
               </ul>
               <div className="mt-2 space-y-2">
                 <select
@@ -1025,22 +1037,6 @@ export default function MatchEdit() {
                     </option>
                   ))}
                 </select>
-                {!ownGoal[team] && (
-                  <select
-                    value={newGoalAssist[team]}
-                    onChange={(e) => setNewGoalAssist((prev) => ({ ...prev, [team]: e.target.value }))}
-                    className="w-full min-w-0 rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-600"
-                  >
-                    <option value="">Assist (opzionale)...</option>
-                    {(team === 'A' ? teamA : teamB)
-                      .filter((p) => p.player_id !== newGoalPlayer[team])
-                      .map((p) => (
-                        <option key={p.player_id} value={p.player_id}>
-                          {p.nickname ?? p.name}
-                        </option>
-                      ))}
-                  </select>
-                )}
                 <label className="flex items-center gap-2 text-xs text-red-600">
                   <input
                     type="checkbox"
@@ -1059,6 +1055,42 @@ export default function MatchEdit() {
                 >
                   + Aggiungi gol
                 </button>
+              </div>
+
+              {/* Assist (indipendenti dai gol) */}
+              <div className="mt-4 border-t border-gray-100 pt-3">
+                <h4 className="mb-2 text-sm font-medium text-field-green-dark">Assist Squadra {team}</h4>
+                <ul className="space-y-1 text-sm">
+                  {assistsByTeam(team).map((a) => (
+                    <li key={a.id} className="flex items-center justify-between gap-2">
+                      <span className="min-w-0">🅰️ {a.name}</span>
+                      <button onClick={() => handleRemoveAssist(a.id)} className="shrink-0 text-xs text-red-600">
+                        Rimuovi
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-2 space-y-2">
+                  <select
+                    value={newAssistPlayer[team]}
+                    onChange={(e) => setNewAssistPlayer((prev) => ({ ...prev, [team]: e.target.value }))}
+                    className="w-full min-w-0 rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
+                  >
+                    <option value="">Giocatore...</option>
+                    {(team === 'A' ? teamA : teamB).map((p) => (
+                      <option key={p.player_id} value={p.player_id}>
+                        {p.nickname ?? p.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={() => handleAddAssist(team)}
+                    disabled={!newAssistPlayer[team]}
+                    className="w-full rounded-lg border border-field-green px-3 py-1.5 text-sm font-medium text-field-green-dark hover:bg-field-green/5 disabled:opacity-50"
+                  >
+                    + Aggiungi assist
+                  </button>
+                </div>
               </div>
             </div>
           ))}

@@ -17,7 +17,13 @@ export interface GoalWithName {
   team: Team
   name: string
   is_own_goal: boolean
-  assist_player_id: string | null
+}
+
+export interface AssistWithName {
+  id: string
+  player_id: string
+  team: Team
+  name: string
 }
 
 export interface PagellaWithName {
@@ -35,6 +41,7 @@ export interface MatchDetailData {
   match: Match
   matchPlayers: MatchPlayerWithName[]
   goals: GoalWithName[]
+  assists: AssistWithName[]
   result: MatchResult | null
   pagelle: PagellaWithName[]
 }
@@ -49,13 +56,14 @@ export function useMatchDetail(matchId: string | undefined) {
     setLoading(true)
     setError(null)
 
-    const [matchRes, playersRes, goalsRes, resultRes, pagelleRes] = await Promise.all([
+    const [matchRes, playersRes, goalsRes, assistsRes, resultRes, pagelleRes] = await Promise.all([
       supabase.from('matches').select('*').eq('id', matchId).single(),
       supabase
         .from('match_players')
         .select('id, player_id, team, players(*)')
         .eq('match_id', matchId),
-      supabase.from('goals').select('id, player_id, team, is_own_goal, assist_player_id, players(name)').eq('match_id', matchId),
+      supabase.from('goals').select('id, player_id, team, is_own_goal, players(name)').eq('match_id', matchId),
+      supabase.from('assists').select('id, player_id, team, players(name)').eq('match_id', matchId),
       supabase.from('match_results').select('*').eq('match_id', matchId).maybeSingle(),
       supabase
         .from('pagelle')
@@ -88,7 +96,12 @@ export function useMatchDetail(matchId: string | undefined) {
         team: g.team,
         name: g.players?.name ?? '',
         is_own_goal: g.is_own_goal,
-        assist_player_id: g.assist_player_id ?? null,
+      })),
+      assists: ((assistsRes.data ?? []) as unknown as (AssistWithName & PlayerJoin)[]).map((a) => ({
+        id: a.id,
+        player_id: a.player_id,
+        team: a.team,
+        name: a.players?.name ?? '',
       })),
       result: (resultRes.data as MatchResult | null) ?? null,
       pagelle: ((pagelleRes.data ?? []) as unknown as (PagellaWithName & PlayerJoin)[]).map((p) => ({

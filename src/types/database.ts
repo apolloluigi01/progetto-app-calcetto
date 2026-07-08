@@ -68,6 +68,14 @@ export interface Goal {
   is_own_goal: boolean
 }
 
+export interface Assist {
+  id: string
+  match_id: string
+  player_id: string
+  team: Team
+  created_at: string
+}
+
 export interface MatchResult {
   id: string
   match_id: string

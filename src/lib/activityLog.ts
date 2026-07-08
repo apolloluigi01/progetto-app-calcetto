@@ -17,6 +17,8 @@ export type ActivityAction =
   | 'risultato_salvato'
   | 'gol_aggiunto'
   | 'gol_rimosso'
+  | 'assist_aggiunto'
+  | 'assist_rimosso'
   | 'pagelle_bozza'
   | 'pagelle_pubblicate'
   | 'partita_eliminata'
@@ -45,6 +47,8 @@ export const actionLabels: Record<ActivityAction, string> = {
   risultato_salvato:     'Risultato salvato',
   gol_aggiunto:          'Gol aggiunto',
   gol_rimosso:           'Gol rimosso',
+  assist_aggiunto:       'Assist aggiunto',
+  assist_rimosso:        'Assist rimosso',
   pagelle_bozza:         'Pagelle salvate in bozza',
   pagelle_pubblicate:    'Pagelle pubblicate',
   partita_eliminata:     'Partita eliminata',

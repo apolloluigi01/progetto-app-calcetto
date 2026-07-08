@@ -68,10 +68,11 @@ export default function MatchDetail() {
   if (loading) return <div className="p-4 text-sm text-gray-500">Caricamento...</div>
   if (error || !data) return <div className="p-4 text-sm text-red-600">{error ?? 'Partita non trovata'}</div>
 
-  const { match, matchPlayers, goals, result, pagelle } = data
+  const { match, matchPlayers, goals, assists, result, pagelle } = data
   const teamA = matchPlayers.filter((p) => p.team === 'A')
   const teamB = matchPlayers.filter((p) => p.team === 'B')
   const goalsByTeam = (team: Team) => goals.filter((g) => g.team === team)
+  const assistsByTeam = (team: Team) => assists.filter((a) => a.team === team)
   const isPublished = pagelle.length > 0 && pagelle.every((p) => p.published_at)
   const bookingCount = bookings.length
   const bookingFull = bookingCount >= MAX_PLAYERS
@@ -306,25 +307,22 @@ export default function MatchDetail() {
         </Link>
       )}
 
-      {goals.length > 0 && (
+      {(goals.length > 0 || assists.length > 0) && (
         <div className="mt-4 rounded-xl bg-white p-3 shadow">
-          <h3 className="mb-2 font-medium text-field-green-dark">Marcatori</h3>
+          <h3 className="mb-2 font-medium text-field-green-dark">Marcatori e assist</h3>
           <div className="grid grid-cols-2 gap-3 text-sm">
             {(['A', 'B'] as Team[]).map((team) => (
-              <ul key={team} className="space-y-1">
-                {goalsByTeam(team).map((g) => {
-                  const assist = g.assist_player_id
-                    ? matchPlayers.find((mp) => mp.player_id === g.assist_player_id)
-                    : null
-                  return (
-                    <li key={g.id}>
-                      ⚽ {g.name} {g.is_own_goal && <span className="text-red-600">(autogol)</span>}
-                      {assist && (
-                        <span className="text-xs text-gray-400"> (assist: {assist.nickname ?? assist.name})</span>
-                      )}
-                    </li>
-                  )
-                })}
+              <ul key={team} className="min-w-0 space-y-1">
+                {goalsByTeam(team).map((g) => (
+                  <li key={g.id}>
+                    ⚽ {g.name} {g.is_own_goal && <span className="text-red-600">(autogol)</span>}
+                  </li>
+                ))}
+                {assistsByTeam(team).map((a) => (
+                  <li key={a.id} className="text-gray-600">
+                    🅰️ {a.name} <span className="text-xs text-gray-400">(assist)</span>
+                  </li>
+                ))}
               </ul>
             ))}
           </div>

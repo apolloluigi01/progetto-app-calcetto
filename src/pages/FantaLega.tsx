@@ -41,7 +41,7 @@ export default function FantaLega() {
     // Parametri bonus/malus configurati dagli admin (CDA → Gestione Fantacalcetto).
     const settings = await getFantaSettings()
 
-    const [lineupsRes, pagelleRes, goalsRes] = await Promise.all([
+    const [lineupsRes, pagelleRes, goalsRes, assistsRes] = await Promise.all([
       supabase
         .from('fanta_lineups')
         .select('id, captain_id, fanta_lineup_players(player_id)')
@@ -52,12 +52,17 @@ export default function FantaLega() {
         .select('player_id, voto, is_mvp')
         .eq('match_id', matchId)
         .not('published_at', 'is', null),
-      supabase.from('goals').select('player_id, is_own_goal, assist_player_id').eq('match_id', matchId),
+      supabase.from('goals').select('player_id, is_own_goal').eq('match_id', matchId),
+      supabase.from('assists').select('player_id').eq('match_id', matchId),
     ])
 
     type LineupRow = { id: string; captain_id: string; fanta_lineup_players: { player_id: string }[] }
     const lineups = (lineupsRes.data ?? []) as unknown as LineupRow[]
-    const matchInput = { pagelle: pagelleRes.data ?? [], goals: goalsRes.data ?? [] }
+    const matchInput = {
+      pagelle: pagelleRes.data ?? [],
+      goals: goalsRes.data ?? [],
+      assists: assistsRes.data ?? [],
+    }
 
     for (const lineup of lineups) {
       const score = computeLineupScore(

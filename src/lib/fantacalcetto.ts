@@ -76,8 +76,10 @@ export function creditCost(overall: number | null): number {
 export interface FantaMatchInput {
   /** Pagelle pubblicate della partita (tutti i giocatori in campo). */
   pagelle: { player_id: string; voto: string; is_mvp: boolean }[]
-  /** Gol della partita, con eventuale assist. */
-  goals: { player_id: string; is_own_goal: boolean; assist_player_id: string | null }[]
+  /** Gol della partita. */
+  goals: { player_id: string; is_own_goal: boolean }[]
+  /** Assist della partita (censiti indipendentemente dai gol). */
+  assists: { player_id: string }[]
 }
 
 export interface FantaPlayerScore {
@@ -128,7 +130,9 @@ export function computeLineupScore(
         if (g.is_own_goal) malus += settings.malusAutogol
         else bonus += settings.bonusGol
       }
-      if (g.assist_player_id === playerId && !g.is_own_goal) bonus += settings.bonusAssist
+    }
+    for (const a of match.assists) {
+      if (a.player_id === playerId) bonus += settings.bonusAssist
     }
     if (worstVote !== null && voto !== null && voto === worstVote) malus += settings.malusPeggiore
 
