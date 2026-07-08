@@ -23,10 +23,11 @@ export default function MatchDetail() {
 
   const [bookingBusy, setBookingBusy] = useState(false)
   const [localVotes, setLocalVotes] = useState<Record<string, number>>({})
+  const [myMvp, setMyMvp] = useState('')
   const [votingBusy, setVotingBusy] = useState(false)
   const [votingSuccess, setVotingSuccess] = useState(false)
 
-  const { participants, voterIds, getMyVotes, hasVotedAll, submitVotes } =
+  const { participants, voterIds, getMyVotes, getMyMvpVote, hasVotedAll, submitVotes } =
     useMatchVoting(id)
 
   async function handleBook() {
@@ -53,13 +54,14 @@ export default function MatchDetail() {
       defaults[p.player_id] = existing[p.player_id] ?? 6
     }
     setLocalVotes(defaults)
+    setMyMvp(getMyMvpVote(player.id))
   }, [player?.id, participants.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleSubmitVotes() {
-    if (!player?.id) return
+    if (!player?.id || !myMvp) return
     setVotingBusy(true)
     setVotingSuccess(false)
-    await submitVotes(player.id, localVotes)
+    await submitVotes(player.id, localVotes, myMvp)
     setVotingBusy(false)
     setVotingSuccess(true)
     setTimeout(() => setVotingSuccess(false), 3000)
@@ -240,15 +242,43 @@ export default function MatchDetail() {
             })}
           </div>
 
+          {/* Voto MVP */}
+          <div className="mt-4 border-t border-purple-200 pt-3">
+            <h4 className="text-sm font-semibold text-purple-800">🏆 Vota l'MVP della partita</h4>
+            <p className="mt-1 text-xs text-purple-500">
+              In caso di parimerito l'MVP verrà scelto dall'admin alla pubblicazione delle pagelle.
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {participants.map((p) => (
+                <button
+                  key={p.player_id}
+                  type="button"
+                  onClick={() => setMyMvp(p.player_id)}
+                  className={`rounded-full px-3 py-1.5 text-sm font-medium transition ${
+                    myMvp === p.player_id
+                      ? 'bg-purple-600 text-white'
+                      : 'bg-white text-gray-700 border border-purple-200 hover:bg-purple-100'
+                  }`}
+                >
+                  {myMvp === p.player_id && '🏆 '}
+                  {p.nickname ?? p.name}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {votingSuccess && (
             <p className="mt-3 text-center text-sm font-medium text-purple-700">
               ✓ Voti inviati correttamente!
             </p>
           )}
+          {!myMvp && (
+            <p className="mt-3 text-xs text-purple-500">• Scegli anche l'MVP per inviare i voti.</p>
+          )}
 
           <button
             onClick={handleSubmitVotes}
-            disabled={votingBusy || Object.keys(localVotes).length === 0}
+            disabled={votingBusy || Object.keys(localVotes).length === 0 || !myMvp}
             className="mt-4 w-full rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50"
           >
             {votingBusy

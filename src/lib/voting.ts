@@ -42,12 +42,33 @@ export function getPlayerAverages(votes: VoteWithRole[], playerIds: string[]): P
   })
 }
 
-export function getProvisionalMvpId(averages: PlayerAverage[]): string | null {
-  const withVotes = averages.filter((a) => a.average !== null)
-  if (withVotes.length === 0) return null
-  const maxAvg = Math.max(...withVotes.map((a) => a.average!))
-  const top = withVotes.filter((a) => a.average === maxAvg)
-  return top.length === 1 ? top[0].player_id : null
+export interface MvpVote {
+  voter_id: string
+  voted_id: string
+}
+
+export interface MvpTally {
+  /** Conteggio voti MVP per giocatore. */
+  counts: Map<string, number>
+  /** Giocatori a pari merito col numero massimo di voti (vuoto se nessun voto). */
+  top: string[]
+  /** MVP provvisorio: valorizzato solo se il più votato è unico. */
+  leaderId: string | null
+}
+
+/**
+ * Spoglio dei voti MVP. In caso di parimerito leaderId resta null:
+ * la scelta finale spetta all'admin alla pubblicazione delle pagelle.
+ */
+export function tallyMvpVotes(votes: MvpVote[]): MvpTally {
+  const counts = new Map<string, number>()
+  for (const v of votes) {
+    counts.set(v.voted_id, (counts.get(v.voted_id) ?? 0) + 1)
+  }
+  if (counts.size === 0) return { counts, top: [], leaderId: null }
+  const max = Math.max(...counts.values())
+  const top = [...counts.entries()].filter(([, c]) => c === max).map(([id]) => id)
+  return { counts, top, leaderId: top.length === 1 ? top[0] : null }
 }
 
 export function formatVote(v: number): string {

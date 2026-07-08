@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import {
   getPlayerAverages,
-  getProvisionalMvpId,
+  tallyMvpVotes,
+  type MvpVote,
   type PlayerAverage,
   type VoteWithRole,
 } from '../lib/voting'
@@ -23,6 +24,7 @@ export interface VoterInfo {
 
 export function useMatchVoting(matchId: string | undefined) {
   const [votes, setVotes] = useState<VoteWithRole[]>([])
+  const [mvpVotes, setMvpVotes] = useState<MvpVote[]>([])
   const [participants, setParticipants] = useState<VotingParticipant[]>([])
   const [voterInfo, setVoterInfo] = useState<Map<string, VoterInfo>>(new Map())
   const [loading, setLoading] = useState(true)
@@ -31,10 +33,14 @@ export function useMatchVoting(matchId: string | undefined) {
     if (!matchId) { setLoading(false); return }
     setLoading(true)
 
-    const [votesRes, partsRes] = await Promise.all([
+    const [votesRes, mvpRes, partsRes] = await Promise.all([
       supabase
         .from('player_votes')
         .select('voter_id, voted_id, vote')
+        .eq('match_id', matchId),
+      supabase
+        .from('mvp_votes')
+        .select('voter_id, voted_id')
         .eq('match_id', matchId),
       supabase
         .from('match_players')
@@ -79,6 +85,7 @@ export function useMatchVoting(matchId: string | undefined) {
       voter_role: nameRoleMap.get(v.voter_id)?.role ?? 'player',
     }))
     setVotes(withRole)
+    setMvpVotes((mvpRes.data ?? []) as MvpVote[])
     setVoterInfo(nameRoleMap)
     setLoading(false)
   }, [matchId])
@@ -87,7 +94,10 @@ export function useMatchVoting(matchId: string | undefined) {
 
   const playerIds = participants.map((p) => p.player_id)
   const averages: PlayerAverage[] = getPlayerAverages(votes, playerIds)
-  const provisionalMvpId: string | null = getProvisionalMvpId(averages)
+  // Spoglio dei voti MVP: il provvisorio è il più votato, null se parimerito
+  // (in quel caso decide l'admin alla pubblicazione delle pagelle).
+  const mvpTally = tallyMvpVotes(mvpVotes)
+  const provisionalMvpId: string | null = mvpTally.leaderId
 
   const voterIds = new Set(votes.map((v) => v.voter_id))
 
@@ -97,13 +107,21 @@ export function useMatchVoting(matchId: string | undefined) {
     )
   }
 
+  function getMyMvpVote(myId: string): string {
+    return mvpVotes.find((v) => v.voter_id === myId)?.voted_id ?? ''
+  }
+
   function hasVotedAll(myId: string): boolean {
     if (participants.length === 0) return false
     const myVotedIds = new Set(votes.filter((v) => v.voter_id === myId).map((v) => v.voted_id))
     return participants.every((p) => myVotedIds.has(p.player_id))
   }
 
-  async function submitVotes(myId: string, myVotes: Record<string, number>): Promise<void> {
+  async function submitVotes(
+    myId: string,
+    myVotes: Record<string, number>,
+    myMvpId?: string,
+  ): Promise<void> {
     if (!matchId) return
     const rows = Object.entries(myVotes).map(([voted_id, vote]) => ({
       match_id: matchId,
@@ -114,11 +132,21 @@ export function useMatchVoting(matchId: string | undefined) {
     await supabase
       .from('player_votes')
       .upsert(rows, { onConflict: 'match_id,voter_id,voted_id' })
+    if (myMvpId) {
+      await supabase
+        .from('mvp_votes')
+        .upsert(
+          { match_id: matchId, voter_id: myId, voted_id: myMvpId },
+          { onConflict: 'match_id,voter_id' },
+        )
+    }
     await load()
   }
 
   return {
     votes,
+    mvpVotes,
+    mvpTally,
     participants,
     voterInfo,
     averages,
@@ -126,6 +154,7 @@ export function useMatchVoting(matchId: string | undefined) {
     voterIds,
     loading,
     getMyVotes,
+    getMyMvpVote,
     hasVotedAll,
     submitVotes,
     refetch: load,
