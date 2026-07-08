@@ -4,12 +4,14 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useMatchDetail } from '../hooks/useMatchDetail'
 import { usePlayerRatings } from '../hooks/usePlayerRatings'
+import { useFantaSettings } from '../hooks/useFantaSettings'
 import {
   FANTA_BUDGET,
   FANTA_TEAM_SIZE,
   computeLineupScore,
   creditCost,
   formatFantaPoints,
+  lineupDeadline,
 } from '../lib/fantacalcetto'
 import FantaPitch from '../components/FantaPitch'
 import type { MatchPlayerWithName } from '../hooks/useMatchDetail'
@@ -33,6 +35,7 @@ export default function FantaFormazione() {
   const { player } = useAuth()
   const { data, loading, error } = useMatchDetail(matchId)
   const { ratings, loading: ratingsLoading } = usePlayerRatings(data?.matchPlayers.map((mp) => mp.player_id))
+  const { settings } = useFantaSettings()
 
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [captainId, setCaptainId] = useState('')
@@ -48,6 +51,14 @@ export default function FantaFormazione() {
   const [isCalculated, setIsCalculated] = useState(false)
   // Formazioni schierate dagli altri partecipanti alla lega.
   const [others, setOthers] = useState<OtherLineup[]>([])
+  // Orologio per il blocco formazioni (15' prima del calcio d'inizio):
+  // si aggiorna ogni 30 secondi così la pagina si blocca da sola allo scadere.
+  const [now, setNow] = useState(() => Date.now())
+
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 30_000)
+    return () => clearInterval(t)
+  }, [])
 
   // Carica l'eventuale formazione già schierata.
   useEffect(() => {
@@ -162,8 +173,12 @@ export default function FantaFormazione() {
   const teamA = matchPlayers.filter((p) => p.team === 'A')
   const teamB = matchPlayers.filter((p) => p.team === 'B')
   const isPublished = pagelle.length > 0 && pagelle.every((p) => p.published_at)
-  // Bloccata se la partita è conclusa oppure se non è la prossima in programma.
-  const locked = !!result || !isNextMatch
+  // Termine ultimo: 15 minuti prima del calcio d'inizio (se la partita ha un orario).
+  const deadline = lineupDeadline(match.match_date, match.match_time)
+  const pastDeadline = deadline !== null && now >= deadline.getTime()
+  // Bloccata se la partita è conclusa, se non è la prossima in programma
+  // o se manca meno di un quarto d'ora al calcio d'inizio.
+  const locked = !!result || !isNextMatch || pastDeadline
 
   const costOf = (playerId: string) => creditCost(ratings.get(playerId) ?? null)
   const budgetUsed = [...selected].reduce((s, id) => s + costOf(id), 0)
@@ -194,7 +209,7 @@ export default function FantaFormazione() {
   }
 
   async function handleSave() {
-    if (!leagueId || !matchId || !player || !isValid) return
+    if (!leagueId || !matchId || !player || !isValid || locked) return
     setSaving(true)
     setSaveError(null)
 
@@ -236,14 +251,19 @@ export default function FantaFormazione() {
   // Punteggio (solo dopo che l'admin ha calcolato la giornata)
   const score =
     locked && isPublished && isCalculated && selected.size > 0
-      ? computeLineupScore([...selected], captainId, {
-          pagelle: pagelle.map((p) => ({ player_id: p.player_id, voto: p.voto, is_mvp: p.is_mvp })),
-          goals: goals.map((g) => ({
-            player_id: g.player_id,
-            is_own_goal: g.is_own_goal,
-            assist_player_id: g.assist_player_id,
-          })),
-        })
+      ? computeLineupScore(
+          [...selected],
+          captainId,
+          {
+            pagelle: pagelle.map((p) => ({ player_id: p.player_id, voto: p.voto, is_mvp: p.is_mvp })),
+            goals: goals.map((g) => ({
+              player_id: g.player_id,
+              is_own_goal: g.is_own_goal,
+              assist_player_id: g.assist_player_id,
+            })),
+          },
+          settings,
+        )
       : null
 
   const nameOf = (playerId: string) => {
@@ -314,7 +334,9 @@ export default function FantaFormazione() {
         <div className="mt-3 rounded-xl border border-field-orange/30 bg-field-orange/5 p-3">
           <p className="text-sm text-field-orange">
             {!result
-              ? '🔒 Puoi schierare la formazione solo per la prossima partita in programma: questa si sbloccherà dopo quella precedente.'
+              ? pastDeadline && isNextMatch
+                ? '🔒 Formazioni bloccate: mancano meno di 15 minuti al calcio d’inizio (o la partita è già iniziata). Non è più possibile inserire o modificare la formazione.'
+                : '🔒 Puoi schierare la formazione solo per la prossima partita in programma: questa si sbloccherà dopo quella precedente.'
               : isCalculated
                 ? 'Giornata calcolata: ecco il punteggio della tua squadra.'
                 : isPublished
@@ -323,10 +345,20 @@ export default function FantaFormazione() {
           </p>
         </div>
       ) : (
-        <p className="mt-1 text-sm text-gray-500">
-          Scegli {FANTA_TEAM_SIZE} giocatori con {FANTA_BUDGET} crediti, pescando da entrambe le squadre
-          (almeno 1 per squadra), poi nomina il capitano (bonus ×1.2).
-        </p>
+        <>
+          <p className="mt-1 text-sm text-gray-500">
+            Scegli {FANTA_TEAM_SIZE} giocatori con {FANTA_BUDGET} crediti, pescando da entrambe le squadre
+            (almeno 1 per squadra), poi nomina il capitano (bonus ×{settings.captainMultiplier}).
+          </p>
+          {deadline && (
+            <p className="mt-2 rounded-lg bg-field-yellow/15 px-3 py-2 text-xs font-medium text-field-orange">
+              ⏳ Puoi inserire o modificare la formazione fino alle{' '}
+              {deadline.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })} del{' '}
+              {deadline.toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })} (15 minuti
+              prima del calcio d'inizio): dopo sarà bloccata.
+            </p>
+          )}
+        </>
       )}
 
       {/* Budget bar */}
@@ -352,7 +384,7 @@ export default function FantaFormazione() {
       {/* Selezione giocatori */}
       {selected.size === 0 && locked ? (
         <p className="mt-4 text-sm text-gray-500">
-          {result
+          {result || pastDeadline
             ? 'Non avevi schierato nessuna formazione per questa partita.'
             : 'Le squadre di questa partita saranno schierabili quando sarà il suo turno.'}
         </p>
@@ -366,7 +398,7 @@ export default function FantaFormazione() {
       {/* Capitano */}
       {selected.size > 0 && (
         <div className="mt-4 rounded-xl bg-white p-3 shadow">
-          <h3 className="font-medium text-field-green-dark">Capitano (bonus ×1.2)</h3>
+          <h3 className="font-medium text-field-green-dark">Capitano (bonus ×{settings.captainMultiplier})</h3>
           <div className="mt-2 flex flex-wrap gap-2">
             {[...selected].map((pid) => (
               <button
@@ -460,7 +492,7 @@ export default function FantaFormazione() {
                   voto {p.voto ?? '-'}
                   {p.bonus > 0 && <span className="text-field-green-dark"> +{p.bonus}</span>}
                   {p.malus < 0 && <span className="text-red-500"> {p.malus}</span>}
-                  {p.isCaptain && ' ×1.2'}
+                  {p.isCaptain && ` ×${settings.captainMultiplier}`}
                   <span className="ml-2 font-bold text-gray-800">{formatFantaPoints(p.total)}</span>
                 </span>
               </li>

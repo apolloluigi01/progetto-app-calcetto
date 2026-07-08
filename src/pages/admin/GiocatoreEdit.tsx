@@ -352,9 +352,11 @@ export default function GiocatoreEdit() {
 
       {canEditOverall && (
         <div className="mt-4 rounded-xl bg-white p-4 shadow">
-          <h2 className="font-medium text-gray-800">Overall iniziale</h2>
+          <h2 className="font-medium text-gray-800">Overall</h2>
           <p className="mt-1 text-xs text-gray-500">
-            Valore usato per la generazione automatica delle squadre quando il giocatore non ha ancora statistiche (1–100).
+            Valore 1–100 usato per la generazione delle squadre bilanciate, le carte giocatore e i costi
+            del fantacalcetto. Si modifica solo manualmente (qui o da CDA → Gestione overall) e ogni
+            modifica viene registrata nel registro attività.
           </p>
           <div className="mt-3 flex items-center gap-3">
             <input

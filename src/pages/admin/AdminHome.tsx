@@ -58,6 +58,28 @@ export default function AdminHome() {
         </Link>
 
         <Link
+          to="/admin/fantacalcetto"
+          className="flex items-center gap-3 rounded-xl bg-field-green px-4 py-3 text-sm font-medium text-white hover:bg-field-green-dark"
+        >
+          <span className="text-lg">🎮</span>
+          <div>
+            <p className="font-semibold">Gestione Fantacalcetto</p>
+            <p className="text-xs opacity-80">Parametri bonus e malus del fantacalcetto</p>
+          </div>
+        </Link>
+
+        <Link
+          to="/admin/overall"
+          className="flex items-center gap-3 rounded-xl bg-field-green px-4 py-3 text-sm font-medium text-white hover:bg-field-green-dark"
+        >
+          <span className="text-lg">📊</span>
+          <div>
+            <p className="font-semibold">Gestione overall</p>
+            <p className="text-xs opacity-80">Modifica manuale dell'overall dei giocatori</p>
+          </div>
+        </Link>
+
+        <Link
           to="/registro-attivita"
           className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50"
         >

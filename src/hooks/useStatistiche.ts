@@ -16,9 +16,7 @@ export function useStatistiche(seasonId?: string) {
         const resolvedSeasonId = seasonId ?? (await getCurrentSeasonId())
         const seasonStats = resolvedSeasonId ? await computeStatistiche(resolvedSeasonId) : []
         const overalls = await computeOverallsForPlayers(
-          seasonStats.map((s) => ({ id: s.player.id, name: s.player.name })),
-          resolvedSeasonId ?? undefined,
-          seasonStats
+          seasonStats.map((s) => ({ id: s.player.id, name: s.player.name }))
         )
         const overallMap = new Map(overalls.map((o) => [o.playerId, o.overall]))
         setStats(seasonStats.map((s) => ({ ...s, overall: overallMap.get(s.player.id) ?? null })))

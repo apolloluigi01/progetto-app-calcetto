@@ -1,7 +1,7 @@
 import { Link, useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useFantaLeague } from '../hooks/useFantaLeague'
-import { computeLineupScore, formatFantaPoints } from '../lib/fantacalcetto'
+import { computeLineupScore, formatFantaPoints, getFantaSettings } from '../lib/fantacalcetto'
 import { logActivity } from '../lib/activityLog'
 import { supabase } from '../lib/supabase'
 import { useState } from 'react'
@@ -38,6 +38,9 @@ export default function FantaLega() {
     setCalcBusy(matchId)
     setCalcError(null)
 
+    // Parametri bonus/malus configurati dagli admin (CDA → Gestione Fantacalcetto).
+    const settings = await getFantaSettings()
+
     const [lineupsRes, pagelleRes, goalsRes] = await Promise.all([
       supabase
         .from('fanta_lineups')
@@ -61,6 +64,7 @@ export default function FantaLega() {
         lineup.fanta_lineup_players.map((p) => p.player_id),
         lineup.captain_id,
         matchInput,
+        settings,
       )
       const { error: updError } = await supabase
         .from('fanta_lineups')

@@ -279,6 +279,11 @@ export default function MatchEdit() {
     setOpeningVoting(true)
     await supabase.from('matches').update({ voting_open: true }).eq('id', id)
     logActivity('votazioni_aperte', { matchId: id, data: match.match_date })
+    // Avvisa via mail gli altri admin della partita chiamati a votare
+    // (o i superadmin, se nessun admin ha partecipato). Non bloccante.
+    supabase.functions
+      .invoke('notify-voting-opened', { body: { matchId: id } })
+      .catch((e) => console.error('notify-voting-opened:', e))
     setOpeningVoting(false)
     refetch()
     refetchVoting()
@@ -393,25 +398,11 @@ export default function MatchEdit() {
     ]
     await supabase.from('match_players').insert(rows)
 
-    // Salva overall aggiornato in ratings
-    await Promise.all(
-      [...draftTeamA, ...draftTeamB].map(p =>
-        supabase
-          .from('ratings')
-          .upsert({ player_id: p.playerId, rating_value: p.overall, fascia: overallToFascia(p.overall), updated_at: new Date().toISOString() }, { onConflict: 'player_id' })
-      )
-    )
-
+    // L'overall è gestito manualmente dagli admin: la generazione squadre
+    // lo legge soltanto, senza più riscriverlo in ratings.
     setConfirming(false)
     setGeneratedTeams(null)
     refetch()
-  }
-
-  function overallToFascia(v: number): 'A' | 'B' | 'C' | 'D' {
-    if (v >= 75) return 'A'
-    if (v >= 55) return 'B'
-    if (v >= 35) return 'C'
-    return 'D'
   }
 
   // --- Modifica manuale squadre già confermate (solo in bozza) ---
@@ -490,14 +481,6 @@ export default function MatchEdit() {
       ...result.teamB.map((p) => ({ match_id: id, player_id: p.playerId, team: 'B' as Team })),
     ]
     await supabase.from('match_players').insert(rows)
-
-    await Promise.all(
-      [...result.teamA, ...result.teamB].map((p) =>
-        supabase
-          .from('ratings')
-          .upsert({ player_id: p.playerId, rating_value: p.overall, fascia: overallToFascia(p.overall), updated_at: new Date().toISOString() }, { onConflict: 'player_id' })
-      )
-    )
 
     logActivity('giocatore_sostituito', {
       matchId: id,
@@ -691,9 +674,9 @@ export default function MatchEdit() {
           ) : (
             <div className="mt-3">
               {/* Anteprima squadre */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {/* Squadra A */}
-                <div className="rounded-xl bg-white p-3 shadow">
+                <div className="min-w-0 rounded-xl bg-white p-3 shadow">
                   <div className="mb-2 flex items-center justify-between">
                     <h3 className="font-semibold text-field-green-dark">Squadra A</h3>
                     <span className="rounded-full bg-field-green/10 px-2 py-0.5 text-xs font-bold text-field-green-dark">
@@ -702,8 +685,8 @@ export default function MatchEdit() {
                   </div>
                   <ul className="space-y-1">
                     {draftTeamA.map(p => (
-                      <li key={p.playerId} className="flex items-center justify-between text-sm">
-                        <span>{p.nickname ?? p.name}</span>
+                      <li key={p.playerId} className="flex items-center justify-between gap-1 text-sm">
+                        <span className="min-w-0 truncate">{p.nickname ?? p.name}</span>
                         <div className="flex items-center gap-1">
                           <span className="rounded bg-field-green/10 px-1.5 text-xs font-bold text-field-green-dark">
                             {p.overall}
@@ -722,7 +705,7 @@ export default function MatchEdit() {
                 </div>
 
                 {/* Squadra B */}
-                <div className="rounded-xl bg-white p-3 shadow">
+                <div className="min-w-0 rounded-xl bg-white p-3 shadow">
                   <div className="mb-2 flex items-center justify-between">
                     <h3 className="font-semibold text-field-green-dark">Squadra B</h3>
                     <span className="rounded-full bg-field-orange/10 px-2 py-0.5 text-xs font-bold text-field-orange">
@@ -731,8 +714,8 @@ export default function MatchEdit() {
                   </div>
                   <ul className="space-y-1">
                     {draftTeamB.map(p => (
-                      <li key={p.playerId} className="flex items-center justify-between text-sm">
-                        <span>{p.nickname ?? p.name}</span>
+                      <li key={p.playerId} className="flex items-center justify-between gap-1 text-sm">
+                        <span className="min-w-0 truncate">{p.nickname ?? p.name}</span>
                         <div className="flex items-center gap-1">
                           <button
                             onClick={() => swapPlayer('B', p.playerId)}
@@ -901,12 +884,12 @@ export default function MatchEdit() {
         <div className="mt-4 rounded-xl border border-field-green/30 bg-field-green/5 p-4">
           <h2 className="font-semibold text-field-green-dark">Modifica squadre</h2>
           <div className="mt-3 grid grid-cols-2 gap-3">
-            <div className="rounded-xl bg-white p-3 shadow">
+            <div className="min-w-0 rounded-xl bg-white p-3 shadow">
               <h3 className="mb-2 font-medium text-field-green-dark">Squadra A</h3>
               <ul className="space-y-1">
                 {localTeamA.map((p) => (
-                  <li key={p.player_id} className="flex items-center justify-between text-sm">
-                    <span>{p.nickname ?? p.name}</span>
+                  <li key={p.player_id} className="flex items-center justify-between gap-1 text-sm">
+                    <span className="min-w-0 truncate">{p.nickname ?? p.name}</span>
                     <button
                       onClick={() => swapConfirmedPlayer('A', p.player_id)}
                       className="text-xs text-gray-400 hover:text-field-orange"
@@ -918,19 +901,19 @@ export default function MatchEdit() {
                 ))}
               </ul>
             </div>
-            <div className="rounded-xl bg-white p-3 shadow">
+            <div className="min-w-0 rounded-xl bg-white p-3 shadow">
               <h3 className="mb-2 font-medium text-field-green-dark">Squadra B</h3>
               <ul className="space-y-1">
                 {localTeamB.map((p) => (
-                  <li key={p.player_id} className="flex items-center justify-between text-sm">
+                  <li key={p.player_id} className="flex items-center justify-between gap-1 text-sm">
                     <button
                       onClick={() => swapConfirmedPlayer('B', p.player_id)}
-                      className="text-xs text-gray-400 hover:text-field-green"
+                      className="shrink-0 text-xs text-gray-400 hover:text-field-green"
                       title="Sposta in A"
                     >
                       A←
                     </button>
-                    <span>{p.nickname ?? p.name}</span>
+                    <span className="min-w-0 truncate">{p.nickname ?? p.name}</span>
                   </li>
                 ))}
               </ul>
@@ -964,7 +947,7 @@ export default function MatchEdit() {
       {/* ===== RISULTATO ===== */}
       <div className="mt-4 rounded-xl bg-white p-4 shadow">
         <h2 className="font-medium">Risultato</h2>
-        <div className="mt-2 flex items-center gap-3">
+        <div className="mt-2 flex flex-wrap items-center gap-3">
           <input
             type="number"
             min={0}
@@ -984,7 +967,7 @@ export default function MatchEdit() {
             onClick={handleSaveResult}
             disabled={savingResult || !infoComplete}
             title={!infoComplete ? 'Completa data, ora e campo prima di salvare il risultato' : undefined}
-            className="ml-auto rounded-lg bg-field-green px-4 py-2 text-sm font-medium text-white hover:bg-field-green-dark disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full rounded-lg bg-field-green px-4 py-2 text-sm font-medium text-white hover:bg-field-green-dark disabled:opacity-50 disabled:cursor-not-allowed sm:ml-auto sm:w-auto"
           >
             Salva risultato
           </button>
@@ -1003,10 +986,12 @@ export default function MatchEdit() {
       </div>
 
       {/* ===== MARCATORI ===== */}
+      {/* Una colonna su mobile, due su schermi larghi: i controlli (select +
+          bottone) sono impilati a tutta larghezza per evitare sovrapposizioni. */}
       {matchPlayers.length > 0 && (
-        <div className="mt-4 grid grid-cols-2 gap-3">
+        <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
           {(['A', 'B'] as Team[]).map((team) => (
-            <div key={team} className="rounded-xl bg-white p-3 shadow">
+            <div key={team} className="min-w-0 rounded-xl bg-white p-3 shadow">
               <h3 className="mb-2 font-medium text-field-green-dark">Marcatori Squadra {team}</h3>
               <ul className="space-y-1 text-sm">
                 {goalsByTeam(team).map((g) => {
@@ -1015,23 +1000,23 @@ export default function MatchEdit() {
                       matchPlayers.find((mp) => mp.player_id === g.assist_player_id)?.name
                     : null
                   return (
-                    <li key={g.id} className="flex items-center justify-between">
-                      <span>
+                    <li key={g.id} className="flex items-center justify-between gap-2">
+                      <span className="min-w-0">
                         ⚽ {g.name} {g.is_own_goal && <span className="text-red-600">(autogol)</span>}
                         {assistName && <span className="text-xs text-gray-400"> (assist: {assistName})</span>}
                       </span>
-                      <button onClick={() => handleRemoveGoal(g.id)} className="text-xs text-red-600">
+                      <button onClick={() => handleRemoveGoal(g.id)} className="shrink-0 text-xs text-red-600">
                         Rimuovi
                       </button>
                     </li>
                   )
                 })}
               </ul>
-              <div className="mt-2 flex gap-2">
+              <div className="mt-2 space-y-2">
                 <select
                   value={newGoalPlayer[team]}
                   onChange={(e) => setNewGoalPlayer((prev) => ({ ...prev, [team]: e.target.value }))}
-                  className="flex-1 rounded-lg border border-gray-300 px-2 py-1 text-sm"
+                  className="w-full min-w-0 rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
                 >
                   <option value="">Giocatore...</option>
                   {(ownGoal[team] ? (team === 'A' ? teamB : teamA) : team === 'A' ? teamA : teamB).map((p) => (
@@ -1040,41 +1025,41 @@ export default function MatchEdit() {
                     </option>
                   ))}
                 </select>
+                {!ownGoal[team] && (
+                  <select
+                    value={newGoalAssist[team]}
+                    onChange={(e) => setNewGoalAssist((prev) => ({ ...prev, [team]: e.target.value }))}
+                    className="w-full min-w-0 rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-600"
+                  >
+                    <option value="">Assist (opzionale)...</option>
+                    {(team === 'A' ? teamA : teamB)
+                      .filter((p) => p.player_id !== newGoalPlayer[team])
+                      .map((p) => (
+                        <option key={p.player_id} value={p.player_id}>
+                          {p.nickname ?? p.name}
+                        </option>
+                      ))}
+                  </select>
+                )}
+                <label className="flex items-center gap-2 text-xs text-red-600">
+                  <input
+                    type="checkbox"
+                    checked={ownGoal[team]}
+                    onChange={(e) => {
+                      setOwnGoal((prev) => ({ ...prev, [team]: e.target.checked }))
+                      setNewGoalPlayer((prev) => ({ ...prev, [team]: '' }))
+                    }}
+                  />
+                  Autogol (giocatore della squadra avversaria)
+                </label>
                 <button
                   onClick={() => handleAddGoal(team)}
                   disabled={!newGoalPlayer[team]}
-                  className="rounded-lg bg-field-green px-3 py-1 text-sm text-white disabled:opacity-50"
+                  className="w-full rounded-lg bg-field-green px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
                 >
-                  + Gol
+                  + Aggiungi gol
                 </button>
               </div>
-              {!ownGoal[team] && (
-                <select
-                  value={newGoalAssist[team]}
-                  onChange={(e) => setNewGoalAssist((prev) => ({ ...prev, [team]: e.target.value }))}
-                  className="mt-2 w-full rounded-lg border border-gray-300 px-2 py-1 text-sm text-gray-600"
-                >
-                  <option value="">Assist (opzionale)...</option>
-                  {(team === 'A' ? teamA : teamB)
-                    .filter((p) => p.player_id !== newGoalPlayer[team])
-                    .map((p) => (
-                      <option key={p.player_id} value={p.player_id}>
-                        {p.nickname ?? p.name}
-                      </option>
-                    ))}
-                </select>
-              )}
-              <label className="mt-2 flex items-center gap-1 text-xs text-red-600">
-                <input
-                  type="checkbox"
-                  checked={ownGoal[team]}
-                  onChange={(e) => {
-                    setOwnGoal((prev) => ({ ...prev, [team]: e.target.checked }))
-                    setNewGoalPlayer((prev) => ({ ...prev, [team]: '' }))
-                  }}
-                />
-                Autogol (giocatore della squadra avversaria)
-              </label>
             </div>
           ))}
         </div>

@@ -1,14 +1,59 @@
+import { supabase } from './supabase'
 import { parseVoto } from './statistiche'
 
 export const FANTA_BUDGET = 15
 export const FANTA_TEAM_SIZE = 5
-export const CAPTAIN_MULTIPLIER = 1.2
 
-export const BONUS_MVP = 3
-export const BONUS_GOL = 2
-export const BONUS_ASSIST = 1
-export const MALUS_AUTOGOL = -1
-export const MALUS_PEGGIORE = -2
+/**
+ * Parametri bonus/malus del fantacalcetto. Non sono più hardcodati:
+ * vivono nella tabella fanta_settings (riga singola) e sono manutenuti
+ * dagli admin dalla sezione CDA → Gestione Fantacalcetto.
+ */
+export interface FantaSettings {
+  bonusMvp: number
+  bonusGol: number
+  bonusAssist: number
+  malusAutogol: number
+  malusPeggiore: number
+  captainMultiplier: number
+}
+
+/** Valori di fallback se la riga di configurazione non è raggiungibile. */
+export const DEFAULT_FANTA_SETTINGS: FantaSettings = {
+  bonusMvp: 3,
+  bonusGol: 2,
+  bonusAssist: 1,
+  malusAutogol: -1,
+  malusPeggiore: -2,
+  captainMultiplier: 1.2,
+}
+
+export async function getFantaSettings(): Promise<FantaSettings> {
+  const { data } = await supabase.from('fanta_settings').select('*').eq('id', 1).maybeSingle()
+  if (!data) return DEFAULT_FANTA_SETTINGS
+  return {
+    bonusMvp: Number(data.bonus_mvp),
+    bonusGol: Number(data.bonus_gol),
+    bonusAssist: Number(data.bonus_assist),
+    malusAutogol: Number(data.malus_autogol),
+    malusPeggiore: Number(data.malus_peggiore),
+    captainMultiplier: Number(data.captain_multiplier),
+  }
+}
+
+/** Minuti prima del calcio d'inizio oltre i quali le formazioni sono bloccate. */
+export const LINEUP_LOCK_MINUTES = 15
+
+/**
+ * Termine ultimo per inserire/modificare la formazione: 15 minuti prima
+ * del calcio d'inizio. Se la partita non ha un orario, nessun termine.
+ */
+export function lineupDeadline(matchDate: string, matchTime: string | null): Date | null {
+  if (!matchTime) return null
+  const kickoff = new Date(`${matchDate}T${matchTime}`)
+  if (isNaN(kickoff.getTime())) return null
+  return new Date(kickoff.getTime() - LINEUP_LOCK_MINUTES * 60 * 1000)
+}
 
 /**
  * Costo in crediti di un giocatore, in base all'overall (stessa griglia
@@ -52,15 +97,16 @@ export interface FantaLineupScore {
 
 /**
  * Calcola il punteggio di una formazione per una partita conclusa
- * (richiede pagelle pubblicate). Bonus: MVP +3, gol +2, assist +1.
- * Malus: autogol -1, peggior voto in campo -2 (in caso di parità si
- * applica a tutti i peggiori). Il capitano moltiplica il proprio
- * punteggio finale per 1.2.
+ * (richiede pagelle pubblicate), usando i parametri bonus/malus
+ * configurati dagli admin. Il malus "peggiore" si applica al peggior
+ * voto in campo (in caso di parità a tutti i peggiori); il capitano
+ * moltiplica il proprio punteggio finale per il moltiplicatore.
  */
 export function computeLineupScore(
   lineupPlayerIds: string[],
   captainId: string,
   match: FantaMatchInput,
+  settings: FantaSettings = DEFAULT_FANTA_SETTINGS,
 ): FantaLineupScore {
   const votes = new Map<string, number>()
   for (const p of match.pagelle) {
@@ -76,19 +122,19 @@ export function computeLineupScore(
     let bonus = 0
     let malus = 0
 
-    if (match.pagelle.find((p) => p.player_id === playerId)?.is_mvp) bonus += BONUS_MVP
+    if (match.pagelle.find((p) => p.player_id === playerId)?.is_mvp) bonus += settings.bonusMvp
     for (const g of match.goals) {
       if (g.player_id === playerId) {
-        if (g.is_own_goal) malus += MALUS_AUTOGOL
-        else bonus += BONUS_GOL
+        if (g.is_own_goal) malus += settings.malusAutogol
+        else bonus += settings.bonusGol
       }
-      if (g.assist_player_id === playerId && !g.is_own_goal) bonus += BONUS_ASSIST
+      if (g.assist_player_id === playerId && !g.is_own_goal) bonus += settings.bonusAssist
     }
-    if (worstVote !== null && voto !== null && voto === worstVote) malus += MALUS_PEGGIORE
+    if (worstVote !== null && voto !== null && voto === worstVote) malus += settings.malusPeggiore
 
     const isCaptain = playerId === captainId
     const raw = (voto ?? 0) + bonus + malus
-    const total = isCaptain ? raw * CAPTAIN_MULTIPLIER : raw
+    const total = isCaptain ? raw * settings.captainMultiplier : raw
 
     return { playerId, voto, bonus, malus, isCaptain, total: Math.round(total * 100) / 100 }
   })

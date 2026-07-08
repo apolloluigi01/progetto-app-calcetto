@@ -12,7 +12,7 @@ const MAX_PLAYERS = 10
 
 export default function MatchDetail() {
   const { id } = useParams<{ id: string }>()
-  const { player, isAdmin } = useAuth()
+  const { player, isAdmin, isSuperAdmin } = useAuth()
   const { data, loading, error } = useMatchDetail(id)
   const {
     bookings,
@@ -77,10 +77,13 @@ export default function MatchDetail() {
   const bookingFull = bookingCount >= MAX_PLAYERS
 
   const alreadyVotedAll = player ? hasVotedAll(player.id) : false
-  // Solo admin/superadmin possono votare: il conteggio va fatto sul totale degli admin partecipanti, non su tutti i giocatori.
+  // Possono votare solo gli admin/superadmin che hanno partecipato alla partita.
+  // Caso limite: se nessun admin fa parte della partita, vota il superadmin
+  // anche se non ha partecipato (le stesse regole sono imposte dalle policy DB).
   const adminVoters = participants.filter((p) => p.role === 'admin' || p.role === 'superadmin')
-  // Ogni admin/superadmin può votare tutti i giocatori della partita, anche se non vi ha partecipato.
-  const canVote = isAdmin
+  const isParticipant = !!player && participants.some((p) => p.player_id === player.id)
+  const canVote =
+    (isAdmin && isParticipant) || (isSuperAdmin && adminVoters.length === 0)
 
   return (
     <div className="p-4 pb-12">
@@ -256,10 +259,12 @@ export default function MatchDetail() {
         </div>
       )}
 
-      {match.voting_open && !isAdmin && (
+      {match.voting_open && !canVote && (
         <div className="mt-4 rounded-xl border border-purple-100 bg-purple-50 p-3 text-center">
           <p className="text-sm text-purple-600">
-            🗳️ Le votazioni sono aperte, ma riservate ad admin e superadmin.
+            {isAdmin
+              ? '🗳️ Le votazioni sono aperte, ma riservate agli admin che hanno partecipato alla partita.'
+              : '🗳️ Le votazioni sono aperte, ma riservate ad admin e superadmin.'}
           </p>
         </div>
       )}
