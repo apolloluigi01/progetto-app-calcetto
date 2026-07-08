@@ -216,7 +216,7 @@ export default function MatchDetail() {
               return (
                 <div key={p.player_id} className="flex items-center gap-3">
                   <span className="w-28 shrink-0 truncate text-sm font-medium text-gray-800">
-                    {p.name}
+                    {p.nickname ?? p.name}
                   </span>
                   <input
                     type="range"
@@ -315,12 +315,12 @@ export default function MatchDetail() {
               <ul key={team} className="min-w-0 space-y-1">
                 {goalsByTeam(team).map((g) => (
                   <li key={g.id}>
-                    ⚽ {g.name} {g.is_own_goal && <span className="text-red-600">(autogol)</span>}
+                    ⚽ {g.nickname ?? g.name} {g.is_own_goal && <span className="text-red-600">(autogol)</span>}
                   </li>
                 ))}
                 {assistsByTeam(team).map((a) => (
                   <li key={a.id} className="text-gray-600">
-                    🅰️ {a.name} <span className="text-xs text-gray-400">(assist)</span>
+                    🅰️ {a.nickname ?? a.name} <span className="text-xs text-gray-400">(assist)</span>
                   </li>
                 ))}
               </ul>
@@ -339,7 +339,7 @@ export default function MatchDetail() {
               <div key={p.id} className="rounded-xl bg-white p-3 shadow">
                 <div className="flex items-center justify-between">
                   <p className="font-medium">
-                    {p.name} {p.is_mvp && <span className="text-field-orange">★ MVP</span>}
+                    {p.nickname ?? p.name} {p.is_mvp && <span className="text-field-orange">★ MVP</span>}
                   </p>
                   <span className="font-semibold text-field-green-dark">{p.voto}</span>
                 </div>

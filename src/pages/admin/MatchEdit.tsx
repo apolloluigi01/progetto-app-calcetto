@@ -253,7 +253,7 @@ export default function MatchEdit() {
     if (incomplete.length > 0) {
       alert(
         `Completa voto, titolo e descrizione per tutti i giocatori prima di pubblicare. Mancano per: ${incomplete
-          .map((mp) => mp.name)
+          .map((mp) => mp.nickname ?? mp.name)
           .join(', ')}.`
       )
       return
@@ -618,7 +618,7 @@ export default function MatchEdit() {
           <div className="mt-3 space-y-1">
             {bookings.map((b) => (
               <div key={b.id} className="flex items-center justify-between rounded-lg bg-white px-3 py-1.5">
-                <span className="text-sm font-medium">{b.name}</span>
+                <span className="text-sm font-medium">{b.nickname ?? b.name}</span>
                 <button
                   onClick={() => handleRemoveBooking(b.player_id, b.name)}
                   className="text-xs text-red-500 hover:text-red-700"
@@ -642,7 +642,7 @@ export default function MatchEdit() {
               >
                 <option value="">+ Aggiungi giocatore</option>
                 {availableToAdd.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
+                  <option key={p.id} value={p.id}>{p.nickname ?? p.name}</option>
                 ))}
               </select>
               <button
@@ -1016,7 +1016,7 @@ export default function MatchEdit() {
                 {goalsByTeam(team).map((g) => (
                   <li key={g.id} className="flex items-center justify-between gap-2">
                     <span className="min-w-0">
-                      ⚽ {g.name} {g.is_own_goal && <span className="text-red-600">(autogol)</span>}
+                      ⚽ {g.nickname ?? g.name} {g.is_own_goal && <span className="text-red-600">(autogol)</span>}
                     </span>
                     <button onClick={() => handleRemoveGoal(g.id)} className="shrink-0 text-xs text-red-600">
                       Rimuovi
@@ -1063,7 +1063,7 @@ export default function MatchEdit() {
                 <ul className="space-y-1 text-sm">
                   {assistsByTeam(team).map((a) => (
                     <li key={a.id} className="flex items-center justify-between gap-2">
-                      <span className="min-w-0">🅰️ {a.name}</span>
+                      <span className="min-w-0">🅰️ {a.nickname ?? a.name}</span>
                       <button onClick={() => handleRemoveAssist(a.id)} className="shrink-0 text-xs text-red-600">
                         Rimuovi
                       </button>
@@ -1150,14 +1150,18 @@ export default function MatchEdit() {
                 const playerVotes = votes.filter((v) => v.voted_id === mp.player_id)
                 return (
                   <div key={mp.id}>
-                    <p className="text-sm font-medium text-gray-800">{mp.name}</p>
+                    <p className="text-sm font-medium text-gray-800">{mp.nickname ?? mp.name}</p>
                     {playerVotes.length === 0 ? (
                       <p className="text-xs text-gray-400">Nessun voto ancora.</p>
                     ) : (
                       <ul className="mt-1 space-y-0.5 text-xs text-gray-600">
                         {playerVotes.map((v) => (
                           <li key={v.voter_id} className="flex items-center justify-between">
-                            <span>{voterInfo.get(v.voter_id)?.name ?? 'Sconosciuto'}</span>
+                            <span>
+                              {voterInfo.get(v.voter_id)?.nickname ??
+                                voterInfo.get(v.voter_id)?.name ??
+                                'Sconosciuto'}
+                            </span>
                             <span className="font-semibold text-purple-700">{formatVote(v.vote)}</span>
                           </li>
                         ))}
@@ -1186,7 +1190,7 @@ export default function MatchEdit() {
                     >
                       <span className="text-sm font-medium text-gray-800">
                         {isMvp && <span className="mr-1">🏆</span>}
-                        {p.name}
+                        {p.nickname ?? p.name}
                       </span>
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-gray-400">
@@ -1227,7 +1231,7 @@ export default function MatchEdit() {
               return (
                 <div key={mp.id} className="rounded-xl bg-white p-3 shadow">
                   <div className="flex items-center justify-between">
-                    <p className="font-medium">{mp.name}</p>
+                    <p className="font-medium">{mp.nickname ?? mp.name}</p>
                     <label className="flex items-center gap-1 text-xs text-field-orange">
                       <input
                         type="radio"

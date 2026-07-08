@@ -80,10 +80,10 @@ Deno.serve(async (req: Request) => {
   const [matchRes, resultRes, goalsRes, pagelleRes, matchPlayersRes] = await Promise.all([
     adminClient.from("matches").select("match_date, field").eq("id", matchId).single(),
     adminClient.from("match_results").select("score_a, score_b").eq("match_id", matchId).maybeSingle(),
-    adminClient.from("goals").select("team, is_own_goal, players(name)").eq("match_id", matchId),
+    adminClient.from("goals").select("team, is_own_goal, players(name, nickname)").eq("match_id", matchId),
     adminClient
       .from("pagelle")
-      .select("player_id, voto, titolo, descrizione, is_mvp, players(name)")
+      .select("player_id, voto, titolo, descrizione, is_mvp, players(name, nickname)")
       .eq("match_id", matchId)
       .not("published_at", "is", null),
     adminClient.from("match_players").select("player_id, team").eq("match_id", matchId),
@@ -91,7 +91,9 @@ Deno.serve(async (req: Request) => {
 
   if (matchRes.error || !matchRes.data) return json({ error: "Partita non trovata" }, 404);
 
-  type Named = { players: { name: string } | null };
+  // Nei riepiloghi si mostra il nickname (univoco), col nome come fallback.
+  type Named = { players: { name: string; nickname: string | null } | null };
+  const displayName = (p: Named) => p.players?.nickname ?? p.players?.name ?? "?";
   const goals = (goalsRes.data ?? []) as unknown as (Named & { team: string; is_own_goal: boolean })[];
   const pagelle = (pagelleRes.data ?? []) as unknown as (Named & {
     player_id: string;
@@ -113,8 +115,7 @@ Deno.serve(async (req: Request) => {
     : "";
 
   function goalRow(g: Named & { is_own_goal: boolean }) {
-    const name = g.players?.name ?? "?";
-    return `<p style="margin:2px 0;font-size:13px;color:#374151;">⚽ ${name}${g.is_own_goal ? ' <span style="color:#dc2626;font-size:11px;">(ag)</span>' : ""}</p>`;
+    return `<p style="margin:2px 0;font-size:13px;color:#374151;">⚽ ${displayName(g)}${g.is_own_goal ? ' <span style="color:#dc2626;font-size:11px;">(ag)</span>' : ""}</p>`;
   }
 
   const goalsA = goals.filter((g) => g.team === "A");
@@ -145,7 +146,7 @@ Deno.serve(async (req: Request) => {
         <table role="presentation" style="width:100%;border-collapse:collapse;">
           <tr>
             <td style="text-align:left;">
-              <span style="font-weight:700;font-size:15px;">${p.players?.name ?? "?"}</span>
+              <span style="font-weight:700;font-size:15px;">${displayName(p)}</span>
               ${p.is_mvp
                 ? '<span style="margin-left:6px;background:#fff8e1;color:#ef6c00;border:1px solid #f9a825;border-radius:999px;padding:1px 8px;font-weight:700;font-size:11px;">★ MVP</span>'
                 : ""}

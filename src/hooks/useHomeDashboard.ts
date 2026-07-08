@@ -6,6 +6,7 @@ export interface DashboardGoal {
   player_id: string
   team: Team
   name: string
+  nickname: string | null
   is_own_goal: boolean
 }
 
@@ -65,12 +66,17 @@ export function useHomeDashboard() {
           const m = lastRes.data as Match & { result: MatchResult[] | MatchResult | null }
           const { data: goalsData, error: goalsError } = await supabase
             .from('goals')
-            .select('player_id, team, is_own_goal, players(name)')
+            .select('player_id, team, is_own_goal, players(name, nickname)')
             .eq('match_id', m.id)
 
           if (goalsError) throw goalsError
 
-          type GoalJoin = { player_id: string; team: Team; is_own_goal: boolean; players: { name: string } | null }
+          type GoalJoin = {
+            player_id: string
+            team: Team
+            is_own_goal: boolean
+            players: { name: string; nickname: string | null } | null
+          }
           setLastMatch({
             match: m,
             result: Array.isArray(m.result) ? m.result[0] ?? null : m.result,
@@ -79,6 +85,7 @@ export function useHomeDashboard() {
               team: g.team,
               is_own_goal: g.is_own_goal,
               name: g.players?.name ?? '',
+              nickname: g.players?.nickname ?? null,
             })),
           })
         } else {

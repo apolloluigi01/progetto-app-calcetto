@@ -16,6 +16,7 @@ export interface GoalWithName {
   player_id: string
   team: Team
   name: string
+  nickname: string | null
   is_own_goal: boolean
 }
 
@@ -24,12 +25,14 @@ export interface AssistWithName {
   player_id: string
   team: Team
   name: string
+  nickname: string | null
 }
 
 export interface PagellaWithName {
   id: string
   player_id: string
   name: string
+  nickname: string | null
   voto: string
   titolo: string | null
   descrizione: string | null
@@ -62,12 +65,12 @@ export function useMatchDetail(matchId: string | undefined) {
         .from('match_players')
         .select('id, player_id, team, players(*)')
         .eq('match_id', matchId),
-      supabase.from('goals').select('id, player_id, team, is_own_goal, players(name)').eq('match_id', matchId),
-      supabase.from('assists').select('id, player_id, team, players(name)').eq('match_id', matchId),
+      supabase.from('goals').select('id, player_id, team, is_own_goal, players(name, nickname)').eq('match_id', matchId),
+      supabase.from('assists').select('id, player_id, team, players(name, nickname)').eq('match_id', matchId),
       supabase.from('match_results').select('*').eq('match_id', matchId).maybeSingle(),
       supabase
         .from('pagelle')
-        .select('id, player_id, voto, titolo, descrizione, is_mvp, published_at, players(name)')
+        .select('id, player_id, voto, titolo, descrizione, is_mvp, published_at, players(name, nickname)')
         .eq('match_id', matchId),
     ])
 
@@ -95,6 +98,7 @@ export function useMatchDetail(matchId: string | undefined) {
         player_id: g.player_id,
         team: g.team,
         name: g.players?.name ?? '',
+        nickname: g.players?.nickname ?? null,
         is_own_goal: g.is_own_goal,
       })),
       assists: ((assistsRes.data ?? []) as unknown as (AssistWithName & PlayerJoin)[]).map((a) => ({
@@ -102,12 +106,14 @@ export function useMatchDetail(matchId: string | undefined) {
         player_id: a.player_id,
         team: a.team,
         name: a.players?.name ?? '',
+        nickname: a.players?.nickname ?? null,
       })),
       result: (resultRes.data as MatchResult | null) ?? null,
       pagelle: ((pagelleRes.data ?? []) as unknown as (PagellaWithName & PlayerJoin)[]).map((p) => ({
         id: p.id,
         player_id: p.player_id,
         name: p.players?.name ?? '',
+        nickname: p.players?.nickname ?? null,
         voto: p.voto,
         titolo: p.titolo,
         descrizione: p.descrizione,

@@ -11,11 +11,13 @@ import type { PlayerRole } from '../types/database'
 export interface VotingParticipant {
   player_id: string
   name: string
+  nickname: string | null
   role: PlayerRole
 }
 
 export interface VoterInfo {
   name: string
+  nickname: string | null
   role: PlayerRole
 }
 
@@ -36,31 +38,37 @@ export function useMatchVoting(matchId: string | undefined) {
         .eq('match_id', matchId),
       supabase
         .from('match_players')
-        .select('player_id, players(name, role)')
+        .select('player_id, players(name, nickname, role)')
         .eq('match_id', matchId),
     ])
 
-    type PartRow = { player_id: string; players: { name: string; role: string } | null }
+    type PartRow = {
+      player_id: string
+      players: { name: string; nickname: string | null; role: string } | null
+    }
     const parts = ((partsRes.data ?? []) as unknown as PartRow[]).map((p) => ({
       player_id: p.player_id,
       name: p.players?.name ?? '',
+      nickname: p.players?.nickname ?? null,
       role: (p.players?.role ?? 'player') as PlayerRole,
     }))
     setParticipants(parts)
 
     const rawVotes = (votesRes.data ?? []) as { voter_id: string; voted_id: string; vote: number }[]
 
-    const nameRoleMap = new Map(parts.map((p) => [p.player_id, { name: p.name, role: p.role }]))
+    const nameRoleMap = new Map(
+      parts.map((p) => [p.player_id, { name: p.name, nickname: p.nickname, role: p.role }])
+    )
     const missingVoterIds = [...new Set(rawVotes.map((v) => v.voter_id))].filter(
       (id) => !nameRoleMap.has(id)
     )
     if (missingVoterIds.length > 0) {
       const { data: extraPlayers } = await supabase
         .from('players')
-        .select('id, name, role')
+        .select('id, name, nickname, role')
         .in('id', missingVoterIds)
-      for (const p of (extraPlayers ?? []) as { id: string; name: string; role: PlayerRole }[]) {
-        nameRoleMap.set(p.id, { name: p.name, role: p.role })
+      for (const p of (extraPlayers ?? []) as { id: string; name: string; nickname: string | null; role: PlayerRole }[]) {
+        nameRoleMap.set(p.id, { name: p.name, nickname: p.nickname, role: p.role })
       }
     }
 

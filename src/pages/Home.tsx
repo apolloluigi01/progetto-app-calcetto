@@ -121,7 +121,7 @@ export default function Home() {
                           ) : (
                             goalsA.map((g, i) => (
                               <p key={i} className="text-sm text-gray-700">
-                                ⚽ {g.name}
+                                ⚽ {g.nickname ?? g.name}
                                 {g.is_own_goal && <span className="text-xs text-red-500"> (ag)</span>}
                               </p>
                             ))
@@ -141,7 +141,7 @@ export default function Home() {
                           ) : (
                             goalsB.map((g, i) => (
                               <p key={i} className="text-sm text-gray-700">
-                                {g.name} ⚽
+                                {g.nickname ?? g.name} ⚽
                                 {g.is_own_goal && <span className="text-xs text-red-500"> (ag)</span>}
                               </p>
                             ))
