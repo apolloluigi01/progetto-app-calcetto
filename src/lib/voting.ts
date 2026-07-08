@@ -18,6 +18,13 @@ export function voteWeight(role: PlayerRole): number {
   return role === 'admin' || role === 'superadmin' ? 2 : 1
 }
 
+/**
+ * Media ponderata dei voti post-partita, arrotondata al mezzo voto più
+ * vicino: i voti delle votazioni possono finire solo con .0 o .5
+ * (es. 6,2 → 6; 6,8 → 7; 6,3 → 6,5). Questa regola vale SOLO per le
+ * votazioni: le medie delle statistiche e il fantavoto continuano a
+ * usare i voti delle pagelle arrotondati a una cifra decimale.
+ */
 export function calculateWeightedAverage(votes: VoteWithRole[]): number | null {
   if (votes.length === 0) return null
   let weightedSum = 0
@@ -27,7 +34,7 @@ export function calculateWeightedAverage(votes: VoteWithRole[]): number | null {
     weightedSum += v.vote * w
     totalWeight += w
   }
-  return Math.round((weightedSum / totalWeight) * 10) / 10
+  return Math.round((weightedSum / totalWeight) * 2) / 2
 }
 
 export function getPlayerAverages(votes: VoteWithRole[], playerIds: string[]): PlayerAverage[] {
