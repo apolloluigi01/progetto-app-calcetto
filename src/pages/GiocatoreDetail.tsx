@@ -7,7 +7,7 @@ import { STAT_CONFIG, type StatKey } from '../lib/statistiche'
 import PlayerCard from '../components/PlayerCard'
 import type { Player } from '../types/database'
 
-const STAT_KEYS: StatKey[] = ['overall', 'marcatori', 'mvp', 'winrate', 'sconfitte', 'mediavoto', 'autogol']
+const STAT_KEYS: StatKey[] = ['overall', 'marcatori', 'assist', 'presenze', 'mvp', 'winrate', 'sconfitte', 'mediavoto', 'autogol']
 
 export default function GiocatoreDetail() {
   const { id } = useParams<{ id: string }>()

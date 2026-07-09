@@ -17,7 +17,7 @@ const PARAMS: ParamDef[] = [
   { key: 'bonusAssist', label: 'Bonus assist', hint: 'Punti per ogni assist', step: '0.5' },
   { key: 'malusAutogol', label: 'Malus autogol', hint: 'Punti (negativi) per ogni autogol', step: '0.5' },
   { key: 'malusPeggiore', label: 'Malus peggior voto', hint: 'Punti (negativi) per il peggior voto in campo', step: '0.5' },
-  { key: 'captainMultiplier', label: 'Moltiplicatore capitano', hint: 'Il punteggio del capitano viene moltiplicato per questo valore', step: '0.1' },
+  { key: 'captainMultiplier', label: 'Moltiplicatore capitano', hint: 'I soli bonus del capitano vengono moltiplicati per questo valore (voto base e malus restano invariati)', step: '0.1' },
 ]
 
 export default function FantaAdmin() {

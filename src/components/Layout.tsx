@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import './layout-fanta.css'
 
@@ -10,6 +10,7 @@ const navItems: NavItem[] = [
   { to: '/giocatori', label: 'Giocatori' },
   { to: '/partite', label: 'Partite' },
   { to: '/statistiche', label: 'Statistiche' },
+  { to: '/ufficio-stampa', label: 'Ufficio Stampa' },
   { to: '/fantacalcetto', label: 'Fantacalcetto', fanta: true },
 ]
 
@@ -27,6 +28,9 @@ function NavLabel({ item, isActive }: { item: NavItem; isActive: boolean }) {
 export default function Layout() {
   const { isAdmin, signOut } = useAuth()
   const [menuOpen, setMenuOpen] = useState(false)
+  const location = useLocation()
+  const navigate = useNavigate()
+  const isHome = location.pathname === '/'
 
   const items = isAdmin
     ? [...navItems, { to: '/admin', label: 'CDA' }, { to: '/impostazioni', label: 'Impostazioni' }]
@@ -45,7 +49,11 @@ export default function Layout() {
         className="hidden md:flex flex-col fixed inset-y-0 left-0 z-40 w-52"
         style={{ background: 'rgba(0,0,0,0.55)' }}
       >
-        <div className="px-5 pt-7 pb-5 flex flex-col items-center gap-2">
+        <Link
+          to="/"
+          className="px-5 pt-7 pb-5 flex flex-col items-center gap-2"
+          title="Torna alla home"
+        >
           <img
             src="/icons/pavone_logo-v2.png"
             alt="Pavone League"
@@ -58,7 +66,7 @@ export default function Layout() {
           >
             PAVONE<br />LEAGUE
           </span>
-        </div>
+        </Link>
 
         <nav className="flex flex-col gap-1 px-4 mt-2">
           {items.map((item) => (
@@ -92,7 +100,7 @@ export default function Layout() {
         className="md:hidden fixed inset-x-0 top-0 z-40 flex items-center justify-between px-4 h-12"
         style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)' }}
       >
-        <div className="flex items-center gap-2">
+        <Link to="/" onClick={() => setMenuOpen(false)} className="flex items-center gap-2" title="Torna alla home">
           <img
             src="/icons/pavone_logo-v2.png"
             alt=""
@@ -102,7 +110,7 @@ export default function Layout() {
           <span className="text-sm font-black tracking-tight" style={{ color: '#a8d5a2', letterSpacing: '-0.01em' }}>
             PAVONE LEAGUE
           </span>
-        </div>
+        </Link>
         <button
           onClick={() => setMenuOpen(!menuOpen)}
           className="flex flex-col justify-center gap-1.5 w-7 h-7 focus:outline-none"
@@ -166,6 +174,17 @@ export default function Layout() {
 
       {/* Contenuto principale */}
       <main className="flex-1 md:ml-52 pt-12 md:pt-0 min-h-svh bg-gray-50">
+        {/* Tasto "indietro" globale, su ogni schermata tranne la home */}
+        {!isHome && (
+          <div className="px-4 pt-3">
+            <button
+              onClick={() => navigate(-1)}
+              className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-600 shadow-sm hover:bg-gray-100"
+            >
+              ← Indietro
+            </button>
+          </div>
+        )}
         <Outlet />
       </main>
     </div>

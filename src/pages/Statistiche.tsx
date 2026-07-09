@@ -4,9 +4,10 @@ import { useAuth } from '../contexts/AuthContext'
 import { useStatistiche } from '../hooks/useStatistiche'
 import { STAT_CONFIG, getRanking, playerFullName, type StatKey } from '../lib/statistiche'
 
-const STAT_KEYS: StatKey[] = ['overall', 'marcatori', 'mvp', 'winrate', 'sconfitte', 'mediavoto', 'autogol']
-const TOP_STAT_KEYS: StatKey[] = ['overall', 'marcatori', 'mvp']
-const BOTTOM_STAT_KEYS: StatKey[] = ['winrate', 'sconfitte', 'mediavoto']
+const STAT_KEYS: StatKey[] = ['overall', 'marcatori', 'assist', 'presenze', 'mvp', 'winrate', 'sconfitte', 'mediavoto', 'autogol']
+const TOP_STAT_KEYS: StatKey[] = ['overall', 'format', 'marcatori']
+const BOTTOM_STAT_KEYS: StatKey[] = ['assist', 'presenze', 'mvp']
+const THIRD_STAT_KEYS: StatKey[] = ['winrate', 'sconfitte', 'mediavoto']
 
 function StatPreviewCard({ statKey, stats }: { statKey: StatKey; stats: ReturnType<typeof useStatistiche>['stats'] }) {
   const config = STAT_CONFIG[statKey]
@@ -107,6 +108,11 @@ export default function Statistiche() {
               </div>
               <div className="mt-2 grid grid-cols-3 gap-2">
                 {BOTTOM_STAT_KEYS.map((key) => (
+                  <StatPreviewCard key={key} statKey={key} stats={stats} />
+                ))}
+              </div>
+              <div className="mt-2 grid grid-cols-3 gap-2">
+                {THIRD_STAT_KEYS.map((key) => (
                   <StatPreviewCard key={key} statKey={key} stats={stats} />
                 ))}
               </div>

@@ -22,6 +22,9 @@ export default function StatisticaDettaglio() {
       if (sortCol === 'name') cmp = a.stats.player.name.localeCompare(b.stats.player.name)
       else if (sortCol === 'extra' && config.extraColumn) {
         cmp = parseFloat(config.extraColumn.getValue(a.stats)) - parseFloat(config.extraColumn.getValue(b.stats))
+      } else if (config.compare) {
+        // Classifica a criteri multipli: il "valore" segue l'ordine della classifica
+        cmp = -config.compare(a.stats, b.stats)
       } else cmp = a.value - b.value
       return sortDir === 'asc' ? cmp : -cmp
     })

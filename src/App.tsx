@@ -32,6 +32,7 @@ import Fantacalcetto from './pages/Fantacalcetto'
 import FantaLega from './pages/FantaLega'
 import FantaFormazione from './pages/FantaFormazione'
 import RegistroAttivita from './pages/RegistroAttivita'
+import UfficioStampa from './pages/UfficioStampa'
 
 function App() {
   return (
@@ -56,6 +57,7 @@ function App() {
               <Route path="/statistiche/elenco" element={<StatisticheElenco />} />
               <Route path="/statistiche/:key" element={<StatisticaDettaglio />} />
               <Route path="/impostazioni" element={<Impostazioni />} />
+              <Route path="/ufficio-stampa" element={<UfficioStampa />} />
               <Route path="/fantacalcetto" element={<Fantacalcetto />} />
               <Route path="/fantacalcetto/:leagueId" element={<FantaLega />} />
               <Route path="/fantacalcetto/:leagueId/partite/:matchId" element={<FantaFormazione />} />

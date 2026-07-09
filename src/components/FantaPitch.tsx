@@ -64,7 +64,7 @@ export default function FantaPitch({ entries, captainId }: FantaPitchProps) {
                 {entry.player.id === captainId && (
                   <span
                     className="absolute -right-1.5 -top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-field-yellow text-xs font-black text-stone-900 shadow ring-2 ring-white"
-                    title="Capitano (bonus ×1.2)"
+                    title="Capitano (i bonus vengono moltiplicati)"
                   >
                     C
                   </span>

@@ -88,7 +88,7 @@ export interface FantaPlayerScore {
   bonus: number
   malus: number
   isCaptain: boolean
-  /** voto + bonus + malus, con moltiplicatore capitano già applicato. */
+  /** voto + bonus + malus; per il capitano i soli bonus sono moltiplicati. */
   total: number
 }
 
@@ -101,8 +101,9 @@ export interface FantaLineupScore {
  * Calcola il punteggio di una formazione per una partita conclusa
  * (richiede pagelle pubblicate), usando i parametri bonus/malus
  * configurati dagli admin. Il malus "peggiore" si applica al peggior
- * voto in campo (in caso di parità a tutti i peggiori); il capitano
- * moltiplica il proprio punteggio finale per il moltiplicatore.
+ * voto in campo (in caso di parità a tutti i peggiori); per il capitano
+ * il moltiplicatore si applica solo alla somma dei bonus (non al voto
+ * base né ai malus): senza bonus, il moltiplicatore non ha effetto.
  */
 export function computeLineupScore(
   lineupPlayerIds: string[],
@@ -137,8 +138,8 @@ export function computeLineupScore(
     if (worstVote !== null && voto !== null && voto === worstVote) malus += settings.malusPeggiore
 
     const isCaptain = playerId === captainId
-    const raw = (voto ?? 0) + bonus + malus
-    const total = isCaptain ? raw * settings.captainMultiplier : raw
+    const effectiveBonus = isCaptain ? bonus * settings.captainMultiplier : bonus
+    const total = (voto ?? 0) + effectiveBonus + malus
 
     return { playerId, voto, bonus, malus, isCaptain, total: Math.round(total * 100) / 100 }
   })

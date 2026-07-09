@@ -128,7 +128,7 @@ export default function Home() {
                           )}
                         </div>
                         {lastMatch.result && (
-                          <p className="self-center whitespace-nowrap text-3xl font-extrabold text-field-green-dark">
+                          <p className="self-center whitespace-nowrap text-4xl font-extrabold text-field-green-dark">
                             {lastMatch.result.score_a} - {lastMatch.result.score_b}
                           </p>
                         )}
@@ -152,7 +152,7 @@ export default function Home() {
                   })()
                 ) : (
                   lastMatch.result && (
-                    <p className="mt-1 text-center text-4xl font-extrabold text-field-green-dark">
+                    <p className="mt-1 text-center text-5xl font-extrabold text-field-green-dark">
                       {lastMatch.result.score_a} - {lastMatch.result.score_b}
                     </p>
                   )
@@ -202,7 +202,7 @@ export default function Home() {
               to="/statistiche/marcatori"
               className="flex items-center justify-between border-b border-gray-200 px-4 py-3 hover:bg-gray-50"
             >
-              <h2 className="font-medium text-field-green-dark">Migliori marcatori</h2>
+              <h2 className="font-medium text-field-green-dark">Gol</h2>
               <span className="text-xs text-gray-400">Vedi tutte →</span>
             </Link>
             {statsLoading && <p className="p-4 text-sm text-gray-500">Caricamento...</p>}

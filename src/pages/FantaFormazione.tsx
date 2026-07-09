@@ -345,7 +345,7 @@ export default function FantaFormazione() {
         <>
           <p className="mt-1 text-sm text-gray-500">
             Scegli {FANTA_TEAM_SIZE} giocatori con {FANTA_BUDGET} crediti, pescando da entrambe le squadre
-            (almeno 1 per squadra), poi nomina il capitano (bonus ×{settings.captainMultiplier}).
+            (almeno 1 per squadra), poi nomina il capitano (i suoi bonus valgono ×{settings.captainMultiplier}).
           </p>
           {deadline && (
             <p className="mt-2 rounded-lg bg-field-yellow/15 px-3 py-2 text-xs font-medium text-field-orange">
@@ -396,6 +396,7 @@ export default function FantaFormazione() {
       {selected.size > 0 && (
         <div className="mt-4 rounded-xl bg-white p-3 shadow">
           <h3 className="font-medium text-field-green-dark">Capitano (bonus ×{settings.captainMultiplier})</h3>
+          <p className="mt-0.5 text-xs text-gray-400">Il moltiplicatore si applica solo ai bonus, non al voto base.</p>
           <div className="mt-2 flex flex-wrap gap-2">
             {[...selected].map((pid) => (
               <button
@@ -487,9 +488,13 @@ export default function FantaFormazione() {
                 </span>
                 <span className="text-xs text-gray-500">
                   voto {p.voto ?? '-'}
-                  {p.bonus > 0 && <span className="text-field-green-dark"> +{p.bonus}</span>}
+                  {p.bonus > 0 && (
+                    <span className="text-field-green-dark">
+                      {' '}+{p.bonus}
+                      {p.isCaptain && `×${settings.captainMultiplier}`}
+                    </span>
+                  )}
                   {p.malus < 0 && <span className="text-red-500"> {p.malus}</span>}
-                  {p.isCaptain && ` ×${settings.captainMultiplier}`}
                   <span className="ml-2 font-bold text-gray-800">{formatFantaPoints(p.total)}</span>
                 </span>
               </li>

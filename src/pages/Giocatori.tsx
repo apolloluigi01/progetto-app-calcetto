@@ -16,7 +16,16 @@ export default function Giocatori() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [reloadToken, setReloadToken] = useState(0)
+  const [search, setSearch] = useState('')
   const { overalls } = useOveralls()
+
+  const query = search.trim().toLowerCase()
+  const filtered = query
+    ? players.filter((p) =>
+        [p.name, p.surname ?? '', p.nickname ?? '', `${p.name} ${p.surname ?? ''}`]
+          .some((v) => v.toLowerCase().includes(query))
+      )
+    : players
 
   useEffect(() => {
     setLoading(true)
@@ -34,7 +43,17 @@ export default function Giocatori() {
 
   return (
     <div className="p-4">
-      <h1 className="text-xl font-semibold text-field-green-dark">Giocatori</h1>
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-xl font-semibold text-field-green-dark">Giocatori</h1>
+        <input
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="🔍 Cerca giocatore..."
+          aria-label="Cerca giocatore per nome, cognome o nickname"
+          className="w-44 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm focus:border-field-green focus:outline-none sm:w-64"
+        />
+      </div>
 
       <div className="mt-4 space-y-2">
         {loading && <p className="text-sm text-gray-500">Caricamento...</p>}
@@ -42,7 +61,10 @@ export default function Giocatori() {
         {!loading && !error && players.length === 0 && (
           <p className="text-sm text-gray-500">Nessun giocatore registrato.</p>
         )}
-        {players.map((p) => (
+        {!loading && !error && players.length > 0 && filtered.length === 0 && (
+          <p className="text-sm text-gray-500">Nessun giocatore corrisponde alla ricerca "{search}".</p>
+        )}
+        {filtered.map((p) => (
           <Link
             key={p.id}
             to={`/giocatori/${p.id}`}

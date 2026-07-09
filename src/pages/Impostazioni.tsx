@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { validatePassword } from '../lib/passwordPolicy'
+import { COUNTRIES } from '../lib/countries'
+import type { PlayingPosition } from '../types/database'
 
 const roleLabels: Record<string, string> = {
   superadmin: 'Superadmin',
@@ -24,6 +26,13 @@ export default function Impostazioni() {
   const [nickname, setNickname] = useState(player?.nickname ?? '')
   const [nicknameError, setNicknameError] = useState<string | null>(null)
   const [savingNickname, setSavingNickname] = useState(false)
+
+  const [nationality, setNationality] = useState(player?.nationality ?? '')
+  const [position, setPosition] = useState<PlayingPosition | ''>(player?.position ?? '')
+  const [jerseyNumber, setJerseyNumber] = useState(player?.jersey_number ? String(player.jersey_number) : '')
+  const [cardError, setCardError] = useState<string | null>(null)
+  const [savingCard, setSavingCard] = useState(false)
+  const [cardSaved, setCardSaved] = useState(false)
 
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
@@ -98,6 +107,33 @@ export default function Impostazioni() {
 
     await refreshPlayer()
     setEditingNickname(false)
+  }
+
+  async function handleSaveCard(e: FormEvent) {
+    e.preventDefault()
+    setCardError(null)
+    setCardSaved(false)
+
+    const parsedJersey = jerseyNumber.trim() === '' ? null : Number(jerseyNumber)
+    if (parsedJersey !== null && (!Number.isInteger(parsedJersey) || parsedJersey < 1 || parsedJersey > 99)) {
+      setCardError('Il numero di maglia deve essere un intero tra 1 e 99.')
+      return
+    }
+
+    setSavingCard(true)
+    const { error: rpcError } = await supabase.rpc('update_own_card', {
+      new_nationality: nationality || null,
+      new_position: position || null,
+      new_jersey_number: parsedJersey,
+    })
+    setSavingCard(false)
+    if (rpcError) {
+      setCardError(rpcError.message)
+      return
+    }
+
+    await refreshPlayer()
+    setCardSaved(true)
   }
 
   async function handleChangePassword(e: FormEvent) {
@@ -218,6 +254,78 @@ export default function Impostazioni() {
           {session?.user.email && <p className="mt-1 text-sm text-gray-500">{session.user.email}</p>}
           <p className="mt-2 text-xs uppercase text-field-green">{roleLabels[player.role] ?? player.role}</p>
         </div>
+      )}
+
+      {player && (
+        <form onSubmit={handleSaveCard} className="mt-4 rounded-xl bg-white p-4 shadow">
+          <h2 className="font-medium text-gray-800">Carta giocatore</h2>
+          <p className="mt-1 text-xs text-gray-500">
+            Nazionalità, ruolo di gioco e numero di maglia mostrati sulla tua carta.
+          </p>
+
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Nazionalità</label>
+              <select
+                value={nationality}
+                onChange={(e) => {
+                  setCardSaved(false)
+                  setNationality(e.target.value)
+                }}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-field-green focus:outline-none"
+              >
+                <option value="">-</option>
+                {COUNTRIES.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Ruolo di gioco</label>
+              <select
+                value={position}
+                onChange={(e) => {
+                  setCardSaved(false)
+                  setPosition(e.target.value as PlayingPosition | '')
+                }}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-field-green focus:outline-none"
+              >
+                <option value="">-</option>
+                <option value="POR">Portiere (POR)</option>
+                <option value="DIF">Difensore (DIF)</option>
+                <option value="CEN">Centrocampista (CEN)</option>
+                <option value="ATT">Attaccante (ATT)</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Numero maglia</label>
+              <input
+                type="number"
+                min={1}
+                max={99}
+                value={jerseyNumber}
+                onChange={(e) => {
+                  setCardSaved(false)
+                  setJerseyNumber(e.target.value)
+                }}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-field-green focus:outline-none"
+              />
+            </div>
+          </div>
+
+          {cardError && <p className="mt-2 text-sm text-red-600">{cardError}</p>}
+          {cardSaved && <p className="mt-2 text-sm text-green-700">✓ Carta giocatore aggiornata.</p>}
+
+          <button
+            type="submit"
+            disabled={savingCard}
+            className="mt-3 w-full rounded-lg bg-field-green px-4 py-2 text-sm font-medium text-white hover:bg-field-green-dark disabled:opacity-60"
+          >
+            {savingCard ? 'Salvataggio...' : 'Salva carta giocatore'}
+          </button>
+        </form>
       )}
 
       <div className="mt-4 rounded-xl bg-white p-4 shadow">

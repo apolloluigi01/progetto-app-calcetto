@@ -8,6 +8,7 @@ export interface PlayerStats {
   pareggi: number
   sconfitte: number
   golFatti: number
+  assist: number
   autogol: number
   mvp: number
   voteAvg: number | null
@@ -46,12 +47,13 @@ export async function computeStatistiche(seasonId: string): Promise<PlayerStats[
     dateByMatch.set(m.id, m.match_date)
   }
 
-  const [matchPlayersRes, goalsRes, pagelleRes] = await Promise.all([
+  const [matchPlayersRes, goalsRes, assistsRes, pagelleRes] = await Promise.all([
     supabase
       .from('match_players')
       .select('match_id, player_id, team, players(*)')
       .in('match_id', matchIds),
     supabase.from('goals').select('match_id, player_id, is_own_goal').in('match_id', matchIds),
+    supabase.from('assists').select('match_id, player_id').in('match_id', matchIds),
     supabase
       .from('pagelle')
       .select('match_id, player_id, voto, is_mvp')
@@ -71,6 +73,7 @@ export async function computeStatistiche(seasonId: string): Promise<PlayerStats[
       pareggi: 0,
       sconfitte: 0,
       golFatti: 0,
+      assist: 0,
       autogol: 0,
       mvp: 0,
       voteAvg: null,
@@ -124,6 +127,11 @@ export async function computeStatistiche(seasonId: string): Promise<PlayerStats[
     else stats.golFatti += 1
   }
 
+  for (const a of assistsRes.data ?? []) {
+    const stats = statsByPlayer.get(a.player_id)
+    if (stats) stats.assist += 1
+  }
+
   const voteSums = new Map<string, number>()
   for (const p of pagelleRes.data ?? []) {
     const stats = statsByPlayer.get(p.player_id)
@@ -145,7 +153,17 @@ export async function computeStatistiche(seasonId: string): Promise<PlayerStats[
   return [...statsByPlayer.values()]
 }
 
-export type StatKey = 'overall' | 'marcatori' | 'mvp' | 'winrate' | 'sconfitte' | 'mediavoto' | 'autogol'
+export type StatKey =
+  | 'overall'
+  | 'format'
+  | 'marcatori'
+  | 'assist'
+  | 'presenze'
+  | 'mvp'
+  | 'winrate'
+  | 'sconfitte'
+  | 'mediavoto'
+  | 'autogol'
 
 interface StatConfig {
   title: string
@@ -156,6 +174,33 @@ interface StatConfig {
   getValue: (p: PlayerStats) => number | null
   formatValue: (value: number) => string
   extraColumn?: { label: string; getValue: (p: PlayerStats) => string }
+  /** Ordinamento personalizzato (es. classifica a criteri multipli): se presente, prevale su sortDir. */
+  compare?: (a: PlayerStats, b: PlayerStats) => number
+}
+
+export const FORMAT_MIN_PRESENZE = 20
+
+/**
+ * Classifica Format: criteri in ordine di importanza.
+ * 1. Almeno 20 presenze stagionali (chi le raggiunge sta sopra)
+ * 2. Media voto (NON fantavoto)  3. Gol fatti  4. % vittorie
+ * 5. Numero vittorie  6. Numero MVP  7. Assist fatti
+ */
+export function compareFormat(a: PlayerStats, b: PlayerStats): number {
+  const criteria: ((p: PlayerStats) => number)[] = [
+    (p) => (p.partiteGiocate >= FORMAT_MIN_PRESENZE ? 1 : 0),
+    (p) => p.voteAvg ?? 0,
+    (p) => p.golFatti,
+    (p) => (p.partiteGiocate > 0 ? p.vittorie / p.partiteGiocate : 0),
+    (p) => p.vittorie,
+    (p) => p.mvp,
+    (p) => p.assist,
+  ]
+  for (const get of criteria) {
+    const diff = get(b) - get(a)
+    if (diff !== 0) return diff
+  }
+  return 0
 }
 
 export const STAT_CONFIG: Record<StatKey, StatConfig> = {
@@ -168,13 +213,43 @@ export const STAT_CONFIG: Record<StatKey, StatConfig> = {
     getValue: (p) => p.overall,
     formatValue: (v) => String(v),
   },
+  format: {
+    title: 'Classifica Format',
+    description:
+      'Classifica complessiva del format: almeno 20 presenze stagionali, poi media voto, gol fatti, % vittorie, vittorie, MVP e assist',
+    color: 'green',
+    sortDir: 'desc',
+    unit: '',
+    getValue: (p) => (p.voteCount > 0 ? p.voteAvg : p.partiteGiocate > 0 ? 0 : null),
+    formatValue: (v) => v.toFixed(2),
+    extraColumn: { label: 'Presenze', getValue: (p) => String(p.partiteGiocate) },
+    compare: compareFormat,
+  },
   marcatori: {
-    title: 'Migliori Marcatori',
+    title: 'Gol',
     description: 'Numero di gol segnati in stagione (esclusi gli autogol)',
     color: 'green',
     sortDir: 'desc',
     unit: 'gol',
     getValue: (p) => p.golFatti,
+    formatValue: (v) => String(v),
+  },
+  assist: {
+    title: 'Assist',
+    description: 'Numero di assist serviti in stagione',
+    color: 'green',
+    sortDir: 'desc',
+    unit: 'assist',
+    getValue: (p) => p.assist,
+    formatValue: (v) => String(v),
+  },
+  presenze: {
+    title: 'Presenze',
+    description: 'Numero di partite giocate in stagione',
+    color: 'green',
+    sortDir: 'desc',
+    unit: 'presenze',
+    getValue: (p) => p.partiteGiocate,
     formatValue: (v) => String(v),
   },
   mvp: {
@@ -236,6 +311,10 @@ export function getRanking(stats: PlayerStats[], key: StatKey): RankedEntry[] {
     .map((s) => ({ stats: s, value: config.getValue(s) }))
     .filter((e): e is RankedEntry => e.value !== null)
 
-  entries.sort((a, b) => (config.sortDir === 'desc' ? b.value - a.value : a.value - b.value))
+  if (config.compare) {
+    entries.sort((a, b) => config.compare!(a.stats, b.stats))
+  } else {
+    entries.sort((a, b) => (config.sortDir === 'desc' ? b.value - a.value : a.value - b.value))
+  }
   return entries
 }
