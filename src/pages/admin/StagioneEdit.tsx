@@ -5,7 +5,7 @@ import type { Season } from '../../types/database'
 
 export default function StagioneEdit() {
   const { id } = useParams<{ id: string }>()
-  const isNew = id === 'nuova'
+  const isNew = !id || id === 'nuova'
   const navigate = useNavigate()
 
   const [name, setName] = useState('')
