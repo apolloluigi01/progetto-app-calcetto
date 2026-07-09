@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { supabase } from '../lib/supabase'
+import { getCurrentSeason } from '../lib/seasons'
 import type { Season } from '../types/database'
 
 export function useCurrentSeason() {
@@ -8,15 +8,13 @@ export function useCurrentSeason() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    supabase
-      .from('seasons')
-      .select('*')
-      .order('start_date', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-      .then(({ data, error }) => {
-        if (error) setError(error.message)
-        setSeason(data as Season | null)
+    getCurrentSeason()
+      .then((data) => {
+        setSeason(data)
+        setLoading(false)
+      })
+      .catch((e) => {
+        setError(e instanceof Error ? e.message : 'Errore caricamento stagione')
         setLoading(false)
       })
   }, [])

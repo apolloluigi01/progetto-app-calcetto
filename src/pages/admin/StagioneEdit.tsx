@@ -52,8 +52,34 @@ export default function StagioneEdit() {
       setError('Nome e data di inizio sono obbligatori.')
       return
     }
+    if (endDate && endDate < startDate) {
+      setError('La data di fine deve essere uguale o successiva alla data di inizio.')
+      return
+    }
     setSaving(true)
     setError(null)
+
+    // Nessuna sovrapposizione tra i range di date delle stagioni
+    // (end_date nullo = stagione aperta, si estende all'infinito).
+    const { data: existing, error: existingError } = await supabase
+      .from('seasons')
+      .select('id, name, start_date, end_date')
+    if (existingError) {
+      setSaving(false)
+      setError(existingError.message)
+      return
+    }
+    const newEnd = endDate || '9999-12-31'
+    const conflict = (existing ?? []).find(
+      (s) => s.id !== id && s.start_date <= newEnd && (s.end_date ?? '9999-12-31') >= startDate
+    )
+    if (conflict) {
+      setSaving(false)
+      setError(
+        `Le date si sovrappongono con la stagione "${conflict.name}" (${conflict.start_date} → ${conflict.end_date ?? 'in corso'}). Modifica il range di date.`
+      )
+      return
+    }
 
     const payload = { name: name.trim(), start_date: startDate, end_date: endDate || null }
 
@@ -124,7 +150,7 @@ export default function StagioneEdit() {
             className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-field-green focus:outline-none"
           />
           <p className="mt-1 text-xs text-gray-400">
-            Lascia vuoto se la stagione è ancora in corso. La stagione senza data di fine più recente sarà considerata quella corrente.
+            Lascia vuoto se la stagione non ha ancora una fine definita. La stagione corrente è quella il cui intervallo di date include la data odierna; le stagioni con inizio futuro risultano programmate, quelle con fine passata concluse.
           </p>
         </div>
 

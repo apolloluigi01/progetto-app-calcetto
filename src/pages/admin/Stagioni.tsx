@@ -2,7 +2,14 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import ErrorNotice from '../../components/ErrorNotice'
+import { getSeasonStatus, type SeasonStatus } from '../../lib/seasons'
 import type { Season } from '../../types/database'
+
+const STATUS_BADGE: Record<SeasonStatus, { label: string; className: string }> = {
+  corrente: { label: 'Corrente', className: 'bg-field-green/10 text-field-green-dark' },
+  conclusa: { label: 'Conclusa', className: 'bg-gray-100 text-gray-500' },
+  programmata: { label: 'Programmata', className: 'bg-field-yellow/20 text-field-orange' },
+}
 
 export default function Stagioni() {
   const [seasons, setSeasons] = useState<Season[]>([])
@@ -53,8 +60,6 @@ export default function Stagioni() {
     load()
   }, [reloadToken])
 
-  const currentSeason = seasons[0]
-
   function formatDate(d: string) {
     return new Date(d).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })
   }
@@ -93,7 +98,7 @@ export default function Stagioni() {
 
       <div className="mt-4 space-y-2">
         {seasons.map((s) => {
-          const isCurrent = s.id === currentSeason?.id
+          const badge = STATUS_BADGE[getSeasonStatus(s)]
           const count = matchCounts[s.id] ?? 0
           return (
             <Link
@@ -104,16 +109,9 @@ export default function Stagioni() {
               <div>
                 <div className="flex items-center gap-2">
                   <span className="font-semibold text-gray-800">{s.name}</span>
-                  {isCurrent && (
-                    <span className="rounded-full bg-field-green/10 px-2 py-0.5 text-[11px] font-semibold text-field-green-dark">
-                      Corrente
-                    </span>
-                  )}
-                  {s.end_date && (
-                    <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-500">
-                      Chiusa
-                    </span>
-                  )}
+                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${badge.className}`}>
+                    {badge.label}
+                  </span>
                 </div>
                 <p className="mt-0.5 text-xs text-gray-500">
                   {formatDate(s.start_date)}

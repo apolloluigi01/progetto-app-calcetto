@@ -5,7 +5,7 @@ import { useMatchDetail } from '../../hooks/useMatchDetail'
 import { useMatchBookings } from '../../hooks/useMatchBookings'
 import { useMatchVoting } from '../../hooks/useMatchVoting'
 import { getKnownFields } from '../../lib/fields'
-import { getSeasonIdForDate } from '../../lib/seasons'
+import { findSeasonForDate } from '../../lib/seasons'
 import { logActivity } from '../../lib/activityLog'
 import { computeOverallsForPlayers, generateBalancedTeams } from '../../lib/teamGeneration'
 import { formatVote } from '../../lib/voting'
@@ -147,14 +147,22 @@ export default function MatchEdit() {
     setInfoError(null)
     setSavingInfo(true)
 
-    const seasonId = await getSeasonIdForDate(matchDate)
-    if (!seasonId) {
+    const season = await findSeasonForDate(matchDate)
+    if (!season) {
       setSavingInfo(false)
       setInfoError(
         'Nessuna stagione copre questa data. Crea o estendi una stagione che includa questa data prima di salvare.'
       )
       return
     }
+    if (season.status === 'conclusa') {
+      setSavingInfo(false)
+      setInfoError(
+        'La stagione che copre questa data è già conclusa: non è possibile spostare partite al suo interno.'
+      )
+      return
+    }
+    const seasonId = season.id
 
     await supabase
       .from('matches')
