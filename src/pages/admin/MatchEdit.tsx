@@ -83,6 +83,18 @@ export default function MatchEdit() {
   // Ricalcolo squadre con gli overall/fasce correnti (solo in bozza)
   const [recalculating, setRecalculating] = useState(false)
 
+  // Nuove squadre (da ricalcolo o sostituzione) in attesa del salvataggio
+  // esplicito: nulla viene scritto sul DB finché l'admin non preme "Salva".
+  interface PendingTeams {
+    teamA: PlayerOverall[]
+    teamB: PlayerOverall[]
+    action: 'squadre_ricalcolate' | 'giocatore_sostituito'
+    logDetails: Record<string, unknown>
+    description: string
+  }
+  const [pendingTeams, setPendingTeams] = useState<PendingTeams | null>(null)
+  const [savingPendingTeams, setSavingPendingTeams] = useState(false)
+
   // Sostituzione giocatore (solo finché la partita è in bozza)
   const [substitutingOpen, setSubstitutingOpen] = useState(false)
   const [subOutId, setSubOutId] = useState('')
@@ -479,14 +491,9 @@ export default function MatchEdit() {
   }
 
   // --- Ricalcolo squadre (dopo modifiche a overall o range fasce) ---
+  // Calcola soltanto l'anteprima: il DB viene aggiornato solo con "Salva squadre".
   async function handleRecalculateTeams() {
     if (!id || matchPlayers.length === 0) return
-    if (
-      !confirm(
-        'Ricalcolare le squadre? Gli stessi giocatori verranno ridistribuiti tra le squadre A e B in base agli overall attuali.'
-      )
-    )
-      return
     setRecalculating(true)
 
     const overalls = await computeOverallsForPlayers(
@@ -494,22 +501,36 @@ export default function MatchEdit() {
     )
     const result = generateBalancedTeams(overalls)
 
+    setPendingTeams({
+      teamA: result.teamA,
+      teamB: result.teamB,
+      action: 'squadre_ricalcolate',
+      logDetails: { avgA: result.avgA, avgB: result.avgB, diff: result.diff },
+      description: 'Squadre ricalcolate con gli overall e le fasce attuali.',
+    })
+    setRecalculating(false)
+  }
+
+  // Salvataggio esplicito delle nuove squadre (ricalcolo o sostituzione).
+  async function handleSavePendingTeams() {
+    if (!id || !pendingTeams) return
+    setSavingPendingTeams(true)
+
     await supabase.from('match_players').delete().eq('match_id', id)
     const rows = [
-      ...result.teamA.map((p) => ({ match_id: id, player_id: p.playerId, team: 'A' as Team })),
-      ...result.teamB.map((p) => ({ match_id: id, player_id: p.playerId, team: 'B' as Team })),
+      ...pendingTeams.teamA.map((p) => ({ match_id: id, player_id: p.playerId, team: 'A' as Team })),
+      ...pendingTeams.teamB.map((p) => ({ match_id: id, player_id: p.playerId, team: 'B' as Team })),
     ]
     await supabase.from('match_players').insert(rows)
 
-    logActivity('squadre_ricalcolate', {
+    logActivity(pendingTeams.action, {
       matchId: id,
       data: match.match_date,
-      avgA: result.avgA,
-      avgB: result.avgB,
-      diff: result.diff,
+      ...pendingTeams.logDetails,
     })
 
-    setRecalculating(false)
+    setSavingPendingTeams(false)
+    setPendingTeams(null)
     refetch()
   }
 
@@ -524,6 +545,8 @@ export default function MatchEdit() {
     setSubstitutingOpen(false)
   }
 
+  // Prepara solo l'anteprima delle squadre con il sostituto: il DB viene
+  // aggiornato solo con "Salva squadre".
   async function handleConfirmSubstitute() {
     if (!id || !subOutId || !subInId) return
     setSubstituting(true)
@@ -540,23 +563,16 @@ export default function MatchEdit() {
     const overalls = await computeOverallsForPlayers(roster)
     const result = generateBalancedTeams(overalls)
 
-    await supabase.from('match_players').delete().eq('match_id', id)
-    const rows = [
-      ...result.teamA.map((p) => ({ match_id: id, player_id: p.playerId, team: 'A' as Team })),
-      ...result.teamB.map((p) => ({ match_id: id, player_id: p.playerId, team: 'B' as Team })),
-    ]
-    await supabase.from('match_players').insert(rows)
-
-    logActivity('giocatore_sostituito', {
-      matchId: id,
-      data: match.match_date,
-      uscito: outPlayer?.name,
-      entrato: inPlayer?.name,
+    setPendingTeams({
+      teamA: result.teamA,
+      teamB: result.teamB,
+      action: 'giocatore_sostituito',
+      logDetails: { uscito: outPlayer ? fullName(outPlayer) : undefined, entrato: inPlayer ? fullName(inPlayer) : undefined },
+      description: `Sostituzione: ${outPlayer ? fullName(outPlayer) : '?'} esce, ${inPlayer ? fullName(inPlayer) : '?'} entra. Squadre rigenerate in base agli overall.`,
     })
 
     setSubstituting(false)
     setSubstitutingOpen(false)
-    refetch()
   }
 
   const bookedNotInMatch = bookings.filter(
@@ -832,8 +848,77 @@ export default function MatchEdit() {
         </div>
       )}
 
+      {/* ===== NUOVE SQUADRE IN ATTESA DI SALVATAGGIO (ricalcolo/sostituzione) ===== */}
+      {matchPlayers.length > 0 && pendingTeams && (
+        <div className="mt-4 rounded-xl border border-field-green/30 bg-field-green/5 p-4">
+          <h2 className="font-semibold text-field-green-dark">Nuove squadre da salvare</h2>
+          <p className="mt-1 text-xs text-gray-600">{pendingTeams.description}</p>
+
+          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="min-w-0 rounded-xl bg-white p-3 shadow">
+              <div className="mb-2 flex items-center justify-between">
+                <h3 className="font-semibold text-field-green-dark">Squadra A</h3>
+                <span className="rounded-full bg-field-green/10 px-2 py-0.5 text-xs font-bold text-field-green-dark">
+                  Overall {avgOverall(pendingTeams.teamA)}
+                </span>
+              </div>
+              <ul className="space-y-1">
+                {pendingTeams.teamA.map((p) => (
+                  <li key={p.playerId} className="flex items-center justify-between gap-1 text-sm">
+                    <PlayerName name={p.name} surname={p.surname} nickname={p.nickname} />
+                    <span className="shrink-0 rounded bg-field-green/10 px-1.5 text-xs font-bold text-field-green-dark">
+                      {p.overall}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="min-w-0 rounded-xl bg-white p-3 shadow">
+              <div className="mb-2 flex items-center justify-between">
+                <h3 className="font-semibold text-field-orange">Squadra B</h3>
+                <span className="rounded-full bg-field-orange/10 px-2 py-0.5 text-xs font-bold text-field-orange">
+                  Overall {avgOverall(pendingTeams.teamB)}
+                </span>
+              </div>
+              <ul className="space-y-1">
+                {pendingTeams.teamB.map((p) => (
+                  <li key={p.playerId} className="flex items-center justify-between gap-1 text-sm">
+                    <PlayerName name={p.name} surname={p.surname} nickname={p.nickname} />
+                    <span className="shrink-0 rounded bg-field-orange/10 px-1.5 text-xs font-bold text-field-orange">
+                      {p.overall}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          <p className="mt-2 text-center text-xs text-gray-500">
+            Differenza overall: {Math.abs(avgOverall(pendingTeams.teamA) - avgOverall(pendingTeams.teamB))} punto/i
+            — le squadre attuali restano valide finché non salvi.
+          </p>
+
+          <div className="mt-3 flex gap-2">
+            <button
+              onClick={() => setPendingTeams(null)}
+              disabled={savingPendingTeams}
+              className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            >
+              Annulla
+            </button>
+            <button
+              onClick={handleSavePendingTeams}
+              disabled={savingPendingTeams}
+              className="flex-1 rounded-lg bg-field-green px-3 py-2 text-sm font-medium text-white hover:bg-field-green-dark disabled:opacity-50"
+            >
+              {savingPendingTeams ? 'Salvataggio...' : '💾 Salva squadre'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ===== SQUADRE (già assegnate) ===== */}
-      {matchPlayers.length > 0 && !editingTeams && !substitutingOpen && (
+      {matchPlayers.length > 0 && !editingTeams && !substitutingOpen && !pendingTeams && (
         <div className="mt-4">
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-xl bg-white p-3 shadow">
