@@ -5,6 +5,8 @@ import { useAuth } from '../../contexts/AuthContext'
 import { getFunctionErrorMessage } from '../../lib/functionErrors'
 import { logActivity, type FieldChange } from '../../lib/activityLog'
 import { COUNTRIES } from '../../lib/countries'
+import { useFasce } from '../../hooks/useFasce'
+import { fasciaForOverall, fasciaLabel, rangeForOverall } from '../../lib/fasce'
 import type { Player, PlayerRole, PlayingPosition } from '../../types/database'
 
 type PlayerWithStatus = Player & { email?: string | null; email_confirmed?: boolean }
@@ -13,6 +15,7 @@ export default function GiocatoreEdit() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { session, isAdmin, isSuperAdmin } = useAuth()
+  const { fasce } = useFasce()
 
   const [player, setPlayer] = useState<PlayerWithStatus | null>(null)
   const [loading, setLoading] = useState(true)
@@ -155,7 +158,7 @@ export default function GiocatoreEdit() {
     setOverallSaved(false)
     setOverallError(null)
     const val = Math.min(100, Math.max(1, Math.round(overallValue)))
-    const fascia = val >= 75 ? 'A' : val >= 55 ? 'B' : val >= 35 ? 'C' : 'D'
+    const fascia = fasciaForOverall(val, fasce)
     const { error: upsertError } = await supabase
       .from('ratings')
       .upsert(
@@ -383,7 +386,7 @@ export default function GiocatoreEdit() {
             />
           </div>
           <p className="mt-1 text-xs text-gray-400">
-            Fascia: {overallValue >= 75 ? 'A (top)' : overallValue >= 55 ? 'B' : overallValue >= 35 ? 'C' : 'D (base)'}
+            Fascia: {fasciaLabel(rangeForOverall(overallValue, fasce))} · Carta {rangeForOverall(overallValue, fasce).cardLabel}
           </p>
           {overallSaved && <p className="mt-1 text-xs text-green-700">Overall salvato.</p>}
           {overallError && <p className="mt-1 text-xs text-red-600">{overallError}</p>}

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useStatistiche } from '../hooks/useStatistiche'
+import { useCurrentSeason } from '../hooks/useCurrentSeason'
 import { STAT_CONFIG, getRanking, playerFullName, type RankedEntry, type StatKey } from '../lib/statistiche'
 
 type SortColumn = 'name' | 'extra' | 'value'
@@ -8,6 +9,7 @@ type SortColumn = 'name' | 'extra' | 'value'
 export default function StatisticaDettaglio() {
   const { key } = useParams<{ key: string }>()
   const { stats, loading, error } = useStatistiche()
+  const { season, loading: seasonLoading } = useCurrentSeason()
   const [sortCol, setSortCol] = useState<SortColumn>('value')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
@@ -33,8 +35,24 @@ export default function StatisticaDettaglio() {
   }, [stats, key, sortCol, sortDir])
 
   if (!config) return <div className="p-4 text-sm text-red-600">Statistica non trovata</div>
-  if (loading) return <div className="p-4 text-sm text-gray-500">Caricamento...</div>
+  if (loading || seasonLoading) return <div className="p-4 text-sm text-gray-500">Caricamento...</div>
   if (error) return <div className="p-4 text-sm text-red-600">{error}</div>
+
+  // Nelle stagioni amichevoli la Classifica Format non viene conteggiata.
+  if (key === 'format' && season?.season_type === 'amichevole') {
+    return (
+      <div className="p-4">
+        <Link to="/statistiche" className="text-sm text-field-green underline">
+          ← Torna alle statistiche
+        </Link>
+        <h1 className="mt-2 text-xl font-semibold text-field-green-dark">Classifica Format</h1>
+        <p className="mt-3 rounded-xl bg-white p-4 text-sm text-gray-500 shadow">
+          La stagione corrente è di tipo <strong>Amichevole</strong>: la Classifica Format non viene
+          conteggiata per questa stagione.
+        </p>
+      </div>
+    )
+  }
 
   const isGreen = config.color === 'green'
   const valueColor = isGreen ? 'text-field-green-dark' : 'text-red-600'

@@ -6,6 +6,7 @@ import { useStatistiche } from '../hooks/useStatistiche'
 import { getRanking, playerFullName } from '../lib/statistiche'
 import { describeWeatherCode, getMatchWeather, type WeatherForecast } from '../lib/weather'
 import ErrorNotice from '../components/ErrorNotice'
+import PlayerName from '../components/PlayerName'
 
 function formatDate(date: string) {
   return new Date(date).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })
@@ -120,10 +121,11 @@ export default function Home() {
                             <p className="text-sm text-gray-400">—</p>
                           ) : (
                             goalsA.map((g, i) => (
-                              <p key={i} className="text-sm text-gray-700">
-                                ⚽ {g.nickname ?? g.name}
-                                {g.is_own_goal && <span className="text-xs text-red-500"> (ag)</span>}
-                              </p>
+                              <div key={i} className="mb-1 flex items-start gap-1 text-sm text-gray-700">
+                                <span>⚽</span>
+                                <PlayerName name={g.name} surname={g.surname} nickname={g.nickname} />
+                                {g.is_own_goal && <span className="shrink-0 text-xs text-red-500">(ag)</span>}
+                              </div>
                             ))
                           )}
                         </div>
@@ -140,10 +142,11 @@ export default function Home() {
                             <p className="text-sm text-gray-400">—</p>
                           ) : (
                             goalsB.map((g, i) => (
-                              <p key={i} className="text-sm text-gray-700">
-                                {g.nickname ?? g.name} ⚽
-                                {g.is_own_goal && <span className="text-xs text-red-500"> (ag)</span>}
-                              </p>
+                              <div key={i} className="mb-1 flex items-start justify-end gap-1 text-sm text-gray-700">
+                                {g.is_own_goal && <span className="shrink-0 text-xs text-red-500">(ag)</span>}
+                                <PlayerName name={g.name} surname={g.surname} nickname={g.nickname} />
+                                <span>⚽</span>
+                              </div>
                             ))
                           )}
                         </div>
@@ -176,11 +179,11 @@ export default function Home() {
                     {nextMatch.players.map((p) => (
                       <li
                         key={p.player_id}
-                        className={`rounded-full px-2 py-0.5 text-xs ${
+                        className={`rounded-full px-2 py-0.5 text-center text-xs ${
                           p.team === 'A' ? 'bg-field-green/10 text-field-green-dark' : 'bg-field-orange/10 text-field-orange'
                         }`}
                       >
-                        {p.nickname ?? p.name}
+                        <PlayerName name={p.name} surname={p.surname} nickname={p.nickname} nicknameClassName="text-[10px]" />
                       </li>
                     ))}
                   </ul>

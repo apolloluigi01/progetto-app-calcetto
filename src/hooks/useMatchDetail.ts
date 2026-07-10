@@ -7,6 +7,7 @@ export interface MatchPlayerWithName {
   player_id: string
   team: Team
   name: string
+  surname: string | null
   nickname: string | null
   player: Player | null
 }
@@ -16,6 +17,7 @@ export interface GoalWithName {
   player_id: string
   team: Team
   name: string
+  surname: string | null
   nickname: string | null
   is_own_goal: boolean
 }
@@ -25,6 +27,7 @@ export interface AssistWithName {
   player_id: string
   team: Team
   name: string
+  surname: string | null
   nickname: string | null
 }
 
@@ -32,6 +35,7 @@ export interface PagellaWithName {
   id: string
   player_id: string
   name: string
+  surname: string | null
   nickname: string | null
   voto: string
   titolo: string | null
@@ -65,12 +69,12 @@ export function useMatchDetail(matchId: string | undefined) {
         .from('match_players')
         .select('id, player_id, team, players(*)')
         .eq('match_id', matchId),
-      supabase.from('goals').select('id, player_id, team, is_own_goal, players(name, nickname)').eq('match_id', matchId),
-      supabase.from('assists').select('id, player_id, team, players(name, nickname)').eq('match_id', matchId),
+      supabase.from('goals').select('id, player_id, team, is_own_goal, players(name, surname, nickname)').eq('match_id', matchId),
+      supabase.from('assists').select('id, player_id, team, players(name, surname, nickname)').eq('match_id', matchId),
       supabase.from('match_results').select('*').eq('match_id', matchId).maybeSingle(),
       supabase
         .from('pagelle')
-        .select('id, player_id, voto, titolo, descrizione, is_mvp, published_at, players(name, nickname)')
+        .select('id, player_id, voto, titolo, descrizione, is_mvp, published_at, players(name, surname, nickname)')
         .eq('match_id', matchId),
     ])
 
@@ -80,7 +84,7 @@ export function useMatchDetail(matchId: string | undefined) {
       return
     }
 
-    type PlayerJoin = { players: { name: string; nickname?: string | null } | null }
+    type PlayerJoin = { players: { name: string; surname?: string | null; nickname?: string | null } | null }
     type FullPlayerJoin = { players: Player | null }
 
     setData({
@@ -90,6 +94,7 @@ export function useMatchDetail(matchId: string | undefined) {
         player_id: p.player_id,
         team: p.team,
         name: p.players?.name ?? '',
+        surname: p.players?.surname ?? null,
         nickname: p.players?.nickname ?? null,
         player: p.players ?? null,
       })),
@@ -98,6 +103,7 @@ export function useMatchDetail(matchId: string | undefined) {
         player_id: g.player_id,
         team: g.team,
         name: g.players?.name ?? '',
+        surname: g.players?.surname ?? null,
         nickname: g.players?.nickname ?? null,
         is_own_goal: g.is_own_goal,
       })),
@@ -106,6 +112,7 @@ export function useMatchDetail(matchId: string | undefined) {
         player_id: a.player_id,
         team: a.team,
         name: a.players?.name ?? '',
+        surname: a.players?.surname ?? null,
         nickname: a.players?.nickname ?? null,
       })),
       result: (resultRes.data as MatchResult | null) ?? null,
@@ -113,6 +120,7 @@ export function useMatchDetail(matchId: string | undefined) {
         id: p.id,
         player_id: p.player_id,
         name: p.players?.name ?? '',
+        surname: p.players?.surname ?? null,
         nickname: p.players?.nickname ?? null,
         voto: p.voto,
         titolo: p.titolo,

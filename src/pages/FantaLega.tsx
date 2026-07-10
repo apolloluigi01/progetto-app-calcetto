@@ -5,6 +5,7 @@ import { computeLineupScore, formatFantaPoints, getFantaSettings } from '../lib/
 import { logActivity } from '../lib/activityLog'
 import { supabase } from '../lib/supabase'
 import { useState } from 'react'
+import PlayerName from '../components/PlayerName'
 
 function formatDate(d: string) {
   return new Date(d).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })
@@ -180,8 +181,10 @@ export default function FantaLega() {
                     {i === 0 ? '🏆' : i + 1}
                   </td>
                   <td className="px-2 py-2.5 font-medium text-gray-700">
-                    {s.nickname ?? s.name}
-                    {s.playerId === player?.id && <span className="ml-1 text-xs text-field-green">(tu)</span>}
+                    <span className="flex min-w-0 items-start gap-1">
+                      <PlayerName name={s.name} surname={s.surname} nickname={s.nickname} />
+                      {s.playerId === player?.id && <span className="shrink-0 text-xs text-field-green">(tu)</span>}
+                    </span>
                   </td>
                   <td className="px-2 py-2.5 text-right text-gray-500">{s.matchesScored}</td>
                   <td className="px-4 py-2.5 text-right">

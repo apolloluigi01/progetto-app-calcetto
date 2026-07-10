@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useMatchDetail } from '../hooks/useMatchDetail'
 import { usePlayerRatings } from '../hooks/usePlayerRatings'
 import { useFantaSettings } from '../hooks/useFantaSettings'
+import { useFasce } from '../hooks/useFasce'
 import {
   FANTA_BUDGET,
   FANTA_TEAM_SIZE,
@@ -14,6 +15,7 @@ import {
   lineupDeadline,
 } from '../lib/fantacalcetto'
 import FantaPitch from '../components/FantaPitch'
+import PlayerName, { fullName } from '../components/PlayerName'
 import type { MatchPlayerWithName } from '../hooks/useMatchDetail'
 import type { Player } from '../types/database'
 
@@ -36,6 +38,7 @@ export default function FantaFormazione() {
   const { data, loading, error } = useMatchDetail(matchId)
   const { ratings, loading: ratingsLoading } = usePlayerRatings(data?.matchPlayers.map((mp) => mp.player_id))
   const { settings } = useFantaSettings()
+  const { fasce } = useFasce()
 
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [captainId, setCaptainId] = useState('')
@@ -96,7 +99,7 @@ export default function FantaFormazione() {
       .from('fanta_lineups')
       // Due foreign key verso players (member e capitano): serve il
       // riferimento esplicito per disambiguare l'embed.
-      .select('member_id, captain_id, score, fanta_lineup_players(player_id), member:players!fanta_lineups_member_id_fkey(name, nickname)')
+      .select('member_id, captain_id, score, fanta_lineup_players(player_id), member:players!fanta_lineups_member_id_fkey(name, surname, nickname)')
       .eq('league_id', leagueId)
       .eq('match_id', matchId)
       .neq('member_id', player.id)
@@ -107,12 +110,12 @@ export default function FantaFormazione() {
           captain_id: string
           score: number | null
           fanta_lineup_players: { player_id: string }[]
-          member: { name: string; nickname: string | null } | null
+          member: { name: string; surname: string | null; nickname: string | null } | null
         }
         setOthers(
           ((rows ?? []) as unknown as Row[]).map((r) => ({
             memberId: r.member_id,
-            memberName: r.member?.nickname ?? r.member?.name ?? '?',
+            memberName: r.member ? fullName(r.member) : '?',
             captainId: r.captain_id,
             playerIds: r.fanta_lineup_players.map((p) => p.player_id),
             score: r.score !== null ? Number(r.score) : null,
@@ -180,7 +183,7 @@ export default function FantaFormazione() {
   // o se manca meno di un quarto d'ora al calcio d'inizio.
   const locked = !!result || !isNextMatch || pastDeadline
 
-  const costOf = (playerId: string) => creditCost(ratings.get(playerId) ?? null)
+  const costOf = (playerId: string) => creditCost(ratings.get(playerId) ?? null, fasce)
   const budgetUsed = [...selected].reduce((s, id) => s + costOf(id), 0)
   const countA = teamA.filter((p) => selected.has(p.player_id)).length
   const countB = teamB.filter((p) => selected.has(p.player_id)).length
@@ -265,7 +268,7 @@ export default function FantaFormazione() {
 
   const nameOf = (playerId: string) => {
     const mp = matchPlayers.find((p) => p.player_id === playerId)
-    return mp ? (mp.nickname ?? mp.name) : '?'
+    return mp ? fullName(mp) : '?'
   }
 
   function renderTeam(team: MatchPlayerWithName[], label: string, count: number) {
@@ -295,7 +298,7 @@ export default function FantaFormazione() {
                       : 'border-gray-200 text-gray-700 hover:bg-gray-50 disabled:opacity-40'
                   }`}
                 >
-                  <span className="truncate">{p.nickname ?? p.name}</span>
+                  <PlayerName name={p.name} surname={p.surname} nickname={p.nickname} />
                   <span
                     className={`ml-2 shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${
                       isSelected ? 'bg-field-green text-white' : 'bg-field-yellow/20 text-field-orange'

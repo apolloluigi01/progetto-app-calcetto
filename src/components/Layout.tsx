@@ -10,6 +10,7 @@ const navItems: NavItem[] = [
   { to: '/giocatori', label: 'Giocatori' },
   { to: '/partite', label: 'Partite' },
   { to: '/statistiche', label: 'Statistiche' },
+  { to: '/albo-oro', label: "Albo d'oro" },
   { to: '/ufficio-stampa', label: 'Ufficio Stampa' },
   { to: '/fantacalcetto', label: 'Fantacalcetto', fanta: true },
 ]

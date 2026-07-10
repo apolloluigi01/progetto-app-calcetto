@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useStatistiche } from '../hooks/useStatistiche'
+import { useCurrentSeason } from '../hooks/useCurrentSeason'
 import { STAT_CONFIG, getRanking, playerFullName, type StatKey } from '../lib/statistiche'
 
 const STAT_KEYS: StatKey[] = ['overall', 'marcatori', 'assist', 'presenze', 'mvp', 'winrate', 'sconfitte', 'mediavoto', 'autogol']
@@ -60,7 +61,12 @@ type Tab = 'generali' | 'personali'
 export default function Statistiche() {
   const { player } = useAuth()
   const { stats, loading, error } = useStatistiche()
+  const { season } = useCurrentSeason()
   const [tab, setTab] = useState<Tab>('generali')
+
+  // Nelle stagioni amichevoli la Classifica Format non viene conteggiata.
+  const showFormat = season?.season_type !== 'amichevole'
+  const topKeys = TOP_STAT_KEYS.filter((k) => showFormat || k !== 'format')
 
   const own = player ? stats.find((s) => s.player.id === player.id) ?? null : null
   const winPercentage = own && own.partiteGiocate > 0 ? (own.vittorie / own.partiteGiocate) * 100 : null
@@ -102,7 +108,7 @@ export default function Statistiche() {
           {stats.length > 0 && (
             <>
               <div className="mt-4 grid grid-cols-3 gap-2">
-                {TOP_STAT_KEYS.map((key) => (
+                {topKeys.map((key) => (
                   <StatPreviewCard key={key} statKey={key} stats={stats} />
                 ))}
               </div>

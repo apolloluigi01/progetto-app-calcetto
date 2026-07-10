@@ -112,6 +112,15 @@ export default function Stagioni() {
                   <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${badge.className}`}>
                     {badge.label}
                   </span>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                      s.season_type === 'amichevole'
+                        ? 'bg-blue-100 text-blue-700'
+                        : 'bg-purple-100 text-purple-700'
+                    }`}
+                  >
+                    {s.season_type === 'amichevole' ? 'Amichevole' : 'Format'}
+                  </span>
                 </div>
                 <p className="mt-0.5 text-xs text-gray-500">
                   {formatDate(s.start_date)}

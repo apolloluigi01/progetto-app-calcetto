@@ -18,11 +18,15 @@ export interface Player {
   created_at: string
 }
 
+export type SeasonType = 'amichevole' | 'format'
+
 export interface Season {
   id: string
   name: string
   start_date: string
   end_date: string | null
+  /** 'format': in stagione si calcola anche la classifica format; 'amichevole': no. */
+  season_type: SeasonType
 }
 
 export interface Match {

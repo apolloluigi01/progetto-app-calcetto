@@ -3,6 +3,7 @@ import { supabase } from './supabase'
 export interface PlayerOverall {
   playerId: string
   name: string
+  surname: string | null
   nickname: string | null
   overall: number
 }
@@ -24,7 +25,7 @@ export interface GeneratedTeams {
  * overall); in assenza di un rating salvato si usa 50.
  */
 export async function computeOverallsForPlayers(
-  players: { id: string; name: string; nickname?: string | null }[],
+  players: { id: string; name: string; surname?: string | null; nickname?: string | null }[],
 ): Promise<PlayerOverall[]> {
   if (players.length === 0) return []
 
@@ -37,7 +38,7 @@ export async function computeOverallsForPlayers(
   return players.map((p) => {
     const raw = ratingMap.get(p.id) ?? 50
     const overall = Math.min(100, Math.max(1, Math.round(raw)))
-    return { playerId: p.id, name: p.name, nickname: p.nickname ?? null, overall }
+    return { playerId: p.id, name: p.name, surname: p.surname ?? null, nickname: p.nickname ?? null, overall }
   })
 }
 

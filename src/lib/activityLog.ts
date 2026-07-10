@@ -35,6 +35,8 @@ export type ActivityAction =
   | 'fanta_giornata_calcolata'
   | 'fanta_calcolo_annullato'
   | 'fanta_parametri_modificati'
+  | 'fasce_modificate'
+  | 'squadre_ricalcolate'
 
 export const actionLabels: Record<ActivityAction, string> = {
   giocatore_creato:      'Giocatore creato',
@@ -65,6 +67,8 @@ export const actionLabels: Record<ActivityAction, string> = {
   fanta_giornata_calcolata: 'Giornata fantacalcetto calcolata',
   fanta_calcolo_annullato:  'Calcolo giornata fantacalcetto annullato',
   fanta_parametri_modificati: 'Parametri fantacalcetto modificati',
+  fasce_modificate:      'Range fasce/carte modificati',
+  squadre_ricalcolate:   'Squadre ricalcolate',
 }
 
 export async function logActivity(

@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { parseVoto } from './statistiche'
+import { DEFAULT_FASCE, rangeForOverall, type FasciaRange } from './fasce'
 
 export const FANTA_BUDGET = 15
 export const FANTA_TEAM_SIZE = 5
@@ -56,21 +57,13 @@ export function lineupDeadline(matchDate: string, matchTime: string | null): Dat
 }
 
 /**
- * Costo in crediti di un giocatore, in base all'overall (stessa griglia
- * delle fasce/carte):
- *   0-34   -> 1 credito (fascia D / bronzo)
- *   35-55  -> 2 crediti (fascia C / argento)
- *   56-74  -> 3 crediti (fascia B / oro)
- *   75-89  -> 4 crediti (fascia A / speciale)
- *   90-100 -> 5 crediti (fascia A / competizione)
+ * Costo in crediti di un giocatore, in base all'overall e alla stessa
+ * griglia delle fasce/carte (configurabile dal CDA -> Gestione Fasce):
+ * 1 credito per la fascia più bassa (bronzo), fino a 5 per la più alta (viola).
  */
-export function creditCost(overall: number | null): number {
-  const v = overall ?? 0
-  if (v >= 90) return 5
-  if (v >= 75) return 4
-  if (v >= 56) return 3
-  if (v >= 35) return 2
-  return 1
+export function creditCost(overall: number | null, fasce: FasciaRange[] = DEFAULT_FASCE): number {
+  const range = rangeForOverall(overall, fasce)
+  return fasce.indexOf(range) + 1
 }
 
 export interface FantaMatchInput {

@@ -122,7 +122,18 @@ export default function StagioneDettaglio() {
 
       <div className="mt-2 flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-field-green-dark">{season.name}</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-semibold text-field-green-dark">{season.name}</h1>
+            <span
+              className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                season.season_type === 'amichevole'
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'bg-purple-100 text-purple-700'
+              }`}
+            >
+              {season.season_type === 'amichevole' ? 'Amichevole' : 'Format'}
+            </span>
+          </div>
           <p className="text-sm text-gray-500">
             {formatDate(season.start_date)}
             {season.end_date ? ` → ${formatDate(season.end_date)}` : ' → In corso'}
@@ -148,7 +159,7 @@ export default function StagioneDettaglio() {
       {!statsLoading && !statsError && stats.length > 0 && (
         <>
           <div className="mt-3 grid grid-cols-3 gap-2">
-            {TOP_STAT_KEYS.map((key) => (
+            {TOP_STAT_KEYS.filter((key) => season.season_type !== 'amichevole' || key !== 'format').map((key) => (
               <StatPreviewCard key={key} statKey={key} stats={stats} seasonId={id} />
             ))}
           </div>

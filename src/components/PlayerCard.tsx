@@ -1,23 +1,8 @@
 import { countryFlag, countryName } from '../lib/countries'
 import { playerFullName, type PlayerStats } from '../lib/statistiche'
+import { useFasce } from '../hooks/useFasce'
+import { tierForOverall, type CardTier } from '../lib/fasce'
 import type { Player } from '../types/database'
-
-type CardTier = 'bronze' | 'silver' | 'gold' | 'special' | 'blue'
-
-// Il template della carta è determinato dall'overall, non da una scelta manuale:
-//   1-34  -> Bronzo
-//   35-55 -> Argento
-//   56-74 -> Oro
-//   75-89 -> Speciale (scura/oro)
-//   90-100 -> Competizione (blu)
-function cardTierForOverall(overall: number | null): CardTier {
-  const v = overall ?? 0
-  if (v >= 90) return 'blue'
-  if (v >= 75) return 'special'
-  if (v >= 56) return 'gold'
-  if (v >= 35) return 'silver'
-  return 'bronze'
-}
 
 interface PlayerCardProps {
   player: Player
@@ -45,8 +30,11 @@ interface CardStyle {
   avatarBg: string
 }
 
+// Il template della carta è determinato dall'overall in base ai range
+// configurati dagli admin (CDA -> Gestione Fasce):
+//   bronzo -> fascia D, argento -> C, oro -> B, blu/viola -> A top
 const CARD_STYLES: Record<CardTier, CardStyle> = {
-  bronze: {
+  bronzo: {
     label: 'Bronzo',
     border: 'bg-gradient-to-b from-orange-200 via-orange-400 to-orange-800',
     bg: 'bg-gradient-to-br from-orange-200 via-orange-400 to-orange-600',
@@ -56,7 +44,7 @@ const CARD_STYLES: Record<CardTier, CardStyle> = {
     divider: 'border-orange-950/20',
     avatarBg: 'bg-orange-950/10',
   },
-  silver: {
+  argento: {
     label: 'Argento',
     border: 'bg-gradient-to-b from-gray-100 via-gray-300 to-gray-500',
     bg: 'bg-gradient-to-br from-gray-100 via-gray-300 to-gray-400',
@@ -66,7 +54,7 @@ const CARD_STYLES: Record<CardTier, CardStyle> = {
     divider: 'border-gray-900/20',
     avatarBg: 'bg-gray-900/10',
   },
-  gold: {
+  oro: {
     label: 'Oro',
     border: 'bg-gradient-to-b from-amber-200 via-yellow-500 to-amber-700',
     bg: 'bg-gradient-to-br from-amber-100 via-yellow-400 to-amber-500',
@@ -76,18 +64,8 @@ const CARD_STYLES: Record<CardTier, CardStyle> = {
     divider: 'border-stone-900/20',
     avatarBg: 'bg-stone-900/10',
   },
-  special: {
-    label: 'Speciale',
-    border: 'bg-gradient-to-b from-yellow-300 via-yellow-500 to-yellow-700',
-    bg: 'bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900',
-    text: 'text-yellow-300',
-    sub: 'text-yellow-100/70',
-    accent: 'text-yellow-300',
-    divider: 'border-yellow-300/25',
-    avatarBg: 'bg-yellow-300/10',
-  },
-  blue: {
-    label: 'Competizione',
+  blu: {
+    label: 'Blu',
     border: 'bg-gradient-to-b from-sky-300 via-blue-500 to-blue-800',
     bg: 'bg-gradient-to-br from-blue-950 via-indigo-800 to-blue-950',
     text: 'text-white',
@@ -96,10 +74,21 @@ const CARD_STYLES: Record<CardTier, CardStyle> = {
     divider: 'border-sky-300/25',
     avatarBg: 'bg-white/10',
   },
+  viola: {
+    label: 'Viola',
+    border: 'bg-gradient-to-b from-fuchsia-300 via-purple-500 to-purple-900',
+    bg: 'bg-gradient-to-br from-purple-950 via-fuchsia-900 to-indigo-950',
+    text: 'text-fuchsia-100',
+    sub: 'text-fuchsia-200/70',
+    accent: 'text-fuchsia-300',
+    divider: 'border-fuchsia-300/25',
+    avatarBg: 'bg-fuchsia-300/10',
+  },
 }
 
 export default function PlayerCard({ player, overall, stats, compact = false }: PlayerCardProps) {
-  const style = CARD_STYLES[cardTierForOverall(overall)]
+  const { fasce } = useFasce()
+  const style = CARD_STYLES[tierForOverall(overall, fasce)]
 
   const winPercentage =
     stats && stats.partiteGiocate > 0 ? Math.round((stats.vittorie / stats.partiteGiocate) * 100) : null

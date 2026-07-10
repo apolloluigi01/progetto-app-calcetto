@@ -9,6 +9,7 @@ import { findSeasonForDate } from '../../lib/seasons'
 import { logActivity } from '../../lib/activityLog'
 import { computeOverallsForPlayers, generateBalancedTeams } from '../../lib/teamGeneration'
 import { formatVote } from '../../lib/voting'
+import PlayerName, { fullName } from '../../components/PlayerName'
 import type { Player, Team } from '../../types/database'
 import type { PlayerOverall, GeneratedTeams } from '../../lib/teamGeneration'
 import type { MatchPlayerWithName } from '../../hooks/useMatchDetail'
@@ -78,6 +79,9 @@ export default function MatchEdit() {
   const [localTeamA, setLocalTeamA] = useState<MatchPlayerWithName[]>([])
   const [localTeamB, setLocalTeamB] = useState<MatchPlayerWithName[]>([])
   const [savingTeams, setSavingTeams] = useState(false)
+
+  // Ricalcolo squadre con gli overall/fasce correnti (solo in bozza)
+  const [recalculating, setRecalculating] = useState(false)
 
   // Sostituzione giocatore (solo finché la partita è in bozza)
   const [substitutingOpen, setSubstitutingOpen] = useState(false)
@@ -261,7 +265,7 @@ export default function MatchEdit() {
     if (incomplete.length > 0) {
       alert(
         `Completa voto, titolo e descrizione per tutti i giocatori prima di pubblicare. Mancano per: ${incomplete
-          .map((mp) => mp.nickname ?? mp.name)
+          .map((mp) => fullName(mp))
           .join(', ')}.`
       )
       return
@@ -379,7 +383,7 @@ export default function MatchEdit() {
     setGeneratedTeams(null)
 
     const players = await computeOverallsForPlayers(
-      bookings.map((b) => ({ id: b.player_id, name: b.name, nickname: b.nickname }))
+      bookings.map((b) => ({ id: b.player_id, name: b.name, surname: b.surname, nickname: b.nickname }))
     )
 
     const result = generateBalancedTeams(players)
@@ -474,6 +478,41 @@ export default function MatchEdit() {
     refetch()
   }
 
+  // --- Ricalcolo squadre (dopo modifiche a overall o range fasce) ---
+  async function handleRecalculateTeams() {
+    if (!id || matchPlayers.length === 0) return
+    if (
+      !confirm(
+        'Ricalcolare le squadre? Gli stessi giocatori verranno ridistribuiti tra le squadre A e B in base agli overall attuali.'
+      )
+    )
+      return
+    setRecalculating(true)
+
+    const overalls = await computeOverallsForPlayers(
+      matchPlayers.map((mp) => ({ id: mp.player_id, name: mp.name, surname: mp.surname, nickname: mp.nickname }))
+    )
+    const result = generateBalancedTeams(overalls)
+
+    await supabase.from('match_players').delete().eq('match_id', id)
+    const rows = [
+      ...result.teamA.map((p) => ({ match_id: id, player_id: p.playerId, team: 'A' as Team })),
+      ...result.teamB.map((p) => ({ match_id: id, player_id: p.playerId, team: 'B' as Team })),
+    ]
+    await supabase.from('match_players').insert(rows)
+
+    logActivity('squadre_ricalcolate', {
+      matchId: id,
+      data: match.match_date,
+      avgA: result.avgA,
+      avgB: result.avgB,
+      diff: result.diff,
+    })
+
+    setRecalculating(false)
+    refetch()
+  }
+
   // --- Sostituzione giocatore già assegnato con uno esterno alla partita ---
   function startSubstitute() {
     setSubOutId('')
@@ -494,8 +533,8 @@ export default function MatchEdit() {
     const roster = [
       ...matchPlayers
         .filter((mp) => mp.player_id !== subOutId)
-        .map((mp) => ({ id: mp.player_id, name: mp.name, nickname: mp.nickname })),
-      { id: subInId, name: inPlayer?.name ?? '', nickname: inPlayer?.nickname ?? null },
+        .map((mp) => ({ id: mp.player_id, name: mp.name, surname: mp.surname, nickname: mp.nickname })),
+      { id: subInId, name: inPlayer?.name ?? '', surname: inPlayer?.surname ?? null, nickname: inPlayer?.nickname ?? null },
     ]
 
     const overalls = await computeOverallsForPlayers(roster)
@@ -626,7 +665,7 @@ export default function MatchEdit() {
           <div className="mt-3 space-y-1">
             {bookings.map((b) => (
               <div key={b.id} className="flex items-center justify-between rounded-lg bg-white px-3 py-1.5">
-                <span className="text-sm font-medium">{b.nickname ?? b.name}</span>
+                <PlayerName name={b.name} surname={b.surname} nickname={b.nickname} nameClassName="text-sm font-medium" />
                 <button
                   onClick={() => handleRemoveBooking(b.player_id, b.name)}
                   className="text-xs text-red-500 hover:text-red-700"
@@ -650,7 +689,7 @@ export default function MatchEdit() {
               >
                 <option value="">+ Aggiungi giocatore</option>
                 {availableToAdd.map(p => (
-                  <option key={p.id} value={p.id}>{p.nickname ?? p.name}</option>
+                  <option key={p.id} value={p.id}>{fullName(p)}{p.nickname ? ` (${p.nickname})` : ''}</option>
                 ))}
               </select>
               <button
@@ -712,7 +751,7 @@ export default function MatchEdit() {
                   <ul className="space-y-1">
                     {draftTeamA.map(p => (
                       <li key={p.playerId} className="flex items-center justify-between gap-1 text-sm">
-                        <span className="min-w-0 truncate">{p.nickname ?? p.name}</span>
+                        <PlayerName name={p.name} surname={p.surname} nickname={p.nickname} />
                         <div className="flex items-center gap-1">
                           <span className="rounded bg-field-green/10 px-1.5 text-xs font-bold text-field-green-dark">
                             {p.overall}
@@ -741,7 +780,7 @@ export default function MatchEdit() {
                   <ul className="space-y-1">
                     {draftTeamB.map(p => (
                       <li key={p.playerId} className="flex items-center justify-between gap-1 text-sm">
-                        <span className="min-w-0 truncate">{p.nickname ?? p.name}</span>
+                        <PlayerName name={p.name} surname={p.surname} nickname={p.nickname} />
                         <div className="flex items-center gap-1">
                           <button
                             onClick={() => swapPlayer('B', p.playerId)}
@@ -801,7 +840,7 @@ export default function MatchEdit() {
               <h3 className="mb-2 font-medium text-field-green-dark">Squadra A</h3>
               <ul className="space-y-1 text-sm">
                 {teamA.map((p) => (
-                  <li key={p.id}>{p.nickname ?? p.name}</li>
+                  <li key={p.id}><PlayerName name={p.name} surname={p.surname} nickname={p.nickname} /></li>
                 ))}
               </ul>
             </div>
@@ -809,7 +848,7 @@ export default function MatchEdit() {
               <h3 className="mb-2 font-medium text-field-green-dark">Squadra B</h3>
               <ul className="space-y-1 text-sm">
                 {teamB.map((p) => (
-                  <li key={p.id}>{p.nickname ?? p.name}</li>
+                  <li key={p.id}><PlayerName name={p.name} surname={p.surname} nickname={p.nickname} /></li>
                 ))}
               </ul>
             </div>
@@ -821,6 +860,14 @@ export default function MatchEdit() {
                 className="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
               >
                 ✏️ Modifica squadre
+              </button>
+              <button
+                onClick={handleRecalculateTeams}
+                disabled={recalculating}
+                className="flex-1 rounded-lg border border-field-green/50 px-3 py-1.5 text-sm text-field-green-dark hover:bg-field-green/5 disabled:opacity-50"
+                title="Rigenera le squadre con gli overall e le fasce attuali"
+              >
+                {recalculating ? 'Ricalcolo...' : '♻️ Ricalcola squadre'}
               </button>
               <button
                 onClick={startSubstitute}
@@ -864,7 +911,7 @@ export default function MatchEdit() {
                 <option value="">Seleziona...</option>
                 {matchPlayers.map((mp) => (
                   <option key={mp.player_id} value={mp.player_id}>
-                    {mp.nickname ?? mp.name} (Squadra {mp.team})
+                    {fullName(mp)}{mp.nickname ? ` (${mp.nickname})` : ''} - Squadra {mp.team}
                   </option>
                 ))}
               </select>
@@ -881,7 +928,7 @@ export default function MatchEdit() {
                 <option value="">Seleziona...</option>
                 {playersNotInMatch.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.nickname ?? p.name}
+                    {fullName(p)}{p.nickname ? ` (${p.nickname})` : ''}
                   </option>
                 ))}
               </select>
@@ -915,7 +962,7 @@ export default function MatchEdit() {
               <ul className="space-y-1">
                 {localTeamA.map((p) => (
                   <li key={p.player_id} className="flex items-center justify-between gap-1 text-sm">
-                    <span className="min-w-0 truncate">{p.nickname ?? p.name}</span>
+                    <PlayerName name={p.name} surname={p.surname} nickname={p.nickname} />
                     <button
                       onClick={() => swapConfirmedPlayer('A', p.player_id)}
                       className="text-xs text-gray-400 hover:text-field-orange"
@@ -939,7 +986,7 @@ export default function MatchEdit() {
                     >
                       A←
                     </button>
-                    <span className="min-w-0 truncate">{p.nickname ?? p.name}</span>
+                    <PlayerName name={p.name} surname={p.surname} nickname={p.nickname} />
                   </li>
                 ))}
               </ul>
@@ -1023,8 +1070,10 @@ export default function MatchEdit() {
               <ul className="space-y-1 text-sm">
                 {goalsByTeam(team).map((g) => (
                   <li key={g.id} className="flex items-center justify-between gap-2">
-                    <span className="min-w-0">
-                      ⚽ {g.nickname ?? g.name} {g.is_own_goal && <span className="text-red-600">(autogol)</span>}
+                    <span className="flex min-w-0 items-start gap-1">
+                      <span>⚽</span>
+                      <PlayerName name={g.name} surname={g.surname} nickname={g.nickname} />
+                      {g.is_own_goal && <span className="shrink-0 text-red-600">(autogol)</span>}
                     </span>
                     <button onClick={() => handleRemoveGoal(g.id)} className="shrink-0 text-xs text-red-600">
                       Rimuovi
@@ -1041,7 +1090,7 @@ export default function MatchEdit() {
                   <option value="">Giocatore...</option>
                   {(ownGoal[team] ? (team === 'A' ? teamB : teamA) : team === 'A' ? teamA : teamB).map((p) => (
                     <option key={p.player_id} value={p.player_id}>
-                      {p.nickname ?? p.name}
+                      {fullName(p)}{p.nickname ? ` (${p.nickname})` : ''}
                     </option>
                   ))}
                 </select>
@@ -1071,7 +1120,10 @@ export default function MatchEdit() {
                 <ul className="space-y-1 text-sm">
                   {assistsByTeam(team).map((a) => (
                     <li key={a.id} className="flex items-center justify-between gap-2">
-                      <span className="min-w-0">🅰️ {a.nickname ?? a.name}</span>
+                      <span className="flex min-w-0 items-start gap-1">
+                        <span>🅰️</span>
+                        <PlayerName name={a.name} surname={a.surname} nickname={a.nickname} />
+                      </span>
                       <button onClick={() => handleRemoveAssist(a.id)} className="shrink-0 text-xs text-red-600">
                         Rimuovi
                       </button>
@@ -1087,7 +1139,7 @@ export default function MatchEdit() {
                     <option value="">Giocatore...</option>
                     {(team === 'A' ? teamA : teamB).map((p) => (
                       <option key={p.player_id} value={p.player_id}>
-                        {p.nickname ?? p.name}
+                        {fullName(p)}{p.nickname ? ` (${p.nickname})` : ''}
                       </option>
                     ))}
                   </select>
@@ -1158,7 +1210,7 @@ export default function MatchEdit() {
                 const playerVotes = votes.filter((v) => v.voted_id === mp.player_id)
                 return (
                   <div key={mp.id}>
-                    <p className="text-sm font-medium text-gray-800">{mp.nickname ?? mp.name}</p>
+                    <PlayerName name={mp.name} surname={mp.surname} nickname={mp.nickname} nameClassName="text-sm font-medium text-gray-800" />
                     {playerVotes.length === 0 ? (
                       <p className="text-xs text-gray-400">Nessun voto ancora.</p>
                     ) : (
@@ -1166,9 +1218,10 @@ export default function MatchEdit() {
                         {playerVotes.map((v) => (
                           <li key={v.voter_id} className="flex items-center justify-between">
                             <span>
-                              {voterInfo.get(v.voter_id)?.nickname ??
-                                voterInfo.get(v.voter_id)?.name ??
-                                'Sconosciuto'}
+                              {(() => {
+                                const info = voterInfo.get(v.voter_id)
+                                return info ? fullName(info) : 'Sconosciuto'
+                              })()}
                             </span>
                             <span className="font-semibold text-purple-700">{formatVote(v.vote)}</span>
                           </li>
@@ -1196,9 +1249,9 @@ export default function MatchEdit() {
                         isMvp ? 'bg-yellow-50 border border-yellow-200' : 'bg-white'
                       }`}
                     >
-                      <span className="text-sm font-medium text-gray-800">
-                        {isMvp && <span className="mr-1">🏆</span>}
-                        {p.nickname ?? p.name}
+                      <span className="flex min-w-0 items-start gap-1 text-sm font-medium text-gray-800">
+                        {isMvp && <span>🏆</span>}
+                        <PlayerName name={p.name} surname={p.surname} nickname={p.nickname} />
                       </span>
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-gray-400">
@@ -1239,7 +1292,7 @@ export default function MatchEdit() {
               return (
                 <div key={mp.id} className="rounded-xl bg-white p-3 shadow">
                   <div className="flex items-center justify-between">
-                    <p className="font-medium">{mp.nickname ?? mp.name}</p>
+                    <PlayerName name={mp.name} surname={mp.surname} nickname={mp.nickname} nameClassName="font-medium" />
                     <label className="flex items-center gap-1 text-xs text-field-orange">
                       <input
                         type="radio"

@@ -6,6 +6,7 @@ import { useMatchDetail } from '../hooks/useMatchDetail'
 import { useMatchBookings } from '../hooks/useMatchBookings'
 import { useMatchVoting } from '../hooks/useMatchVoting'
 import { formatVote } from '../lib/voting'
+import PlayerName from '../components/PlayerName'
 import type { Team } from '../types/database'
 
 const MAX_PLAYERS = 10
@@ -162,9 +163,9 @@ export default function MatchDetail() {
               {bookings.map((b) => (
                 <span
                   key={b.id}
-                  className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-blue-800 shadow-sm"
+                  className="rounded-full bg-white px-2 py-0.5 text-center text-xs font-medium text-blue-800 shadow-sm"
                 >
-                  {b.nickname ?? b.name}
+                  <PlayerName name={b.name} surname={b.surname} nickname={b.nickname} nicknameClassName="text-[10px]" />
                 </span>
               ))}
             </div>
@@ -215,8 +216,8 @@ export default function MatchDetail() {
               const v = localVotes[p.player_id] ?? 6
               return (
                 <div key={p.player_id} className="flex items-center gap-3">
-                  <span className="w-28 shrink-0 truncate text-sm font-medium text-gray-800">
-                    {p.nickname ?? p.name}
+                  <span className="w-28 shrink-0 text-sm font-medium text-gray-800">
+                    <PlayerName name={p.name} surname={p.surname} nickname={p.nickname} />
                   </span>
                   <input
                     type="range"
@@ -287,7 +288,7 @@ export default function MatchDetail() {
             <h3 className="mb-2 font-medium text-field-green-dark">Squadra A</h3>
             <ul className="space-y-1 text-sm">
               {teamA.map((p) => (
-                <li key={p.id}>{p.nickname ?? p.name}</li>
+                <li key={p.id}><PlayerName name={p.name} surname={p.surname} nickname={p.nickname} /></li>
               ))}
             </ul>
           </div>
@@ -295,7 +296,7 @@ export default function MatchDetail() {
             <h3 className="mb-2 font-medium text-field-green-dark">Squadra B</h3>
             <ul className="space-y-1 text-sm">
               {teamB.map((p) => (
-                <li key={p.id}>{p.nickname ?? p.name}</li>
+                <li key={p.id}><PlayerName name={p.name} surname={p.surname} nickname={p.nickname} /></li>
               ))}
             </ul>
           </div>
@@ -318,13 +319,17 @@ export default function MatchDetail() {
             {(['A', 'B'] as Team[]).map((team) => (
               <ul key={team} className="min-w-0 space-y-1">
                 {goalsByTeam(team).map((g) => (
-                  <li key={g.id}>
-                    ⚽ {g.nickname ?? g.name} {g.is_own_goal && <span className="text-red-600">(autogol)</span>}
+                  <li key={g.id} className="flex items-start gap-1">
+                    <span>⚽</span>
+                    <PlayerName name={g.name} surname={g.surname} nickname={g.nickname} />
+                    {g.is_own_goal && <span className="shrink-0 text-red-600">(autogol)</span>}
                   </li>
                 ))}
                 {assistsByTeam(team).map((a) => (
-                  <li key={a.id} className="text-gray-600">
-                    🅰️ {a.nickname ?? a.name} <span className="text-xs text-gray-400">(assist)</span>
+                  <li key={a.id} className="flex items-start gap-1 text-gray-600">
+                    <span>🅰️</span>
+                    <PlayerName name={a.name} surname={a.surname} nickname={a.nickname} />
+                    <span className="shrink-0 text-xs text-gray-400">(assist)</span>
                   </li>
                 ))}
               </ul>
@@ -342,9 +347,10 @@ export default function MatchDetail() {
             {pagelle.map((p) => (
               <div key={p.id} className="rounded-xl bg-white p-3 shadow">
                 <div className="flex items-center justify-between">
-                  <p className="font-medium">
-                    {p.nickname ?? p.name} {p.is_mvp && <span className="text-field-orange">★ MVP</span>}
-                  </p>
+                  <span className="flex min-w-0 items-start gap-2 font-medium">
+                    <PlayerName name={p.name} surname={p.surname} nickname={p.nickname} />
+                    {p.is_mvp && <span className="shrink-0 text-field-orange">★ MVP</span>}
+                  </span>
                   <span className="font-semibold text-field-green-dark">{p.voto}</span>
                 </div>
                 {p.titolo && <p className="text-sm font-medium text-gray-700">{p.titolo}</p>}

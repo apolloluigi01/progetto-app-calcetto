@@ -1,7 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { supabase } from '../../lib/supabase'
 import { useStatistiche } from '../../hooks/useStatistiche'
 import { STAT_CONFIG, getRanking, playerFullName, type RankedEntry, type StatKey } from '../../lib/statistiche'
+import type { SeasonType } from '../../types/database'
 
 type SortColumn = 'name' | 'extra' | 'value'
 
@@ -10,6 +12,17 @@ export default function StagioneStatisticaDettaglio() {
   const { stats, loading, error } = useStatistiche(id)
   const [sortCol, setSortCol] = useState<SortColumn>('value')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  const [seasonType, setSeasonType] = useState<SeasonType | null>(null)
+
+  useEffect(() => {
+    if (!id) return
+    supabase
+      .from('seasons')
+      .select('season_type')
+      .eq('id', id)
+      .maybeSingle()
+      .then(({ data }) => setSeasonType((data?.season_type as SeasonType) ?? 'format'))
+  }, [id])
 
   const config = key && key in STAT_CONFIG ? STAT_CONFIG[key as StatKey] : null
 
@@ -36,6 +49,22 @@ export default function StagioneStatisticaDettaglio() {
   if (!config) return <div className="p-4 text-sm text-red-600">Statistica non trovata</div>
   if (loading) return <div className="p-4 text-sm text-gray-500">Caricamento...</div>
   if (error) return <div className="p-4 text-sm text-red-600">{error}</div>
+
+  // Nelle stagioni amichevoli la Classifica Format non viene conteggiata.
+  if (key === 'format' && seasonType === 'amichevole') {
+    return (
+      <div className="p-4">
+        <Link to={`/admin/stagioni/${id}`} className="text-sm text-field-green underline">
+          ← Torna alla stagione
+        </Link>
+        <h1 className="mt-2 text-xl font-semibold text-field-green-dark">Classifica Format</h1>
+        <p className="mt-3 rounded-xl bg-white p-4 text-sm text-gray-500 shadow">
+          Questa stagione è di tipo <strong>Amichevole</strong>: la Classifica Format non viene
+          conteggiata.
+        </p>
+      </div>
+    )
+  }
 
   const isGreen = config.color === 'green'
   const valueColor = isGreen ? 'text-field-green-dark' : 'text-red-600'

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
-import type { Season } from '../../types/database'
+import type { Season, SeasonType } from '../../types/database'
 
 export default function StagioneEdit() {
   const { id } = useParams<{ id: string }>()
@@ -11,6 +11,7 @@ export default function StagioneEdit() {
   const [name, setName] = useState('')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
+  const [seasonType, setSeasonType] = useState<SeasonType>('format')
   const [loading, setLoading] = useState(!isNew)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -42,6 +43,7 @@ export default function StagioneEdit() {
           setName(s.name)
           setStartDate(s.start_date)
           setEndDate(s.end_date ?? '')
+          setSeasonType(s.season_type ?? 'format')
         }
         setLoading(false)
       })
@@ -81,7 +83,7 @@ export default function StagioneEdit() {
       return
     }
 
-    const payload = { name: name.trim(), start_date: startDate, end_date: endDate || null }
+    const payload = { name: name.trim(), start_date: startDate, end_date: endDate || null, season_type: seasonType }
 
     if (isNew) {
       const { data, error: err } = await supabase.from('seasons').insert(payload).select('id').single()
@@ -127,6 +129,22 @@ export default function StagioneEdit() {
             placeholder="es. 2024/25"
             className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-field-green focus:outline-none"
           />
+        </div>
+
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">Tipo stagione</label>
+          <select
+            value={seasonType}
+            onChange={(e) => setSeasonType(e.target.value as SeasonType)}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-field-green focus:outline-none"
+          >
+            <option value="format">Format</option>
+            <option value="amichevole">Amichevole</option>
+          </select>
+          <p className="mt-1 text-xs text-gray-400">
+            Format: in questa stagione si calcola anche la Classifica Format (e a fine stagione entra
+            nell'albo d'oro). Amichevole: la Classifica Format non viene conteggiata.
+          </p>
         </div>
 
         <div>

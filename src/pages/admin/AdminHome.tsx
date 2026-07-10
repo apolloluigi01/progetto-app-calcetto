@@ -80,6 +80,28 @@ export default function AdminHome() {
         </Link>
 
         <Link
+          to="/admin/fasce"
+          className="flex items-center gap-3 rounded-xl bg-field-green px-4 py-3 text-sm font-medium text-white hover:bg-field-green-dark"
+        >
+          <span className="text-lg">🃏</span>
+          <div>
+            <p className="font-semibold">Gestione Fasce</p>
+            <p className="text-xs opacity-80">Range di overall per fasce e carte dei giocatori</p>
+          </div>
+        </Link>
+
+        <Link
+          to="/albo-oro"
+          className="flex items-center gap-3 rounded-xl bg-field-green px-4 py-3 text-sm font-medium text-white hover:bg-field-green-dark"
+        >
+          <span className="text-lg">🥇</span>
+          <div>
+            <p className="font-semibold">Albo d'oro</p>
+            <p className="text-xs opacity-80">Podio delle stagioni format concluse</p>
+          </div>
+        </Link>
+
+        <Link
           to="/registro-attivita"
           className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50"
         >

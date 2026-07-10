@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { logActivity } from '../../lib/activityLog'
+import { useFasce } from '../../hooks/useFasce'
+import { fasciaForOverall, fasciaLabel, rangeForOverall } from '../../lib/fasce'
 
 interface Row {
   id: string
@@ -11,13 +13,6 @@ interface Row {
   savedOverall: number
 }
 
-function overallToFascia(v: number): 'A' | 'B' | 'C' | 'D' {
-  if (v >= 75) return 'A'
-  if (v >= 55) return 'B'
-  if (v >= 35) return 'C'
-  return 'D'
-}
-
 /**
  * Gestione manuale dell'overall di tutti i giocatori (solo admin).
  * L'overall non viene più ricalcolato automaticamente dalle statistiche:
@@ -25,6 +20,7 @@ function overallToFascia(v: number): 'A' | 'B' | 'C' | 'D' {
  * e ogni modifica viene registrata nel registro attività.
  */
 export default function OverallAdmin() {
+  const { fasce } = useFasce()
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -70,7 +66,7 @@ export default function OverallAdmin() {
     const { error: upsertError } = await supabase
       .from('ratings')
       .upsert(
-        { player_id: row.id, rating_value: val, fascia: overallToFascia(val), updated_at: new Date().toISOString() },
+        { player_id: row.id, rating_value: val, fascia: fasciaForOverall(val, fasce), updated_at: new Date().toISOString() },
         { onConflict: 'player_id' },
       )
     setSavingId(null)
@@ -116,7 +112,7 @@ export default function OverallAdmin() {
                   {row.nickname && <p className="truncate text-xs text-gray-500">{row.nickname}</p>}
                 </div>
                 <span className="shrink-0 rounded-full bg-field-green/10 px-2 py-0.5 text-xs font-bold text-field-green-dark">
-                  Fascia {overallToFascia(Math.min(100, Math.max(1, Math.round(row.overall) || 1)))}
+                  Fascia {fasciaLabel(rangeForOverall(Math.min(100, Math.max(1, Math.round(row.overall) || 1)), fasce))}
                 </span>
               </div>
               <div className="mt-2 flex items-center gap-3">

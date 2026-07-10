@@ -28,6 +28,8 @@ import StagioneDettaglio from './pages/admin/StagioneDettaglio'
 import StagioneStatisticaDettaglio from './pages/admin/StagioneStatisticaDettaglio'
 import FantaAdmin from './pages/admin/FantaAdmin'
 import OverallAdmin from './pages/admin/OverallAdmin'
+import FasceAdmin from './pages/admin/FasceAdmin'
+import AlboOro from './pages/AlboOro'
 import Fantacalcetto from './pages/Fantacalcetto'
 import FantaLega from './pages/FantaLega'
 import FantaFormazione from './pages/FantaFormazione'
@@ -56,6 +58,7 @@ function App() {
               <Route path="/statistiche" element={<Statistiche />} />
               <Route path="/statistiche/elenco" element={<StatisticheElenco />} />
               <Route path="/statistiche/:key" element={<StatisticaDettaglio />} />
+              <Route path="/albo-oro" element={<AlboOro />} />
               <Route path="/impostazioni" element={<Impostazioni />} />
               <Route path="/ufficio-stampa" element={<UfficioStampa />} />
               <Route path="/fantacalcetto" element={<Fantacalcetto />} />
@@ -74,6 +77,7 @@ function App() {
                 <Route path="/admin/giocatori/:id" element={<GiocatoreEdit />} />
                 <Route path="/admin/fantacalcetto" element={<FantaAdmin />} />
                 <Route path="/admin/overall" element={<OverallAdmin />} />
+                <Route path="/admin/fasce" element={<FasceAdmin />} />
                 <Route path="/admin/partite" element={<PartiteAdmin />} />
                 <Route path="/admin/partite/:id" element={<MatchEdit />} />
                 <Route path="/partite/nuova" element={<PartitaForm />} />

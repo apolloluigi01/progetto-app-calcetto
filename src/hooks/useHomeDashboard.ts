@@ -6,6 +6,7 @@ export interface DashboardGoal {
   player_id: string
   team: Team
   name: string
+  surname: string | null
   nickname: string | null
   is_own_goal: boolean
 }
@@ -14,6 +15,7 @@ export interface DashboardMatchPlayer {
   player_id: string
   team: Team
   name: string
+  surname: string | null
   nickname: string | null
 }
 
@@ -66,7 +68,7 @@ export function useHomeDashboard() {
           const m = lastRes.data as Match & { result: MatchResult[] | MatchResult | null }
           const { data: goalsData, error: goalsError } = await supabase
             .from('goals')
-            .select('player_id, team, is_own_goal, players(name, nickname)')
+            .select('player_id, team, is_own_goal, players(name, surname, nickname)')
             .eq('match_id', m.id)
 
           if (goalsError) throw goalsError
@@ -75,7 +77,7 @@ export function useHomeDashboard() {
             player_id: string
             team: Team
             is_own_goal: boolean
-            players: { name: string; nickname: string | null } | null
+            players: { name: string; surname: string | null; nickname: string | null } | null
           }
           setLastMatch({
             match: m,
@@ -85,6 +87,7 @@ export function useHomeDashboard() {
               team: g.team,
               is_own_goal: g.is_own_goal,
               name: g.players?.name ?? '',
+              surname: g.players?.surname ?? null,
               nickname: g.players?.nickname ?? null,
             })),
           })
@@ -96,18 +99,19 @@ export function useHomeDashboard() {
           const m = nextRes.data as Match
           const { data: playersData, error: playersError } = await supabase
             .from('match_players')
-            .select('player_id, team, players(name, nickname)')
+            .select('player_id, team, players(name, surname, nickname)')
             .eq('match_id', m.id)
 
           if (playersError) throw playersError
 
-          type PlayerJoin = { player_id: string; team: Team; players: { name: string; nickname: string | null } | null }
+          type PlayerJoin = { player_id: string; team: Team; players: { name: string; surname: string | null; nickname: string | null } | null }
           setNextMatch({
             match: m,
             players: ((playersData ?? []) as unknown as PlayerJoin[]).map((p) => ({
               player_id: p.player_id,
               team: p.team,
               name: p.players?.name ?? '',
+              surname: p.players?.surname ?? null,
               nickname: p.players?.nickname ?? null,
             })),
           })

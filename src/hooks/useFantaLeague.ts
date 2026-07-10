@@ -5,6 +5,7 @@ import type { Match } from '../types/database'
 export interface FantaStanding {
   playerId: string
   name: string
+  surname: string | null
   nickname: string | null
   total: number
   matchesScored: number
@@ -63,7 +64,7 @@ export function useFantaLeague(leagueId: string | undefined, myPlayerId: string 
     const [membersRes, matchesRes, lineupsRes, calcsRes] = await Promise.all([
       supabase
         .from('fanta_league_members')
-        .select('player_id, players(name, nickname)')
+        .select('player_id, players(name, surname, nickname)')
         .eq('league_id', leagueId),
       supabase
         .from('matches')
@@ -92,7 +93,7 @@ export function useFantaLeague(leagueId: string | undefined, myPlayerId: string 
         : Promise.resolve({ data: [] as { match_id: string; player_id: string }[] }),
     ])
 
-    type MemberRow = { player_id: string; players: { name: string; nickname: string | null } | null }
+    type MemberRow = { player_id: string; players: { name: string; surname: string | null; nickname: string | null } | null }
     type LineupRow = {
       id: string
       match_id: string
@@ -129,6 +130,7 @@ export function useFantaLeague(leagueId: string | undefined, myPlayerId: string 
       .map((m) => ({
         playerId: m.player_id,
         name: m.players?.name ?? '',
+        surname: m.players?.surname ?? null,
         nickname: m.players?.nickname ?? null,
         total: totals.get(m.player_id)?.total ?? 0,
         matchesScored: totals.get(m.player_id)?.matchesScored ?? 0,

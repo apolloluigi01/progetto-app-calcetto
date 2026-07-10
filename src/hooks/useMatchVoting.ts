@@ -11,12 +11,14 @@ import type { PlayerRole } from '../types/database'
 export interface VotingParticipant {
   player_id: string
   name: string
+  surname: string | null
   nickname: string | null
   role: PlayerRole
 }
 
 export interface VoterInfo {
   name: string
+  surname: string | null
   nickname: string | null
   role: PlayerRole
 }
@@ -38,17 +40,18 @@ export function useMatchVoting(matchId: string | undefined) {
         .eq('match_id', matchId),
       supabase
         .from('match_players')
-        .select('player_id, players(name, nickname, role)')
+        .select('player_id, players(name, surname, nickname, role)')
         .eq('match_id', matchId),
     ])
 
     type PartRow = {
       player_id: string
-      players: { name: string; nickname: string | null; role: string } | null
+      players: { name: string; surname: string | null; nickname: string | null; role: string } | null
     }
     const parts = ((partsRes.data ?? []) as unknown as PartRow[]).map((p) => ({
       player_id: p.player_id,
       name: p.players?.name ?? '',
+      surname: p.players?.surname ?? null,
       nickname: p.players?.nickname ?? null,
       role: (p.players?.role ?? 'player') as PlayerRole,
     }))
@@ -57,7 +60,7 @@ export function useMatchVoting(matchId: string | undefined) {
     const rawVotes = (votesRes.data ?? []) as { voter_id: string; voted_id: string; vote: number }[]
 
     const nameRoleMap = new Map(
-      parts.map((p) => [p.player_id, { name: p.name, nickname: p.nickname, role: p.role }])
+      parts.map((p) => [p.player_id, { name: p.name, surname: p.surname, nickname: p.nickname, role: p.role }])
     )
     const missingVoterIds = [...new Set(rawVotes.map((v) => v.voter_id))].filter(
       (id) => !nameRoleMap.has(id)
@@ -65,10 +68,10 @@ export function useMatchVoting(matchId: string | undefined) {
     if (missingVoterIds.length > 0) {
       const { data: extraPlayers } = await supabase
         .from('players')
-        .select('id, name, nickname, role')
+        .select('id, name, surname, nickname, role')
         .in('id', missingVoterIds)
-      for (const p of (extraPlayers ?? []) as { id: string; name: string; nickname: string | null; role: PlayerRole }[]) {
-        nameRoleMap.set(p.id, { name: p.name, nickname: p.nickname, role: p.role })
+      for (const p of (extraPlayers ?? []) as { id: string; name: string; surname: string | null; nickname: string | null; role: PlayerRole }[]) {
+        nameRoleMap.set(p.id, { name: p.name, surname: p.surname, nickname: p.nickname, role: p.role })
       }
     }
 
