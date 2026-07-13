@@ -37,6 +37,9 @@ export type ActivityAction =
   | 'fanta_parametri_modificati'
   | 'fasce_modificate'
   | 'squadre_ricalcolate'
+  | 'albo_voce_creata'
+  | 'albo_voce_modificata'
+  | 'albo_voce_eliminata'
 
 export const actionLabels: Record<ActivityAction, string> = {
   giocatore_creato:      'Giocatore creato',
@@ -69,6 +72,9 @@ export const actionLabels: Record<ActivityAction, string> = {
   fanta_parametri_modificati: 'Parametri fantacalcetto modificati',
   fasce_modificate:      'Range fasce/carte modificati',
   squadre_ricalcolate:   'Squadre ricalcolate',
+  albo_voce_creata:      "Voce albo d'oro creata",
+  albo_voce_modificata:  "Voce albo d'oro modificata",
+  albo_voce_eliminata:   "Voce albo d'oro eliminata",
 }
 
 export async function logActivity(

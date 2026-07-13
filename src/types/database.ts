@@ -101,6 +101,23 @@ export interface RatingWeight {
   weight_percent: number
 }
 
+export type HonorKind = 'format' | 'fanta'
+
+/**
+ * Voce dell'albo d'oro censita manualmente dagli admin (stagioni disputate
+ * prima dell'app o podio del fantacalcetto).
+ */
+export interface HonorEntry {
+  id: string
+  kind: HonorKind
+  season_name: string
+  end_date: string | null
+  first_player_id: string | null
+  second_player_id: string | null
+  third_player_id: string | null
+  created_at: string
+}
+
 export interface Pagella {
   id: string
   match_id: string

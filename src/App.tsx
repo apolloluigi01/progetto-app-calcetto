@@ -29,6 +29,7 @@ import StagioneStatisticaDettaglio from './pages/admin/StagioneStatisticaDettagl
 import FantaAdmin from './pages/admin/FantaAdmin'
 import OverallAdmin from './pages/admin/OverallAdmin'
 import FasceAdmin from './pages/admin/FasceAdmin'
+import AlboOroAdmin from './pages/admin/AlboOroAdmin'
 import AlboOro from './pages/AlboOro'
 import Fantacalcetto from './pages/Fantacalcetto'
 import FantaLega from './pages/FantaLega'
@@ -78,6 +79,7 @@ function App() {
                 <Route path="/admin/fantacalcetto" element={<FantaAdmin />} />
                 <Route path="/admin/overall" element={<OverallAdmin />} />
                 <Route path="/admin/fasce" element={<FasceAdmin />} />
+                <Route path="/admin/albo-oro" element={<AlboOroAdmin />} />
                 <Route path="/admin/partite" element={<PartiteAdmin />} />
                 <Route path="/admin/partite/:id" element={<MatchEdit />} />
                 <Route path="/partite/nuova" element={<PartitaForm />} />

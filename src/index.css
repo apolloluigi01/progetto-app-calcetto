@@ -9,11 +9,29 @@
   --color-field-orange: #ef6c00;
 }
 
+html {
+  /* Evita che iOS/Android riscalino il testo (effetto "pagina zoomata"). */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   @apply bg-gray-50 text-gray-900 font-sans;
   margin: 0;
+  /* Un elemento più largo dello schermo non deve far "zoomare" la pagina. */
+  overflow-x: hidden;
 }
 
 #root {
   min-height: 100svh;
+}
+
+/* iOS Safari zooma automaticamente sul focus di input con font < 16px e la
+   pagina resta zoomata: su mobile i campi devono avere almeno 16px. */
+@media (max-width: 767px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
 }
