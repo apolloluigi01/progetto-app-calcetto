@@ -18,8 +18,6 @@ html {
 body {
   @apply bg-gray-50 text-gray-900 font-sans;
   margin: 0;
-  /* Un elemento più largo dello schermo non deve far "zoomare" la pagina. */
-  overflow-x: hidden;
 }
 
 #root {
