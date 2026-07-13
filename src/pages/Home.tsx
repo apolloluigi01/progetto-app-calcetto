@@ -113,7 +113,9 @@ export default function Home() {
                     const goalsB = lastMatch.goals.filter((g) => g.team === 'B')
                     return (
                       <div className="mt-2 grid grid-cols-[1fr_auto_1fr] items-start gap-3">
-                        <div>
+                        {/* min-w-0: senza, i nomi con "truncate" impediscono alle
+                            colonne di restringersi e la pagina sfora lo schermo. */}
+                        <div className="min-w-0">
                           <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-field-green-dark">
                             Squadra A
                           </p>
@@ -134,7 +136,7 @@ export default function Home() {
                             {lastMatch.result.score_a} - {lastMatch.result.score_b}
                           </p>
                         )}
-                        <div className="text-right">
+                        <div className="min-w-0 text-right">
                           <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-field-orange">
                             Squadra B
                           </p>

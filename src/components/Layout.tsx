@@ -97,8 +97,11 @@ export default function Layout() {
       </aside>
 
       {/* Topbar mobile */}
+      {/* pt-[env(safe-area-inset-top)]: su iPhone (PWA standalone) la barra
+          non deve finire sotto la status bar di sistema, altrimenti logo e
+          tasto menu risultano coperti e non cliccabili. */}
       <header
-        className="md:hidden fixed inset-x-0 top-0 z-40 flex items-center justify-between px-4 h-12"
+        className="md:hidden fixed inset-x-0 top-0 z-40 flex items-center justify-between px-4 h-[calc(3rem+env(safe-area-inset-top))] pt-[env(safe-area-inset-top)]"
         style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)' }}
       >
         <Link to="/" onClick={() => setMenuOpen(false)} className="flex items-center gap-2" title="Torna alla home">
@@ -135,7 +138,7 @@ export default function Layout() {
       {/* Dropdown menu mobile */}
       {menuOpen && (
         <div
-          className="md:hidden fixed inset-x-0 top-12 z-30 flex flex-col py-2"
+          className="md:hidden fixed inset-x-0 top-[calc(3rem+env(safe-area-inset-top))] z-30 flex flex-col py-2"
           style={{ background: 'rgba(0,0,0,0.92)', backdropFilter: 'blur(8px)' }}
         >
           {items.map((item) => (
@@ -174,7 +177,7 @@ export default function Layout() {
       )}
 
       {/* Contenuto principale */}
-      <main className="flex-1 md:ml-52 pt-12 md:pt-0 min-h-svh bg-gray-50">
+      <main className="flex-1 md:ml-52 pt-[calc(3rem+env(safe-area-inset-top))] md:pt-0 min-h-svh bg-gray-50 overflow-x-clip">
         {/* Tasto "indietro" globale, su ogni schermata tranne la home */}
         {!isHome && (
           <div className="px-4 pt-3">
