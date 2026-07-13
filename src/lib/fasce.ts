@@ -73,7 +73,7 @@ export function fasciaForOverall(overall: number | null, fasce: FasciaRange[] = 
   return rangeForOverall(overall, fasce).fascia
 }
 
-/** Etichetta fascia da mostrare (le due carte più alte sono la fascia "A top"). */
+/** Etichetta fascia da mostrare (le due carte più alte sono la fascia "TOP"). */
 export function fasciaLabel(range: FasciaRange): string {
-  return range.fascia === 'A' ? 'A top' : range.fascia
+  return range.fascia === 'A' ? 'TOP' : range.fascia
 }
