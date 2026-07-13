@@ -17,41 +17,44 @@ function StatPreviewCard({ statKey, stats }: { statKey: StatKey; stats: ReturnTy
   const valueColor = isGreen ? 'text-field-green-dark' : 'text-red-600'
   const valueBg = isGreen ? 'bg-field-green/10' : 'bg-red-50'
 
+  // Righe flex e non <table>: il truncate sulle celle di tabella non
+  // funziona e su mobile il valore finiva spinto fuori dalla card.
   return (
     <Link
       to={`/statistiche/${statKey}`}
-      className="block overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm transition hover:shadow-md"
+      className="block overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition hover:shadow-md"
     >
-      <h2 className="truncate border-b border-gray-200 px-2 py-2 text-xs font-semibold text-field-green-dark">
+      <h2 className="truncate border-b border-gray-200 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-field-green-dark">
         {config.title}
       </h2>
-      <table className="w-full text-xs">
-        <tbody>
-          {ranking.length === 0 && (
-            <tr>
-              <td className="px-2 py-2 text-gray-400">-</td>
-            </tr>
-          )}
-          {ranking.map((entry, i) => (
-            <tr key={entry.stats.player.id} className="border-t border-gray-100 first:border-t-0">
-              <td className="py-2 pl-2 pr-0.5 text-gray-400">{i + 1}</td>
-              <td className="truncate py-2 pr-1 font-medium text-gray-700">
+      <ul>
+        {ranking.length === 0 && <li className="px-3 py-2 text-xs text-gray-400">-</li>}
+        {ranking.map((entry, i) => (
+          <li
+            key={entry.stats.player.id}
+            className="flex items-center gap-2 border-t border-gray-100 px-3 py-2 first:border-t-0"
+          >
+            <span className="w-3 shrink-0 text-center text-[11px] font-semibold text-gray-300">
+              {i + 1}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-xs font-medium leading-snug text-gray-700">
                 {playerFullName(entry.stats.player)}
-                {entry.stats.player.nickname && (
-                  <span className="block truncate text-[10px] font-normal leading-tight text-gray-400">
-                    {entry.stats.player.nickname}
-                  </span>
-                )}
-              </td>
-              <td className="py-2 pr-2 text-right">
-                <span className={`inline-flex items-center rounded-full px-2 py-1 font-semibold ${valueColor} ${valueBg}`}>
-                  {config.formatValue(entry.value)}
+              </span>
+              {entry.stats.player.nickname && (
+                <span className="block truncate text-[10px] font-normal leading-tight text-gray-400">
+                  {entry.stats.player.nickname}
                 </span>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+              )}
+            </span>
+            <span
+              className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${valueColor} ${valueBg}`}
+            >
+              {config.formatValue(entry.value)}
+            </span>
+          </li>
+        ))}
+      </ul>
     </Link>
   )
 }
@@ -106,23 +109,13 @@ export default function Statistiche() {
           )}
 
           {stats.length > 0 && (
-            <>
-              <div className="mt-4 grid grid-cols-3 gap-2">
-                {topKeys.map((key) => (
-                  <StatPreviewCard key={key} statKey={key} stats={stats} />
-                ))}
-              </div>
-              <div className="mt-2 grid grid-cols-3 gap-2">
-                {BOTTOM_STAT_KEYS.map((key) => (
-                  <StatPreviewCard key={key} statKey={key} stats={stats} />
-                ))}
-              </div>
-              <div className="mt-2 grid grid-cols-3 gap-2">
-                {THIRD_STAT_KEYS.map((key) => (
-                  <StatPreviewCard key={key} statKey={key} stats={stats} />
-                ))}
-              </div>
-            </>
+            /* Mobile-first: 2 colonne su telefono (card larghe e nomi
+               leggibili), 3 colonne da tablet in su. */
+            <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {[...topKeys, ...BOTTOM_STAT_KEYS, ...THIRD_STAT_KEYS].map((key) => (
+                <StatPreviewCard key={key} statKey={key} stats={stats} />
+              ))}
+            </div>
           )}
 
           <div className="mt-8 flex justify-center">
