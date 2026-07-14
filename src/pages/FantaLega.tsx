@@ -211,7 +211,7 @@ export default function FantaLega() {
               </p>
             )}
             {upcoming.map((m) =>
-              m.isNext ? (
+              m.isNext && m.teamsOfficial ? (
                 <Link
                   key={m.match.id}
                   to={`/fantacalcetto/${league.id}/partite/${m.match.id}`}
@@ -241,10 +241,14 @@ export default function FantaLega() {
                     <div>
                       <p className="font-medium">{formatDate(m.match.match_date)}</p>
                       <p className="text-xs text-gray-500">
-                        Si potrà schierare solo dopo la partita precedente.
+                        {m.isNext
+                          ? "Squadre non ancora ufficializzate: lo schieramento si aprirà dopo l'ufficializzazione degli admin."
+                          : 'Si potrà schierare solo dopo la partita precedente.'}
                       </p>
                     </div>
-                    <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">🔒 Bloccata</span>
+                    <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
+                      {m.isNext ? '⏳ In attesa' : '🔒 Bloccata'}
+                    </span>
                   </div>
                 </div>
               ),

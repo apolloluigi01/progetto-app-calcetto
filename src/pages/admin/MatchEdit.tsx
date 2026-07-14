@@ -83,6 +83,9 @@ export default function MatchEdit() {
   // Ricalcolo squadre con gli overall/fasce correnti (solo in bozza)
   const [recalculating, setRecalculating] = useState(false)
 
+  // Ufficializzazione squadre: dopo non si toccano più e si apre il fanta.
+  const [officializing, setOfficializing] = useState(false)
+
   // Nuove squadre (da ricalcolo o sostituzione) in attesa del salvataggio
   // esplicito: nulla viene scritto sul DB finché l'admin non preme "Salva".
   interface PendingTeams {
@@ -143,6 +146,8 @@ export default function MatchEdit() {
   // "In bozza" finché non è stato salvato un risultato e non sono state pubblicate le pagelle:
   // solo in questa fase ha senso poter ancora spostare i giocatori tra le squadre.
   const isDraft = !result && !isPublished
+  // Squadre ufficializzate: non più modificabili/ricalcolabili/sostituibili.
+  const teamsOfficial = !!match.teams_official_at
   const infoComplete = !!matchDate && !!matchTime && !!field
 
   // --- Azioni info partita ---
@@ -469,6 +474,27 @@ export default function MatchEdit() {
         .upsert(resetRows, { onConflict: 'league_id,match_id,member_id' })
     }
     await supabase.from('fanta_lineups').delete().eq('match_id', id)
+  }
+
+  // --- Ufficializzazione squadre ---
+  // Step esplicito e definitivo: blocca ogni modifica alle squadre e apre
+  // lo schieramento delle formazioni fantacalcetto.
+  async function handleOfficializeTeams() {
+    if (
+      !id ||
+      !confirm(
+        'Ufficializzare le squadre? Dopo non potranno più essere modificate, ricalcolate o soggette a sostituzioni, e si aprirà lo schieramento delle formazioni del fantacalcetto.'
+      )
+    )
+      return
+    setOfficializing(true)
+    await supabase
+      .from('matches')
+      .update({ teams_official_at: new Date().toISOString() })
+      .eq('id', id)
+    logActivity('squadre_ufficializzate', { matchId: id, data: match.match_date })
+    setOfficializing(false)
+    refetch()
   }
 
   // --- Modifica manuale squadre già confermate (solo in bozza) ---
@@ -965,7 +991,22 @@ export default function MatchEdit() {
               </ul>
             </div>
           </div>
-          {isDraft && (
+          {teamsOfficial && (
+            <p className="mt-2 rounded-lg bg-field-green/10 px-3 py-2 text-center text-xs font-medium text-field-green-dark">
+              ✅ Squadre ufficializzate: non sono più modificabili e lo schieramento del
+              fantacalcetto è aperto.
+            </p>
+          )}
+          {isDraft && !teamsOfficial && (
+            <button
+              onClick={handleOfficializeTeams}
+              disabled={officializing}
+              className="mt-2 w-full rounded-lg bg-field-green px-3 py-2 text-sm font-medium text-white hover:bg-field-green-dark disabled:opacity-50"
+            >
+              {officializing ? 'Ufficializzazione...' : '✅ Ufficializza squadre'}
+            </button>
+          )}
+          {isDraft && !teamsOfficial && (
             <div className="mt-2 flex gap-2">
               <button
                 onClick={startEditingTeams}

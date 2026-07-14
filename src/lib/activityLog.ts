@@ -38,6 +38,7 @@ export type ActivityAction =
   | 'fanta_reminder_inviato'
   | 'fasce_modificate'
   | 'squadre_ricalcolate'
+  | 'squadre_ufficializzate'
   | 'albo_voce_creata'
   | 'albo_voce_modificata'
   | 'albo_voce_eliminata'
@@ -74,6 +75,7 @@ export const actionLabels: Record<ActivityAction, string> = {
   fanta_reminder_inviato: 'Reminder formazione fantacalcetto inviato',
   fasce_modificate:      'Range fasce/carte modificati',
   squadre_ricalcolate:   'Squadre ricalcolate',
+  squadre_ufficializzate: 'Squadre ufficializzate',
   albo_voce_creata:      "Voce albo d'oro creata",
   albo_voce_modificata:  "Voce albo d'oro modificata",
   albo_voce_eliminata:   "Voce albo d'oro eliminata",

@@ -38,6 +38,9 @@ export interface Match {
   status: MatchStatus
   booking_open: boolean
   voting_open: boolean
+  /** Quando l'admin ha ufficializzato le squadre: da lì non si toccano più
+   *  e si apre lo schieramento delle formazioni fantacalcetto. */
+  teams_official_at: string | null
   created_at: string
 }
 

@@ -19,6 +19,8 @@ export interface FantaLineupInfo {
 export interface FantaMatchRow {
   match: Match
   hasTeams: boolean
+  /** True se l'admin ha ufficializzato le squadre: solo allora si schiera. */
+  teamsOfficial: boolean
   hasResult: boolean
   isPublished: boolean
   /** True solo per la prossima partita da giocare: l'unica schierabile. */
@@ -150,6 +152,7 @@ export function useFantaLeague(leagueId: string | undefined, myPlayerId: string 
       return {
         match: m as unknown as Match,
         hasTeams: (teamsCountByMatch.get(m.id) ?? 0) > 0,
+        teamsOfficial: !!m.teams_official_at,
         hasResult: !!result,
         isPublished: publishedMatchIds.has(m.id),
         isNext: m.id === nextMatchId,
