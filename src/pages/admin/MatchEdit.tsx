@@ -64,6 +64,7 @@ export default function MatchEdit() {
   const [allPlayers, setAllPlayers] = useState<Player[]>([])
   const [addBookingPlayer, setAddBookingPlayer] = useState('')
   const [addingBooking, setAddingBooking] = useState(false)
+  const [addBookingError, setAddBookingError] = useState<string | null>(null)
   const [closingSurvey, setClosingSurvey] = useState(false)
 
   // Generazione squadre
@@ -365,9 +366,24 @@ export default function MatchEdit() {
 
   // --- Azioni sondaggio ---
   async function handleAddBooking() {
-    if (!id || !addBookingPlayer) return
+    // Numero fisso di 10 giocatori: il limite vale anche per l'aggiunta
+    // manuale dell'admin (e in ogni caso è imposto dal trigger sul DB).
+    if (!id || !addBookingPlayer || bookings.length >= MAX_PLAYERS) return
     setAddingBooking(true)
-    await supabase.from('match_bookings').insert({ match_id: id, player_id: addBookingPlayer })
+    setAddBookingError(null)
+    const { error: addError } = await supabase
+      .from('match_bookings')
+      .insert({ match_id: id, player_id: addBookingPlayer })
+    if (addError) {
+      setAddingBooking(false)
+      setAddBookingError(
+        addError.message.includes('Sondaggio al completo')
+          ? 'Sondaggio al completo: il numero di giocatori per partita è fisso a 10.'
+          : addError.message
+      )
+      refetchBookings()
+      return
+    }
     logActivity('prenotazione_aggiunta', {
       matchId: id,
       giocatore: allPlayers.find(p => p.id === addBookingPlayer)?.name,
@@ -636,7 +652,8 @@ export default function MatchEdit() {
   const inMatchIds = new Set(matchPlayers.map((mp) => mp.player_id))
   const playersNotInMatch = allPlayers.filter((p) => !inMatchIds.has(p.id))
 
-  const canGenerate = bookings.length >= MAX_PLAYERS && matchPlayers.length === 0
+  // Le squadre si generano solo con esattamente 10 giocatori: né di più né di meno.
+  const canGenerate = bookings.length === MAX_PLAYERS && matchPlayers.length === 0
 
   return (
     <div className="p-4 pb-12">
@@ -771,6 +788,8 @@ export default function MatchEdit() {
             </div>
           )}
 
+          {addBookingError && <p className="mt-2 text-sm text-red-600">{addBookingError}</p>}
+
           {/* Chiudi sondaggio */}
           {match.booking_open && (
             <button
@@ -793,6 +812,12 @@ export default function MatchEdit() {
             {bookings.length < MAX_PLAYERS && (
               <span className="text-field-orange">
                 {' '}Servono {MAX_PLAYERS - bookings.length} prenotazioni in più per generare le squadre.
+              </span>
+            )}
+            {bookings.length > MAX_PLAYERS && (
+              <span className="text-red-600">
+                {' '}Ci sono {bookings.length - MAX_PLAYERS} prenotazioni di troppo: il numero di
+                giocatori è fisso a {MAX_PLAYERS}, rimuovile per generare le squadre.
               </span>
             )}
           </p>

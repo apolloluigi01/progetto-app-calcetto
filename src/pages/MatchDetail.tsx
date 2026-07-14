@@ -23,6 +23,7 @@ export default function MatchDetail() {
   } = useMatchBookings(id, player?.id)
 
   const [bookingBusy, setBookingBusy] = useState(false)
+  const [bookingError, setBookingError] = useState<string | null>(null)
   const [localVotes, setLocalVotes] = useState<Record<string, number>>({})
   const [votingBusy, setVotingBusy] = useState(false)
   const [votingSuccess, setVotingSuccess] = useState(false)
@@ -31,10 +32,23 @@ export default function MatchDetail() {
     useMatchVoting(id)
 
   async function handleBook() {
-    if (!id || !player) return
+    // Il numero di giocatori è fisso a 10: oltre non si prenota. Il limite è
+    // imposto anche da un trigger sul DB (copre pagine non aggiornate e
+    // prenotazioni simultanee).
+    if (!id || !player || bookings.length >= MAX_PLAYERS) return
     setBookingBusy(true)
-    await supabase.from('match_bookings').insert({ match_id: id, player_id: player.id })
+    setBookingError(null)
+    const { error: bookError } = await supabase
+      .from('match_bookings')
+      .insert({ match_id: id, player_id: player.id })
     setBookingBusy(false)
+    if (bookError && bookError.code !== '23505') {
+      setBookingError(
+        bookError.message.includes('Sondaggio al completo')
+          ? 'Sondaggio al completo: il numero di giocatori per partita è fisso a 10.'
+          : bookError.message
+      )
+    }
     refetchBookings()
   }
 
@@ -170,6 +184,8 @@ export default function MatchDetail() {
               ))}
             </div>
           )}
+
+          {bookingError && <p className="mt-2 text-sm text-red-600">{bookingError}</p>}
 
           {/* Bottone prenota / disdici */}
           <div className="mt-3">
