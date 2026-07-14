@@ -35,6 +35,7 @@ export type ActivityAction =
   | 'fanta_giornata_calcolata'
   | 'fanta_calcolo_annullato'
   | 'fanta_parametri_modificati'
+  | 'fanta_reminder_inviato'
   | 'fasce_modificate'
   | 'squadre_ricalcolate'
   | 'albo_voce_creata'
@@ -70,6 +71,7 @@ export const actionLabels: Record<ActivityAction, string> = {
   fanta_giornata_calcolata: 'Giornata fantacalcetto calcolata',
   fanta_calcolo_annullato:  'Calcolo giornata fantacalcetto annullato',
   fanta_parametri_modificati: 'Parametri fantacalcetto modificati',
+  fanta_reminder_inviato: 'Reminder formazione fantacalcetto inviato',
   fasce_modificate:      'Range fasce/carte modificati',
   squadre_ricalcolate:   'Squadre ricalcolate',
   albo_voce_creata:      "Voce albo d'oro creata",

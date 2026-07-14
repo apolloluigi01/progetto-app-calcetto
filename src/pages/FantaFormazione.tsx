@@ -14,10 +14,15 @@ import {
   formatFantaPoints,
   lineupDeadline,
 } from '../lib/fantacalcetto'
+import { getFunctionErrorMessage } from '../lib/functionErrors'
+import { logActivity } from '../lib/activityLog'
 import FantaPitch from '../components/FantaPitch'
 import PlayerName, { fullName } from '../components/PlayerName'
 import type { MatchPlayerWithName } from '../hooks/useMatchDetail'
 import type { Player } from '../types/database'
+
+/** Massimo di reminder mail inviabili per giornata (stesso limite lato server). */
+const MAX_REMINDERS = 3
 
 interface SavedLineup {
   playerIds: string[]
@@ -34,7 +39,7 @@ interface OtherLineup {
 
 export default function FantaFormazione() {
   const { leagueId, matchId } = useParams<{ leagueId: string; matchId: string }>()
-  const { player } = useAuth()
+  const { player, isAdmin } = useAuth()
   const { data, loading, error } = useMatchDetail(matchId)
   const { ratings, loading: ratingsLoading } = usePlayerRatings(data?.matchPlayers.map((mp) => mp.player_id))
   const { settings } = useFantaSettings()
@@ -54,6 +59,11 @@ export default function FantaFormazione() {
   const [isCalculated, setIsCalculated] = useState(false)
   // Formazioni schierate dagli altri partecipanti alla lega.
   const [others, setOthers] = useState<OtherLineup[]>([])
+  // Reminder mail "schiera la formazione" (solo admin): quanti già inviati.
+  const [reminderCount, setReminderCount] = useState<number | null>(null)
+  const [reminderSending, setReminderSending] = useState(false)
+  const [reminderError, setReminderError] = useState<string | null>(null)
+  const [reminderSent, setReminderSent] = useState(false)
   // Orologio per il blocco formazioni (15' prima del calcio d'inizio):
   // si aggiorna ogni 30 secondi così la pagina si blocca da sola allo scadere.
   const [now, setNow] = useState(() => Date.now())
@@ -144,6 +154,23 @@ export default function FantaFormazione() {
       cancelled = true
     }
   }, [leagueId, matchId])
+
+  // Numero di reminder già inviati per questa giornata (solo admin).
+  useEffect(() => {
+    if (!leagueId || !matchId || !isAdmin) return
+    let cancelled = false
+    supabase
+      .from('fanta_lineup_reminders')
+      .select('id', { count: 'exact', head: true })
+      .eq('league_id', leagueId)
+      .eq('match_id', matchId)
+      .then(({ count }) => {
+        if (!cancelled) setReminderCount(count ?? 0)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [leagueId, matchId, isAdmin])
 
   // Verifica che questa sia davvero la prossima partita da giocare della
   // stagione: le formazioni si possono schierare solo per quella.
@@ -249,6 +276,27 @@ export default function FantaFormazione() {
     }
     setSaved(true)
     setSavedLineup({ playerIds: [...selected], captainId })
+  }
+
+  // Invia a tutti i partecipanti della lega la mail che ricorda di schierare
+  // la formazione. Solo admin, max 3 reminder, solo finché non è tutto bloccato.
+  async function handleSendReminder() {
+    if (!leagueId || !matchId || !isAdmin || locked || reminderSending) return
+    if ((reminderCount ?? 0) >= MAX_REMINDERS) return
+    setReminderSending(true)
+    setReminderError(null)
+    setReminderSent(false)
+    const { error: fnError } = await supabase.functions.invoke('fanta-lineup-reminder', {
+      body: { leagueId, matchId },
+    })
+    setReminderSending(false)
+    if (fnError) {
+      setReminderError(await getFunctionErrorMessage(fnError, "Errore nell'invio del reminder"))
+      return
+    }
+    setReminderCount((c) => (c ?? 0) + 1)
+    setReminderSent(true)
+    logActivity('fanta_reminder_inviato', { leagueId, matchId })
   }
 
   // Punteggio (solo dopo che l'admin ha calcolato la giornata)
@@ -359,6 +407,37 @@ export default function FantaFormazione() {
             </p>
           )}
         </>
+      )}
+
+      {/* Reminder mail ai partecipanti (solo admin): va di pari passo con il
+          blocco formazioni — quando non si può più schierare, non si invia più. */}
+      {isAdmin && isNextMatch && !result && (
+        <div className="mt-3 rounded-xl border border-field-yellow/40 bg-field-yellow/10 p-3">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-medium text-gray-600">
+              📣 Reminder formazione (admin) — inviati {reminderCount ?? '...'}/{MAX_REMINDERS}
+            </p>
+          </div>
+          <button
+            onClick={handleSendReminder}
+            disabled={
+              locked || reminderSending || reminderCount === null || reminderCount >= MAX_REMINDERS
+            }
+            className="mt-2 w-full rounded-lg bg-field-orange px-4 py-2 text-sm font-medium text-white hover:bg-field-orange/90 disabled:opacity-50"
+          >
+            {reminderSending
+              ? 'Invio in corso...'
+              : locked
+                ? '🔒 Formazioni bloccate: reminder non più inviabile'
+                : reminderCount !== null && reminderCount >= MAX_REMINDERS
+                  ? 'Limite di reminder raggiunto'
+                  : '✉️ Invia reminder ai partecipanti'}
+          </button>
+          {reminderSent && (
+            <p className="mt-2 text-xs text-green-700">✓ Reminder inviato a tutti i partecipanti della lega.</p>
+          )}
+          {reminderError && <p className="mt-2 text-xs text-red-600">{reminderError}</p>}
+        </div>
       )}
 
       {/* Budget bar */}

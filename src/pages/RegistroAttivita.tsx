@@ -40,6 +40,7 @@ const actionColors: Record<ActivityAction, string> = {
   fanta_giornata_calcolata: 'bg-field-yellow/20 text-field-orange',
   fanta_calcolo_annullato:  'bg-red-50 text-red-600',
   fanta_parametri_modificati: 'bg-field-yellow/20 text-field-orange',
+  fanta_reminder_inviato: 'bg-field-yellow/20 text-field-orange',
   fasce_modificate:      'bg-field-yellow/20 text-field-orange',
   squadre_ricalcolate:   'bg-blue-50 text-blue-700',
   albo_voce_creata:      'bg-field-green/10 text-field-green-dark',
