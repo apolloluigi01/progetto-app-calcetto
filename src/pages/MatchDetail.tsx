@@ -297,6 +297,15 @@ export default function MatchDetail() {
         </p>
       )}
 
+      {/* Squadre non ancora ufficializzate: i player normali non le vedono
+          (le righe di match_players sono filtrate anche dalle policy RLS). */}
+      {!isAdmin && matchPlayers.length === 0 && !match.booking_open && !result && !match.teams_official_at && (
+        <p className="mt-4 rounded-xl bg-white p-4 text-sm text-gray-500 shadow">
+          🔒 Le squadre non sono ancora state ufficializzate dagli admin: saranno visibili a tutti
+          dopo l'ufficializzazione.
+        </p>
+      )}
+
       {/* Squadre (visibili solo se i giocatori sono stati assegnati) */}
       {matchPlayers.length > 0 && (
         <div className="mt-4 grid grid-cols-2 gap-3">
