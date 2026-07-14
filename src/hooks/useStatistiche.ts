@@ -3,12 +3,18 @@ import { getCurrentSeasonId } from '../lib/seasons'
 import { computeStatistiche, type PlayerStats } from '../lib/statistiche'
 import { computeOverallsForPlayers } from '../lib/teamGeneration'
 
-export function useStatistiche(seasonId?: string) {
+export function useStatistiche(seasonId?: string, enabled = true) {
   const [stats, setStats] = useState<PlayerStats[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    if (!enabled) {
+      setStats([])
+      setLoading(false)
+      setError(null)
+      return
+    }
     async function load() {
       setLoading(true)
       setError(null)
@@ -27,7 +33,7 @@ export function useStatistiche(seasonId?: string) {
       }
     }
     load()
-  }, [seasonId])
+  }, [seasonId, enabled])
 
   return { stats, loading, error }
 }

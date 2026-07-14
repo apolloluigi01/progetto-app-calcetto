@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useStatistiche } from '../hooks/useStatistiche'
 import { useOveralls } from '../hooks/useOveralls'
-import { STAT_CONFIG, type StatKey } from '../lib/statistiche'
+import { STAT_CONFIG, type PlayerStats, type StatKey } from '../lib/statistiche'
 import PlayerCard from '../components/PlayerCard'
 import type { Player } from '../types/database'
 
@@ -11,7 +11,16 @@ const STAT_KEYS: StatKey[] = ['overall', 'marcatori', 'assist', 'presenze', 'mvp
 
 export default function GiocatoreDetail() {
   const { id } = useParams<{ id: string }>()
-  const { stats: seasonStats, loading: statsLoading } = useStatistiche()
+  const [searchParams] = useSearchParams()
+  // Aperto dall'albo d'oro: mostra le statistiche di quella stagione specifica.
+  // "storica" = stagione pre-app censita a mano dagli admin: nessuna statistica disponibile.
+  const seasonParam = searchParams.get('season')
+  const seasonName = searchParams.get('seasonName')
+  const isStorica = seasonParam === 'storica'
+  const { stats: seasonStats, loading: statsLoading } = useStatistiche(
+    seasonParam ?? undefined,
+    !isStorica
+  )
   const { overalls, loading: overallsLoading } = useOveralls()
 
   const [player, setPlayer] = useState<Player | null>(null)
@@ -36,7 +45,22 @@ export default function GiocatoreDetail() {
   if (loading) return <div className="p-4 text-sm text-gray-500">Caricamento...</div>
   if (error || !player) return <div className="p-4 text-sm text-red-600">{error ?? 'Giocatore non trovato'}</div>
 
-  const playerStats = seasonStats.find((s) => s.player.id === id) ?? null
+  const zeroStats: PlayerStats = {
+    player,
+    partiteGiocate: 0,
+    vittorie: 0,
+    pareggi: 0,
+    sconfitte: 0,
+    golFatti: 0,
+    assist: 0,
+    autogol: 0,
+    mvp: 0,
+    voteAvg: null,
+    voteCount: 0,
+    overall: null,
+    winStreak: 0,
+  }
+  const playerStats = isStorica ? zeroStats : seasonStats.find((s) => s.player.id === id) ?? null
   const winPercentage =
     playerStats && playerStats.partiteGiocate > 0 ? (playerStats.vittorie / playerStats.partiteGiocate) * 100 : null
 
@@ -50,7 +74,14 @@ export default function GiocatoreDetail() {
         )}
       </div>
 
-      <h2 className="mt-6 text-lg font-semibold text-field-green-dark">Statistiche stagione</h2>
+      <h2 className="mt-6 text-lg font-semibold text-field-green-dark">
+        Statistiche stagione{seasonName ? ` ${seasonName}` : ''}
+      </h2>
+      {isStorica && (
+        <p className="mt-1 text-xs text-gray-400">
+          Stagione precedente all'app: statistiche non disponibili.
+        </p>
+      )}
 
       {statsLoading && <p className="mt-2 text-sm text-gray-500">Caricamento statistiche...</p>}
 

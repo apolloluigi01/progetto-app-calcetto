@@ -18,6 +18,9 @@ interface Podium {
   key: string
   title: string
   endDate: string | null
+  /** Id della stagione app; null per le voci censite a mano (stagioni pre-app). */
+  seasonId: string | null
+  seasonName: string
   top3: (PodiumEntry | null)[]
 }
 
@@ -71,6 +74,8 @@ export default function AlboOro() {
             key: `season-${season.id}`,
             title: `Stagione ${season.name}`,
             endDate: season.end_date,
+            seasonId: season.id,
+            seasonName: season.name,
             top3: top3.map((e) => ({
               player: e.stats.player,
               overall: overallMap.get(e.stats.player.id) ?? null,
@@ -107,6 +112,8 @@ export default function AlboOro() {
           key: `manual-${h.id}`,
           title: h.kind === 'fanta' ? h.season_name : `Stagione ${h.season_name}`,
           endDate: h.end_date,
+          seasonId: null,
+          seasonName: h.season_name,
           top3: [h.first_player_id, h.second_player_id, h.third_player_id].map((id) => {
             const player = id ? playerMap.get(id) : undefined
             if (!player) return null
@@ -140,7 +147,7 @@ export default function AlboOro() {
     return new Date(d).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })
   }
 
-  function renderPodium({ key, title, endDate, top3 }: Podium, fanta: boolean) {
+  function renderPodium({ key, title, endDate, seasonId, seasonName, top3 }: Podium, fanta: boolean) {
     // Podio: 2° a sinistra, 1° al centro (più in alto), 3° a destra.
     const slots: { entry: PodiumEntry | null; place: number; height: string; medal: string }[] = [
       { entry: top3[1] ?? null, place: 2, height: 'h-14', medal: '🥈' },
@@ -164,7 +171,7 @@ export default function AlboOro() {
               <div key={place} className="flex flex-col items-center justify-end">
                 {entry ? (
                   <Link
-                    to={`/giocatori/${entry.player.id}`}
+                    to={`/giocatori/${entry.player.id}?season=${seasonId ?? 'storica'}&seasonName=${encodeURIComponent(seasonName)}`}
                     className="flex w-full max-w-[130px] flex-col items-center transition-transform hover:scale-105"
                   >
                     <PlayerCard player={entry.player} overall={entry.overall} stats={entry.stats} compact />
