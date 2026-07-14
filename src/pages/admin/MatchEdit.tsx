@@ -447,6 +447,14 @@ export default function MatchEdit() {
     refetch()
   }
 
+  // Le squadre della partita sono cambiate: le formazioni fantacalcetto
+  // schierate su quelle squadre non sono più valide e vengono azzerate per
+  // tutte le leghe (i partecipanti potranno rischierarle sulle nuove squadre).
+  async function resetFantaLineups() {
+    if (!id) return
+    await supabase.from('fanta_lineups').delete().eq('match_id', id)
+  }
+
   // --- Modifica manuale squadre già confermate (solo in bozza) ---
   function startEditingTeams() {
     setLocalTeamA(teamA)
@@ -483,6 +491,8 @@ export default function MatchEdit() {
     await Promise.all(
       changed.map((p) => supabase.from('match_players').update({ team: p.team }).eq('id', p.id))
     )
+
+    await resetFantaLineups()
 
     setSavingTeams(false)
     setEditingTeams(false)
@@ -522,6 +532,7 @@ export default function MatchEdit() {
       ...pendingTeams.teamB.map((p) => ({ match_id: id, player_id: p.playerId, team: 'B' as Team })),
     ]
     await supabase.from('match_players').insert(rows)
+    await resetFantaLineups()
 
     logActivity(pendingTeams.action, {
       matchId: id,

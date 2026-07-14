@@ -206,9 +206,12 @@ export default function FantaFormazione() {
   // Termine ultimo: 15 minuti prima del calcio d'inizio (se la partita ha un orario).
   const deadline = lineupDeadline(match.match_date, match.match_time)
   const pastDeadline = deadline !== null && now >= deadline.getTime()
-  // Bloccata se la partita è conclusa, se non è la prossima in programma
-  // o se manca meno di un quarto d'ora al calcio d'inizio.
-  const locked = !!result || !isNextMatch || pastDeadline
+  // Senza squadre formate non c'è nulla da schierare.
+  const teamsFormed = teamA.length > 0 && teamB.length > 0
+  // Bloccata se le squadre non sono ancora formate, se la partita è conclusa,
+  // se non è la prossima in programma o se manca meno di un quarto d'ora al
+  // calcio d'inizio.
+  const locked = !teamsFormed || !!result || !isNextMatch || pastDeadline
 
   const costOf = (playerId: string) => creditCost(ratings.get(playerId) ?? null, fasce)
   const budgetUsed = [...selected].reduce((s, id) => s + costOf(id), 0)
@@ -381,7 +384,9 @@ export default function FantaFormazione() {
       {locked ? (
         <div className="mt-3 rounded-xl border border-field-orange/30 bg-field-orange/5 p-3">
           <p className="text-sm text-field-orange">
-            {!result
+            {!teamsFormed && !result
+              ? '🔒 Le squadre di questa partita non sono ancora state formate: la formazione si potrà schierare dopo la generazione delle squadre.'
+              : !result
               ? pastDeadline && isNextMatch
                 ? '🔒 Formazioni bloccate: mancano meno di 15 minuti al calcio d’inizio (o la partita è già iniziata). Non è più possibile inserire o modificare la formazione.'
                 : '🔒 Puoi schierare la formazione solo per la prossima partita in programma: questa si sbloccherà dopo quella precedente.'
@@ -411,7 +416,7 @@ export default function FantaFormazione() {
 
       {/* Reminder mail ai partecipanti (solo admin): va di pari passo con il
           blocco formazioni — quando non si può più schierare, non si invia più. */}
-      {isAdmin && isNextMatch && !result && (
+      {isAdmin && isNextMatch && !result && teamsFormed && (
         <div className="mt-3 rounded-xl border border-field-yellow/40 bg-field-yellow/10 p-3">
           <div className="flex items-center justify-between">
             <p className="text-xs font-medium text-gray-600">
