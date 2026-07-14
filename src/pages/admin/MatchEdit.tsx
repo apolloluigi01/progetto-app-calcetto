@@ -452,6 +452,22 @@ export default function MatchEdit() {
   // tutte le leghe (i partecipanti potranno rischierarle sulle nuove squadre).
   async function resetFantaLineups() {
     if (!id) return
+    // Traccia chi aveva già schierato: la Home mostrerà a ciascuno l'avviso
+    // di rischierare finché non salva una nuova formazione.
+    const { data: existing } = await supabase
+      .from('fanta_lineups')
+      .select('league_id, member_id')
+      .eq('match_id', id)
+    const resetRows = ((existing ?? []) as { league_id: string; member_id: string }[]).map((l) => ({
+      league_id: l.league_id,
+      match_id: id,
+      member_id: l.member_id,
+    }))
+    if (resetRows.length > 0) {
+      await supabase
+        .from('fanta_lineup_resets')
+        .upsert(resetRows, { onConflict: 'league_id,match_id,member_id' })
+    }
     await supabase.from('fanta_lineups').delete().eq('match_id', id)
   }
 

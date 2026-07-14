@@ -35,6 +35,7 @@ interface OtherLineup {
   captainId: string
   playerIds: string[]
   score: number | null
+  hidden: boolean
 }
 
 export default function FantaFormazione() {
@@ -47,6 +48,8 @@ export default function FantaFormazione() {
 
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [captainId, setCaptainId] = useState('')
+  // Flag "formazione invisibile agli altri" (resta visibile che è schierata).
+  const [hiddenFlag, setHiddenFlag] = useState(false)
   const [lineupLoaded, setLineupLoaded] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -79,19 +82,20 @@ export default function FantaFormazione() {
     let cancelled = false
     supabase
       .from('fanta_lineups')
-      .select('captain_id, fanta_lineup_players(player_id)')
+      .select('captain_id, hidden, fanta_lineup_players(player_id)')
       .eq('league_id', leagueId)
       .eq('match_id', matchId)
       .eq('member_id', player.id)
       .maybeSingle()
       .then(({ data: row }) => {
         if (cancelled) return
-        type Row = { captain_id: string; fanta_lineup_players: { player_id: string }[] }
+        type Row = { captain_id: string; hidden: boolean; fanta_lineup_players: { player_id: string }[] }
         if (row) {
           const r = row as unknown as Row
           const ids = r.fanta_lineup_players.map((p) => p.player_id)
           setSelected(new Set(ids))
           setCaptainId(r.captain_id)
+          setHiddenFlag(r.hidden)
           setSavedLineup({ playerIds: ids, captainId: r.captain_id })
         }
         setLineupLoaded(true)
@@ -109,7 +113,7 @@ export default function FantaFormazione() {
       .from('fanta_lineups')
       // Due foreign key verso players (member e capitano): serve il
       // riferimento esplicito per disambiguare l'embed.
-      .select('member_id, captain_id, score, fanta_lineup_players(player_id), member:players!fanta_lineups_member_id_fkey(name, surname, nickname)')
+      .select('member_id, captain_id, score, hidden, fanta_lineup_players(player_id), member:players!fanta_lineups_member_id_fkey(name, surname, nickname)')
       .eq('league_id', leagueId)
       .eq('match_id', matchId)
       .neq('member_id', player.id)
@@ -119,6 +123,7 @@ export default function FantaFormazione() {
           member_id: string
           captain_id: string
           score: number | null
+          hidden: boolean
           fanta_lineup_players: { player_id: string }[]
           member: { name: string; surname: string | null; nickname: string | null } | null
         }
@@ -129,6 +134,7 @@ export default function FantaFormazione() {
             captainId: r.captain_id,
             playerIds: r.fanta_lineup_players.map((p) => p.player_id),
             score: r.score !== null ? Number(r.score) : null,
+            hidden: r.hidden,
           })),
         )
       })
@@ -254,6 +260,7 @@ export default function FantaFormazione() {
           match_id: matchId,
           member_id: player.id,
           captain_id: captainId,
+          hidden: hiddenFlag,
           updated_at: new Date().toISOString(),
         },
         { onConflict: 'league_id,match_id,member_id' },
@@ -277,6 +284,13 @@ export default function FantaFormazione() {
       setSaveError(playersError.message)
       return
     }
+    // Formazione rischierata: l'avviso "squadre ricalcolate" in Home sparisce.
+    await supabase
+      .from('fanta_lineup_resets')
+      .delete()
+      .eq('league_id', leagueId)
+      .eq('match_id', matchId)
+      .eq('member_id', player.id)
     setSaved(true)
     setSavedLineup({ playerIds: [...selected], captainId })
   }
@@ -524,6 +538,25 @@ export default function FantaFormazione() {
             )}
           </div>
 
+          <label className="mt-3 flex items-start gap-2 rounded-xl bg-white p-3 shadow">
+            <input
+              type="checkbox"
+              checked={hiddenFlag}
+              onChange={(e) => {
+                setSaved(false)
+                setHiddenFlag(e.target.checked)
+              }}
+              className="mt-0.5 h-4 w-4 accent-field-green"
+            />
+            <span className="text-sm text-gray-700">
+              🙈 <span className="font-medium">Formazione invisibile</span>
+              <span className="block text-xs text-gray-400">
+                Gli altri partecipanti vedranno solo che hai schierato, non chi: la formazione
+                tornerà visibile al blocco delle formazioni.
+              </span>
+            </span>
+          </label>
+
           {saveError && <p className="mt-2 text-sm text-red-600">{saveError}</p>}
           {saved && <p className="mt-2 text-sm text-green-700">✓ Formazione salvata.</p>}
 
@@ -607,21 +640,27 @@ export default function FantaFormazione() {
                     </span>
                   )}
                 </div>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {o.playerIds.map((pid) => (
-                    <span
-                      key={pid}
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                        pid === o.captainId
-                          ? 'bg-field-orange/10 text-field-orange'
-                          : 'bg-gray-100 text-gray-600'
-                      }`}
-                    >
-                      {pid === o.captainId && 'Ⓒ '}
-                      {nameOf(pid)}
-                    </span>
-                  ))}
-                </div>
+                {/* Formazione nascosta: si vede che è schierata, non chi c'è dentro.
+                    Torna visibile quando le formazioni si bloccano (deadline o partita giocata). */}
+                {o.hidden && !result && !pastDeadline ? (
+                  <p className="mt-2 text-xs italic text-gray-500">🙈 Formazione schierata, invisibile</p>
+                ) : (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {o.playerIds.map((pid) => (
+                      <span
+                        key={pid}
+                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                          pid === o.captainId
+                            ? 'bg-field-orange/10 text-field-orange'
+                            : 'bg-gray-100 text-gray-600'
+                        }`}
+                      >
+                        {pid === o.captainId && 'Ⓒ '}
+                        {nameOf(pid)}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
           </div>

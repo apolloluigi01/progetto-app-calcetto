@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { supabase } from '../lib/supabase'
+import { useAuth } from '../contexts/AuthContext'
 import { useHomeDashboard } from '../hooks/useHomeDashboard'
 import { useCurrentSeason } from '../hooks/useCurrentSeason'
 import { useStatistiche } from '../hooks/useStatistiche'
@@ -72,6 +74,69 @@ function WeatherCard({
   )
 }
 
+/**
+ * Avviso "squadre ricalcolate": compare se l'utente aveva schierato la
+ * formazione fanta e un admin ha rifatto le squadre (reset della lineup).
+ * Resta finché l'utente non rischiera (il salvataggio cancella la riga di
+ * reset); le partite già concluse non generano più l'avviso.
+ */
+function FantaResetNotice() {
+  const { player } = useAuth()
+  const [resets, setResets] = useState<{ leagueId: string; matchId: string; matchDate: string }[]>([])
+
+  useEffect(() => {
+    if (!player) return
+    let cancelled = false
+    supabase
+      .from('fanta_lineup_resets')
+      .select('league_id, match_id, matches(match_date, result:match_results(id))')
+      .eq('member_id', player.id)
+      .then(({ data }) => {
+        if (cancelled) return
+        type Row = {
+          league_id: string
+          match_id: string
+          matches: { match_date: string; result: { id: string }[] | { id: string } | null } | null
+        }
+        setResets(
+          ((data ?? []) as unknown as Row[])
+            .filter((r) => {
+              const res = r.matches?.result
+              return !(Array.isArray(res) ? res[0] ?? null : res)
+            })
+            .map((r) => ({
+              leagueId: r.league_id,
+              matchId: r.match_id,
+              matchDate: r.matches?.match_date ?? '',
+            })),
+        )
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [player])
+
+  if (resets.length === 0) return null
+
+  return (
+    <div className="mt-4 rounded-xl border border-field-orange/40 bg-field-orange/5 p-4">
+      <p className="text-sm font-semibold text-field-orange">⚠️ Squadre ricalcolate</p>
+      {resets.map((r) => (
+        <p key={`${r.leagueId}-${r.matchId}`} className="mt-1 text-sm text-gray-700">
+          Le squadre della partita del {formatDate(r.matchDate)} sono state ricalcolate: la tua
+          formazione del fantacalcetto è stata azzerata.{' '}
+          <Link
+            to={`/fantacalcetto/${r.leagueId}/partite/${r.matchId}`}
+            className="font-medium text-field-green underline"
+          >
+            Rischierala ora →
+          </Link>
+        </p>
+      ))}
+    </div>
+  )
+}
+
 export default function Home() {
   const { lastMatch, nextMatch, loading, error, reload } = useHomeDashboard()
   const { season } = useCurrentSeason()
@@ -88,6 +153,8 @@ export default function Home() {
           </span>
         )}
       </div>
+
+      <FantaResetNotice />
 
       {loading && <p className="mt-4 text-sm text-gray-500">Caricamento...</p>}
 
