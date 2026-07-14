@@ -11,6 +11,8 @@ import type { GeneratedTeams } from '../lib/teamGeneration'
 
 type Modalita = 'manuale' | 'sondaggio'
 
+const MAX_PLAYERS = 10
+
 export default function PartitaForm() {
   const navigate = useNavigate()
   const [players, setPlayers] = useState<Player[]>([])
@@ -38,11 +40,16 @@ export default function PartitaForm() {
     getKnownFields().then(setKnownFields)
   }, [])
 
+  // Il numero di giocatori per partita è fisso a 10: oltre non si può selezionare.
   function toggleSelected(playerId: string) {
     setSelected((prev) => {
       const next = new Set(prev)
-      if (next.has(playerId)) next.delete(playerId)
-      else next.add(playerId)
+      if (next.has(playerId)) {
+        next.delete(playerId)
+      } else {
+        if (next.size >= MAX_PLAYERS) return prev
+        next.add(playerId)
+      }
       return next
     })
   }
@@ -69,11 +76,11 @@ export default function PartitaForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modalita, selected, players])
 
-  // NOTA: vincolo dei 10 giocatori temporaneamente disattivato per testing
+  // In modalità manuale servono esattamente 10 giocatori, né di più né di meno.
   const canSubmit =
     matchDate &&
     (modalita === 'sondaggio' ||
-      (selectedIds.length > 0 && generatedTeams !== null && !generatingTeams))
+      (selectedIds.length === MAX_PLAYERS && generatedTeams !== null && !generatingTeams))
 
   async function handleSubmit() {
     setError(null)
@@ -214,19 +221,32 @@ export default function PartitaForm() {
         <>
           <div className="mt-4 rounded-xl bg-white p-4 shadow">
             <h2 className="font-medium">
-              Giocatori presenti ({selectedIds.length}/10)
+              Giocatori presenti ({selectedIds.length}/{MAX_PLAYERS})
             </h2>
+            {selectedIds.length !== MAX_PLAYERS && (
+              <p className="mt-1 text-xs text-field-orange">
+                Il numero di giocatori è fisso a {MAX_PLAYERS}: selezionane esattamente {MAX_PLAYERS}.
+              </p>
+            )}
             <div className="mt-2 space-y-1">
-              {players.map((p) => (
-                <label key={p.id} className="flex items-center gap-2 py-1">
-                  <input
-                    type="checkbox"
-                    checked={selected.has(p.id)}
-                    onChange={() => toggleSelected(p.id)}
-                  />
-                  <PlayerName name={p.name} surname={p.surname} nickname={p.nickname} />
-                </label>
-              ))}
+              {players.map((p) => {
+                const isSelected = selected.has(p.id)
+                const disabled = !isSelected && selectedIds.length >= MAX_PLAYERS
+                return (
+                  <label
+                    key={p.id}
+                    className={`flex items-center gap-2 py-1 ${disabled ? 'opacity-40' : ''}`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      disabled={disabled}
+                      onChange={() => toggleSelected(p.id)}
+                    />
+                    <PlayerName name={p.name} surname={p.surname} nickname={p.nickname} />
+                  </label>
+                )
+              })}
             </div>
           </div>
 
