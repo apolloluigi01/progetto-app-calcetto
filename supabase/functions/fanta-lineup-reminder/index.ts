@@ -31,6 +31,17 @@ function minifyHtml(html: string): string {
   return html.replace(/>\s+</g, "><").replace(/\s+/g, " ").trim();
 }
 
+// Neutralizza eventuali caratteri speciali nel nome della lega (definito dagli
+// utenti) prima di inserirlo nell'HTML della mail.
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 async function sendEmail(to: string, subject: string, html: string): Promise<void> {
   const client = new SMTPClient({
     connection: {
@@ -126,23 +137,30 @@ Deno.serve(async (req: Request) => {
     day: "numeric", month: "long", year: "numeric",
   });
 
+  // Nota encoding: il corpo usa SOLO caratteri ASCII, con entit&agrave; HTML per
+  // accenti (&agrave;, &egrave;, &ugrave;...) ed emoji (&#9200;). Cos&igrave; i byte
+  // trasmessi sono ASCII puro e la mail non pu&ograve; mai risultare "illeggibile"
+  // per problemi di charset/quoted-printable, indipendentemente dal client.
+  const leagueName = escapeHtml(leagueRes.data.name);
   const html = `
     <div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#1a1a1a;">
       <div style="background:#f57f17;border-radius:12px 12px 0 0;padding:20px 24px;">
-        <h2 style="color:white;margin:0;font-size:20px;">⏰ Reminder Fantacalcetto</h2>
-        <p style="color:rgba(255,255,255,.85);margin:4px 0 0;font-size:14px;">${leagueRes.data.name} — partita del ${dateLabel}</p>
+        <h2 style="color:white;margin:0;font-size:20px;">&#9200; Promemoria Fantacalcetto</h2>
+        <p style="color:rgba(255,255,255,.85);margin:4px 0 0;font-size:14px;">${leagueName} &mdash; partita del ${dateLabel}</p>
       </div>
       <div style="border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;padding:20px 24px;">
-        <p style="font-size:14px;color:#374151;margin:0 0 12px;">
-          Non dimenticarti di schierare la formazione per il fantacalcetto!
+        <p style="font-size:15px;color:#374151;margin:0 0 12px;">Ciao!</p>
+        <p style="font-size:15px;color:#374151;margin:0 0 12px;">
+          Ti ricordiamo di <strong>schierare la formazione</strong> per la giornata di
+          fantacalcetto della lega <strong>${leagueName}</strong>, relativa alla partita del ${dateLabel}.
         </p>
-        <p style="font-size:14px;color:#374151;margin:0 0 12px;">
-          Apri l'app Pavone League, entra nella tua lega e schiera la squadra prima che le
+        <p style="font-size:15px;color:#374151;margin:0 0 12px;">
+          Apri l'app Pavone League, entra nella tua lega e schiera la tua squadra prima che le
           formazioni vengano bloccate (15 minuti prima del calcio d'inizio).
         </p>
         <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0;">
         <p style="color:#9ca3af;font-size:12px;text-align:center;margin:0;">
-          Pavone League — reminder inviato da un admin della lega.
+          Pavone League &mdash; promemoria inviato da un admin della lega.
         </p>
       </div>
     </div>`;
@@ -155,7 +173,7 @@ Deno.serve(async (req: Request) => {
 
   const results = await Promise.allSettled(
     emails.map((email) =>
-      sendEmail(email, `⏰ Fantacalcetto: schiera la formazione per la partita del ${dateLabel}`, html)
+      sendEmail(email, `Fantacalcetto: schiera la formazione per la partita del ${dateLabel}`, html)
     )
   );
 

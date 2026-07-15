@@ -301,22 +301,13 @@ export default function FantaLega() {
                     {calcBusy === m.match.id ? 'Calcolo in corso...' : '🧮 Calcola giornata'}
                   </button>
                 ) : (
-                  <>
-                    <button
-                      onClick={() => calcolaGiornata(m.match.id)}
-                      disabled={calcBusy === m.match.id}
-                      className="flex-1 rounded-lg border border-field-orange/50 px-3 py-1.5 text-xs font-medium text-field-orange hover:bg-field-orange/5 disabled:opacity-60"
-                    >
-                      {calcBusy === m.match.id ? 'Calcolo...' : '↻ Ricalcola'}
-                    </button>
-                    <button
-                      onClick={() => annullaCalcolo(m.match.id)}
-                      disabled={calcBusy === m.match.id}
-                      className="flex-1 rounded-lg border border-red-300 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-60"
-                    >
-                      ✕ Annulla calcolo
-                    </button>
-                  </>
+                  <button
+                    onClick={() => annullaCalcolo(m.match.id)}
+                    disabled={calcBusy === m.match.id}
+                    className="flex-1 rounded-lg border border-red-300 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-60"
+                  >
+                    ✕ Annulla calcolo
+                  </button>
                 )}
               </div>
             )}

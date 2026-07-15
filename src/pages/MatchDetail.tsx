@@ -309,19 +309,19 @@ export default function MatchDetail() {
       {/* Squadre (visibili solo se i giocatori sono stati assegnati) */}
       {matchPlayers.length > 0 && (
         <div className="mt-4 grid grid-cols-2 gap-3">
-          <div className="rounded-xl bg-white p-3 shadow">
+          <div className="min-w-0 rounded-xl bg-white p-3 shadow">
             <h3 className="mb-2 font-medium text-field-green-dark">Squadra A</h3>
             <ul className="space-y-1 text-sm">
               {teamA.map((p) => (
-                <li key={p.id}><PlayerName name={p.name} surname={p.surname} nickname={p.nickname} /></li>
+                <li key={p.id} className="min-w-0"><PlayerName name={p.name} surname={p.surname} nickname={p.nickname} /></li>
               ))}
             </ul>
           </div>
-          <div className="rounded-xl bg-white p-3 shadow">
+          <div className="min-w-0 rounded-xl bg-white p-3 shadow">
             <h3 className="mb-2 font-medium text-field-green-dark">Squadra B</h3>
             <ul className="space-y-1 text-sm">
               {teamB.map((p) => (
-                <li key={p.id}><PlayerName name={p.name} surname={p.surname} nickname={p.nickname} /></li>
+                <li key={p.id} className="min-w-0"><PlayerName name={p.name} surname={p.surname} nickname={p.nickname} /></li>
               ))}
             </ul>
           </div>

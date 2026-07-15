@@ -9,11 +9,10 @@ import { getKnownFields } from '../../lib/fields'
 import { findSeasonForDate } from '../../lib/seasons'
 import { logActivity } from '../../lib/activityLog'
 import { computeOverallsForPlayers, generateBalancedTeams } from '../../lib/teamGeneration'
-import { formatVote } from '../../lib/voting'
+import { formatVote, formatExact } from '../../lib/voting'
 import PlayerName, { fullName } from '../../components/PlayerName'
 import type { Player, Team } from '../../types/database'
 import type { PlayerOverall, GeneratedTeams } from '../../lib/teamGeneration'
-import type { MatchPlayerWithName } from '../../hooks/useMatchDetail'
 
 const MAX_PLAYERS = 10
 
@@ -22,6 +21,17 @@ interface PagellaDraft {
   titolo: string
   descrizione: string
   is_mvp: boolean
+}
+
+// Riga della bozza squadre (match_players_draft): è l'area di lavoro degli
+// admin. match_players (official) viene scritto solo all'ufficializzazione.
+interface DraftPlayer {
+  id: string
+  player_id: string
+  team: Team
+  name: string
+  surname: string | null
+  nickname: string | null
 }
 
 export default function MatchEdit() {
@@ -58,8 +68,17 @@ export default function MatchEdit() {
   const [openingVoting, setOpeningVoting] = useState(false)
   const [closingVoting, setClosingVoting] = useState(false)
 
-  const { votes, voterInfo, averages, provisionalMvpId, voterIds, participants, refetch: refetchVoting } =
-    useMatchVoting(id)
+  const {
+    votes,
+    voterInfo,
+    averages,
+    provisionalMvpId,
+    voterIds,
+    adminVoterIds,
+    allAdminVotersVoted,
+    participants,
+    refetch: refetchVoting,
+  } = useMatchVoting(id)
   const [showVoteDetail, setShowVoteDetail] = useState(false)
 
   // Sondaggio: aggiunta manuale giocatore
@@ -69,34 +88,33 @@ export default function MatchEdit() {
   const [addBookingError, setAddBookingError] = useState<string | null>(null)
   const [closingSurvey, setClosingSurvey] = useState(false)
 
-  // Generazione squadre
+  // Bozza squadre (workflow snapshot): tutto il lavoro sulle squadre avviene qui.
+  const [draftPlayers, setDraftPlayers] = useState<DraftPlayer[]>([])
+
+  // Generazione squadre (prima assegnazione)
   const [generatedTeams, setGeneratedTeams] = useState<GeneratedTeams | null>(null)
   const [generating, setGenerating] = useState(false)
   const [confirming, setConfirming] = useState(false)
-  // Stato locale delle squadre per lo scambio manuale
-  const [draftTeamA, setDraftTeamA] = useState<PlayerOverall[]>([])
-  const [draftTeamB, setDraftTeamB] = useState<PlayerOverall[]>([])
+  // Stato locale delle squadre per lo scambio manuale in fase di generazione
+  const [genTeamA, setGenTeamA] = useState<PlayerOverall[]>([])
+  const [genTeamB, setGenTeamB] = useState<PlayerOverall[]>([])
 
-  // Modifica manuale delle squadre già confermate (solo finché la partita è in bozza)
+  // Modifica manuale delle squadre in bozza
   const [editingTeams, setEditingTeams] = useState(false)
-  const [localTeamA, setLocalTeamA] = useState<MatchPlayerWithName[]>([])
-  const [localTeamB, setLocalTeamB] = useState<MatchPlayerWithName[]>([])
+  const [localTeamA, setLocalTeamA] = useState<DraftPlayer[]>([])
+  const [localTeamB, setLocalTeamB] = useState<DraftPlayer[]>([])
   const [savingTeams, setSavingTeams] = useState(false)
 
-  // Ricalcolo squadre con gli overall/fasce correnti (solo in bozza)
   const [recalculating, setRecalculating] = useState(false)
-
-  // Ufficializzazione squadre: dopo non si toccano più e si apre il fanta.
   const [officializing, setOfficializing] = useState(false)
 
-  // Approvazione squadre: prima dell'ufficializzazione tutti gli admin
-  // devono approvare la versione corrente (ogni modifica azzera i flag).
+  // Approvazione squadre: prima dell'ufficializzazione tutti gli admin devono
+  // approvare la versione corrente (ogni modifica azzera i flag).
   const [approvals, setApprovals] = useState<string[]>([])
   const [approvalsVersion, setApprovalsVersion] = useState(0)
   const [approving, setApproving] = useState(false)
 
-  // Nuove squadre (da ricalcolo o sostituzione) in attesa del salvataggio
-  // esplicito: nulla viene scritto sul DB finché l'admin non preme "Salva".
+  // Nuove squadre (da ricalcolo o sostituzione) in attesa del salvataggio.
   interface PendingTeams {
     teamA: PlayerOverall[]
     teamB: PlayerOverall[]
@@ -107,11 +125,41 @@ export default function MatchEdit() {
   const [pendingTeams, setPendingTeams] = useState<PendingTeams | null>(null)
   const [savingPendingTeams, setSavingPendingTeams] = useState(false)
 
-  // Sostituzione giocatore (solo finché la partita è in bozza)
+  // Sostituzione giocatore
   const [substitutingOpen, setSubstitutingOpen] = useState(false)
   const [subOutId, setSubOutId] = useState('')
   const [subInId, setSubInId] = useState('')
   const [substituting, setSubstituting] = useState(false)
+
+  // --- Caricamento bozza squadre ---
+  async function loadDraft() {
+    if (!id) return
+    const { data: dd } = await supabase
+      .from('match_players_draft')
+      .select('id, player_id, team, players(name, surname, nickname)')
+      .eq('match_id', id)
+    type Row = {
+      id: string
+      player_id: string
+      team: Team
+      players: { name: string; surname: string | null; nickname: string | null } | null
+    }
+    setDraftPlayers(
+      ((dd ?? []) as unknown as Row[]).map((r) => ({
+        id: r.id,
+        player_id: r.player_id,
+        team: r.team,
+        name: r.players?.name ?? '',
+        surname: r.players?.surname ?? null,
+        nickname: r.players?.nickname ?? null,
+      }))
+    )
+  }
+
+  useEffect(() => {
+    loadDraft()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id])
 
   useEffect(() => {
     if (!id) return
@@ -162,25 +210,46 @@ export default function MatchEdit() {
   if (error || !data) return <div className="p-4 text-sm text-red-600">{error ?? 'Partita non trovata'}</div>
 
   const { match, matchPlayers, goals, assists, pagelle, result } = data
+  // Squadre UFFICIALI (visibili a tutti): guidano marcatori, voti e pagelle.
   const teamA = matchPlayers.filter((p) => p.team === 'A')
   const teamB = matchPlayers.filter((p) => p.team === 'B')
+  // Squadre in BOZZA (area di lavoro admin).
+  const dTeamA = draftPlayers.filter((p) => p.team === 'A')
+  const dTeamB = draftPlayers.filter((p) => p.team === 'B')
+
   const goalsByTeam = (team: Team) => goals.filter((g) => g.team === team)
   const assistsByTeam = (team: Team) => assists.filter((a) => a.team === team)
+
   const isPublished = pagelle.length > 0 && pagelle.every((p) => p.published_at)
-  // "In bozza" finché non è stato salvato un risultato e non sono state pubblicate le pagelle:
-  // solo in questa fase ha senso poter ancora spostare i giocatori tra le squadre.
-  const isDraft = !result && !isPublished
-  // Squadre ufficializzate: non più modificabili/ricalcolabili/sostituibili.
+  // Partita "chiusa": pagelle pubblicate. Non più modificabile da nessuno,
+  // resta possibile solo eliminarla.
+  const locked = isPublished
+  // Squadre ufficializzate almeno una volta.
   const teamsOfficial = !!match.teams_official_at
-  // Si ufficializza solo quando tutti gli admin hanno approvato la versione corrente.
+  // Le squadre si possono ancora toccare finché non è stato salvato il risultato.
+  const canEditTeams = !locked && !result
+
+  // La bozza differisce dalle squadre ufficiali (serve una nuova ufficializzazione)?
+  const officialMap = new Map(matchPlayers.map((mp) => [mp.player_id, mp.team]))
+  const teamsDirty =
+    draftPlayers.length > 0 &&
+    (officialMap.size !== draftPlayers.length ||
+      draftPlayers.some((dp) => officialMap.get(dp.player_id) !== dp.team))
+  const needsOfficialization = canEditTeams && draftPlayers.length > 0 && (!teamsOfficial || teamsDirty)
+
+  // Coerenza gol/risultato: i voti e le pagelle si sbloccano solo quando il
+  // numero di gol per squadra coincide con il risultato inserito.
+  const goalsCoherent =
+    !!result && goalsByTeam('A').length === result.score_a && goalsByTeam('B').length === result.score_b
+
   const adminIds = allPlayers.filter((p) => p.role === 'admin' || p.role === 'superadmin').map((p) => p.id)
   const allApproved = adminIds.length > 0 && adminIds.every((aid) => approvals.includes(aid))
   const iApproved = !!currentAdmin && approvals.includes(currentAdmin.id)
   const infoComplete = !!matchDate && !!matchTime && !!field
 
-  // --- Azioni info partita ---
+  // --- Info partita ---
   async function handleSaveResult() {
-    if (!id || !infoComplete) return
+    if (!id || !infoComplete || locked) return
     setSavingResult(true)
     await supabase
       .from('match_results')
@@ -192,7 +261,7 @@ export default function MatchEdit() {
   }
 
   async function handleSaveInfo() {
-    if (!id) return
+    if (!id || locked) return
     setInfoError(null)
     setSavingInfo(true)
 
@@ -223,7 +292,7 @@ export default function MatchEdit() {
   }
 
   async function handleAddGoal(team: Team) {
-    if (!id || !newGoalPlayer[team]) return
+    if (!id || !newGoalPlayer[team] || locked) return
     await supabase
       .from('goals')
       .insert({
@@ -232,7 +301,7 @@ export default function MatchEdit() {
         team,
         is_own_goal: ownGoal[team],
       })
-    const playerName = matchPlayers.find(p => p.player_id === newGoalPlayer[team])?.name
+    const playerName = matchPlayers.find((p) => p.player_id === newGoalPlayer[team])?.name
     logActivity('gol_aggiunto', { matchId: id, data: match.match_date, squadra: team, giocatore: playerName, autogol: ownGoal[team] })
     setNewGoalPlayer((prev) => ({ ...prev, [team]: '' }))
     setOwnGoal((prev) => ({ ...prev, [team]: false }))
@@ -240,14 +309,15 @@ export default function MatchEdit() {
   }
 
   async function handleRemoveGoal(goalId: string) {
-    const goal = goals.find(g => g.id === goalId)
+    if (locked) return
+    const goal = goals.find((g) => g.id === goalId)
     await supabase.from('goals').delete().eq('id', goalId)
     logActivity('gol_rimosso', { matchId: id, data: match.match_date, giocatore: goal?.name })
     refetch()
   }
 
   async function handleAddAssist(team: Team) {
-    if (!id || !newAssistPlayer[team]) return
+    if (!id || !newAssistPlayer[team] || locked) return
     await supabase
       .from('assists')
       .insert({ match_id: id, player_id: newAssistPlayer[team], team })
@@ -258,6 +328,7 @@ export default function MatchEdit() {
   }
 
   async function handleRemoveAssist(assistId: string) {
+    if (locked) return
     const assist = assists.find((a) => a.id === assistId)
     await supabase.from('assists').delete().eq('id', assistId)
     logActivity('assist_rimosso', { matchId: id, data: match.match_date, giocatore: assist?.name })
@@ -291,6 +362,7 @@ export default function MatchEdit() {
   }
 
   async function handleSaveDraft() {
+    if (locked) return
     setSavingPagelle(true)
     await supabase.from('pagelle').upsert(buildPagelleRows(false), { onConflict: 'match_id,player_id' })
     setSavingPagelle(false)
@@ -299,8 +371,13 @@ export default function MatchEdit() {
   }
 
   async function handlePublish() {
+    if (locked) return
     if (!result) {
       alert('Salva prima il risultato della partita: le pagelle non possono essere pubblicate senza un risultato.')
+      return
+    }
+    if (!goalsCoherent) {
+      alert('I gol registrati non coincidono con il risultato: correggi i marcatori o il risultato prima di pubblicare.')
       return
     }
     const incomplete = matchPlayers.filter((mp) => {
@@ -322,7 +399,7 @@ export default function MatchEdit() {
     }
     if (
       !confirm(
-        'Pubblicare le pagelle? Diventeranno visibili a tutti i giocatori e verrà inviata una mail a tutti i partecipanti con risultato, marcatori e pagelle.'
+        'Pubblicare le pagelle? Diventeranno visibili a tutti i giocatori e verrà inviata una mail a tutti i partecipanti con risultato, marcatori e pagelle. Dopo la pubblicazione la partita non sarà più modificabile.'
       )
     )
       return
@@ -348,14 +425,12 @@ export default function MatchEdit() {
     navigate('/admin/partite')
   }
 
-  // --- Azioni votazioni ---
+  // --- Votazioni ---
   async function handleOpenVoting() {
-    if (!id) return
+    if (!id || locked) return
     setOpeningVoting(true)
     await supabase.from('matches').update({ voting_open: true }).eq('id', id)
     logActivity('votazioni_aperte', { matchId: id, data: match.match_date })
-    // Avvisa via mail gli altri admin della partita chiamati a votare
-    // (o i superadmin, se nessun admin ha partecipato). Non bloccante.
     supabase.functions
       .invoke('notify-voting-opened', { body: { matchId: id } })
       .catch((e) => console.error('notify-voting-opened:', e))
@@ -391,10 +466,8 @@ export default function MatchEdit() {
     })
   }
 
-  // --- Azioni sondaggio ---
+  // --- Sondaggio ---
   async function handleAddBooking() {
-    // Numero fisso di 10 giocatori: il limite vale anche per l'aggiunta
-    // manuale dell'admin (e in ogni caso è imposto dal trigger sul DB).
     if (!id || !addBookingPlayer || bookings.length >= MAX_PLAYERS) return
     setAddingBooking(true)
     setAddBookingError(null)
@@ -413,7 +486,7 @@ export default function MatchEdit() {
     }
     logActivity('prenotazione_aggiunta', {
       matchId: id,
-      giocatore: allPlayers.find(p => p.id === addBookingPlayer)?.name,
+      giocatore: allPlayers.find((p) => p.id === addBookingPlayer)?.name,
     })
     setAddBookingPlayer('')
     setAddingBooking(false)
@@ -436,7 +509,7 @@ export default function MatchEdit() {
     refetch()
   }
 
-  // --- Generazione squadre ---
+  // --- Generazione squadre (scrive nella BOZZA) ---
   async function handleGenerateTeams() {
     if (!id) return
     setGenerating(true)
@@ -446,31 +519,26 @@ export default function MatchEdit() {
       bookings.map((b) => ({ id: b.player_id, name: b.name, surname: b.surname, nickname: b.nickname }))
     )
 
-    const result = generateBalancedTeams(players)
-    setGeneratedTeams(result)
-    setDraftTeamA(result.teamA)
-    setDraftTeamB(result.teamB)
+    const gen = generateBalancedTeams(players)
+    setGeneratedTeams(gen)
+    setGenTeamA(gen.teamA)
+    setGenTeamB(gen.teamB)
     setGenerating(false)
 
-    logActivity('squadre_generate', {
-      matchId: id,
-      avgA: result.avgA,
-      avgB: result.avgB,
-      diff: result.diff,
-    })
+    logActivity('squadre_generate', { matchId: id, avgA: gen.avgA, avgB: gen.avgB, diff: gen.diff })
   }
 
-  function swapPlayer(from: 'A' | 'B', playerId: string) {
+  function swapGenPlayer(from: 'A' | 'B', playerId: string) {
     if (from === 'A') {
-      const player = draftTeamA.find(p => p.playerId === playerId)
+      const player = genTeamA.find((p) => p.playerId === playerId)
       if (!player) return
-      setDraftTeamA(prev => prev.filter(p => p.playerId !== playerId))
-      setDraftTeamB(prev => [...prev, player])
+      setGenTeamA((prev) => prev.filter((p) => p.playerId !== playerId))
+      setGenTeamB((prev) => [...prev, player])
     } else {
-      const player = draftTeamB.find(p => p.playerId === playerId)
+      const player = genTeamB.find((p) => p.playerId === playerId)
       if (!player) return
-      setDraftTeamB(prev => prev.filter(p => p.playerId !== playerId))
-      setDraftTeamA(prev => [...prev, player])
+      setGenTeamB((prev) => prev.filter((p) => p.playerId !== playerId))
+      setGenTeamA((prev) => [...prev, player])
     }
   }
 
@@ -481,27 +549,22 @@ export default function MatchEdit() {
   async function handleConfirmTeams() {
     if (!id) return
     setConfirming(true)
-
+    await supabase.from('match_players_draft').delete().eq('match_id', id)
     const rows = [
-      ...draftTeamA.map(p => ({ match_id: id, player_id: p.playerId, team: 'A' as Team })),
-      ...draftTeamB.map(p => ({ match_id: id, player_id: p.playerId, team: 'B' as Team })),
+      ...genTeamA.map((p) => ({ match_id: id, player_id: p.playerId, team: 'A' as Team })),
+      ...genTeamB.map((p) => ({ match_id: id, player_id: p.playerId, team: 'B' as Team })),
     ]
-    await supabase.from('match_players').insert(rows)
-
-    // L'overall è gestito manualmente dagli admin: la generazione squadre
-    // lo legge soltanto, senza più riscriverlo in ratings.
+    await supabase.from('match_players_draft').insert(rows)
+    await clearTeamApprovals()
     setConfirming(false)
     setGeneratedTeams(null)
-    refetch()
+    loadDraft()
   }
 
-  // Le squadre della partita sono cambiate: le formazioni fantacalcetto
-  // schierate su quelle squadre non sono più valide e vengono azzerate per
-  // tutte le leghe (i partecipanti potranno rischierarle sulle nuove squadre).
+  // Le squadre ufficiali sono cambiate: le formazioni fantacalcetto schierate su
+  // quelle squadre non sono più valide e vengono azzerate per tutte le leghe.
   async function resetFantaLineups() {
     if (!id) return
-    // Traccia chi aveva già schierato: la Home mostrerà a ciascuno l'avviso
-    // di rischierare finché non salva una nuova formazione.
     const { data: existing } = await supabase
       .from('fanta_lineups')
       .select('league_id, member_id')
@@ -519,7 +582,7 @@ export default function MatchEdit() {
     await supabase.from('fanta_lineups').delete().eq('match_id', id)
   }
 
-  // --- Approvazione squadre (tutti gli admin, prima dell'ufficializzazione) ---
+  // --- Approvazione squadre ---
   async function handleApproveTeams() {
     if (!id || !currentAdmin) return
     setApproving(true)
@@ -527,47 +590,51 @@ export default function MatchEdit() {
       .from('team_approvals')
       .insert({ match_id: id, admin_id: currentAdmin.id })
     setApproving(false)
-    // 23505: aveva già approvato (doppio click) — non è un errore.
     if (!apError || apError.code === '23505') {
       if (!apError) logActivity('squadre_approvate', { matchId: id, data: match.match_date })
       setApprovalsVersion((v) => v + 1)
     }
   }
 
-  // Le squadre sono cambiate: la versione approvata non esiste più, tutti
-  // gli admin devono riapprovare prima di poter ufficializzare.
+  // Le squadre in bozza sono cambiate: la versione approvata non esiste più.
   async function clearTeamApprovals() {
     if (!id) return
     await supabase.from('team_approvals').delete().eq('match_id', id)
     setApprovalsVersion((v) => v + 1)
   }
 
-  // --- Ufficializzazione squadre ---
-  // Step esplicito e definitivo: blocca ogni modifica alle squadre e apre
-  // lo schieramento delle formazioni fantacalcetto.
+  // --- Ufficializzazione: copia la BOZZA in match_players (visibile a tutti) ---
   async function handleOfficializeTeams() {
     if (
       !id ||
       !allApproved ||
       !confirm(
-        'Ufficializzare le squadre? Dopo non potranno più essere modificate, ricalcolate o soggette a sostituzioni, e si aprirà lo schieramento delle formazioni del fantacalcetto.'
+        teamsOfficial
+          ? 'Ufficializzare la nuova versione delle squadre? Diventerà quella visibile a tutti al posto della precedente, e le formazioni del fantacalcetto verranno azzerate perché le squadre sono cambiate.'
+          : 'Ufficializzare le squadre? Diventeranno visibili a tutti i giocatori e si aprirà lo schieramento delle formazioni del fantacalcetto.'
       )
     )
       return
     setOfficializing(true)
+    // Copia bozza -> squadre ufficiali.
+    await supabase.from('match_players').delete().eq('match_id', id)
+    const rows = draftPlayers.map((p) => ({ match_id: id, player_id: p.player_id, team: p.team }))
+    if (rows.length > 0) await supabase.from('match_players').insert(rows)
     await supabase
       .from('matches')
       .update({ teams_official_at: new Date().toISOString() })
       .eq('id', id)
+    // Le squadre (ri)ufficializzate invalidano le formazioni fantacalcetto già schierate.
+    await resetFantaLineups()
     logActivity('squadre_ufficializzate', { matchId: id, data: match.match_date })
     setOfficializing(false)
     refetch()
   }
 
-  // --- Modifica manuale squadre già confermate (solo in bozza) ---
+  // --- Modifica manuale squadre in bozza ---
   function startEditingTeams() {
-    setLocalTeamA(teamA)
-    setLocalTeamB(teamB)
+    setLocalTeamA(dTeamA)
+    setLocalTeamB(dTeamB)
     setEditingTeams(true)
   }
 
@@ -575,7 +642,7 @@ export default function MatchEdit() {
     setEditingTeams(false)
   }
 
-  function swapConfirmedPlayer(from: 'A' | 'B', playerId: string) {
+  function swapDraftPlayer(from: 'A' | 'B', playerId: string) {
     if (from === 'A') {
       const player = localTeamA.find((p) => p.player_id === playerId)
       if (!player) return
@@ -590,73 +657,57 @@ export default function MatchEdit() {
   }
 
   async function handleSaveTeams() {
-    if (localTeamA.length !== 5 || localTeamB.length !== 5) return
+    if (!id || localTeamA.length !== 5 || localTeamB.length !== 5) return
     setSavingTeams(true)
-
     const changed = [
       ...localTeamA.filter((p) => p.team !== 'A').map((p) => ({ ...p, team: 'A' as Team })),
       ...localTeamB.filter((p) => p.team !== 'B').map((p) => ({ ...p, team: 'B' as Team })),
     ]
     await Promise.all(
-      changed.map((p) => supabase.from('match_players').update({ team: p.team }).eq('id', p.id))
+      changed.map((p) => supabase.from('match_players_draft').update({ team: p.team }).eq('id', p.id))
     )
-
-    await resetFantaLineups()
     await clearTeamApprovals()
-
     setSavingTeams(false)
     setEditingTeams(false)
     logActivity('squadre_modificate', { matchId: id, data: match.match_date })
-    refetch()
+    loadDraft()
   }
 
-  // --- Ricalcolo squadre (dopo modifiche a overall o range fasce) ---
-  // Calcola soltanto l'anteprima: il DB viene aggiornato solo con "Salva squadre".
+  // --- Ricalcolo squadre (anteprima; salvataggio esplicito) ---
   async function handleRecalculateTeams() {
-    if (!id || matchPlayers.length === 0) return
+    if (!id || draftPlayers.length === 0) return
     setRecalculating(true)
-
     const overalls = await computeOverallsForPlayers(
-      matchPlayers.map((mp) => ({ id: mp.player_id, name: mp.name, surname: mp.surname, nickname: mp.nickname }))
+      draftPlayers.map((mp) => ({ id: mp.player_id, name: mp.name, surname: mp.surname, nickname: mp.nickname }))
     )
-    const result = generateBalancedTeams(overalls)
-
+    const gen = generateBalancedTeams(overalls)
     setPendingTeams({
-      teamA: result.teamA,
-      teamB: result.teamB,
+      teamA: gen.teamA,
+      teamB: gen.teamB,
       action: 'squadre_ricalcolate',
-      logDetails: { avgA: result.avgA, avgB: result.avgB, diff: result.diff },
+      logDetails: { avgA: gen.avgA, avgB: gen.avgB, diff: gen.diff },
       description: 'Squadre ricalcolate con gli overall e le fasce attuali.',
     })
     setRecalculating(false)
   }
 
-  // Salvataggio esplicito delle nuove squadre (ricalcolo o sostituzione).
   async function handleSavePendingTeams() {
     if (!id || !pendingTeams) return
     setSavingPendingTeams(true)
-
-    await supabase.from('match_players').delete().eq('match_id', id)
+    await supabase.from('match_players_draft').delete().eq('match_id', id)
     const rows = [
       ...pendingTeams.teamA.map((p) => ({ match_id: id, player_id: p.playerId, team: 'A' as Team })),
       ...pendingTeams.teamB.map((p) => ({ match_id: id, player_id: p.playerId, team: 'B' as Team })),
     ]
-    await supabase.from('match_players').insert(rows)
-    await resetFantaLineups()
+    await supabase.from('match_players_draft').insert(rows)
     await clearTeamApprovals()
-
-    logActivity(pendingTeams.action, {
-      matchId: id,
-      data: match.match_date,
-      ...pendingTeams.logDetails,
-    })
-
+    logActivity(pendingTeams.action, { matchId: id, data: match.match_date, ...pendingTeams.logDetails })
     setSavingPendingTeams(false)
     setPendingTeams(null)
-    refetch()
+    loadDraft()
   }
 
-  // --- Sostituzione giocatore già assegnato con uno esterno alla partita ---
+  // --- Sostituzione giocatore in bozza ---
   function startSubstitute() {
     setSubOutId('')
     setSubInId('')
@@ -667,46 +718,37 @@ export default function MatchEdit() {
     setSubstitutingOpen(false)
   }
 
-  // Prepara solo l'anteprima delle squadre con il sostituto: il DB viene
-  // aggiornato solo con "Salva squadre".
   async function handleConfirmSubstitute() {
     if (!id || !subOutId || !subInId) return
     setSubstituting(true)
-
     const inPlayer = allPlayers.find((p) => p.id === subInId)
-    const outPlayer = matchPlayers.find((mp) => mp.player_id === subOutId)
+    const outPlayer = draftPlayers.find((mp) => mp.player_id === subOutId)
     const roster = [
-      ...matchPlayers
+      ...draftPlayers
         .filter((mp) => mp.player_id !== subOutId)
         .map((mp) => ({ id: mp.player_id, name: mp.name, surname: mp.surname, nickname: mp.nickname })),
       { id: subInId, name: inPlayer?.name ?? '', surname: inPlayer?.surname ?? null, nickname: inPlayer?.nickname ?? null },
     ]
-
     const overalls = await computeOverallsForPlayers(roster)
-    const result = generateBalancedTeams(overalls)
-
+    const gen = generateBalancedTeams(overalls)
     setPendingTeams({
-      teamA: result.teamA,
-      teamB: result.teamB,
+      teamA: gen.teamA,
+      teamB: gen.teamB,
       action: 'giocatore_sostituito',
       logDetails: { uscito: outPlayer ? fullName(outPlayer) : undefined, entrato: inPlayer ? fullName(inPlayer) : undefined },
       description: `Sostituzione: ${outPlayer ? fullName(outPlayer) : '?'} esce, ${inPlayer ? fullName(inPlayer) : '?'} entra. Squadre rigenerate in base agli overall.`,
     })
-
     setSubstituting(false)
     setSubstitutingOpen(false)
   }
 
-  const bookedNotInMatch = bookings.filter(
-    b => !matchPlayers.some(mp => mp.player_id === b.player_id)
-  )
-  const alreadyBookedIds = new Set(bookings.map(b => b.player_id))
-  const availableToAdd = allPlayers.filter(p => !alreadyBookedIds.has(p.id))
-  const inMatchIds = new Set(matchPlayers.map((mp) => mp.player_id))
-  const playersNotInMatch = allPlayers.filter((p) => !inMatchIds.has(p.id))
+  const bookedNotInDraft = bookings.filter((b) => !draftPlayers.some((dp) => dp.player_id === b.player_id))
+  const alreadyBookedIds = new Set(bookings.map((b) => b.player_id))
+  const availableToAdd = allPlayers.filter((p) => !alreadyBookedIds.has(p.id))
+  const inDraftIds = new Set(draftPlayers.map((dp) => dp.player_id))
+  const playersNotInDraft = allPlayers.filter((p) => !inDraftIds.has(p.id))
 
-  // Le squadre si generano solo con esattamente 10 giocatori: né di più né di meno.
-  const canGenerate = bookings.length === MAX_PLAYERS && matchPlayers.length === 0
+  const canGenerate = bookings.length === MAX_PLAYERS && draftPlayers.length === 0
 
   return (
     <div className="p-4 pb-12">
@@ -721,9 +763,7 @@ export default function MatchEdit() {
         </h1>
         <div className="flex gap-2">
           {match.booking_open && (
-            <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700">
-              Sondaggio aperto
-            </span>
+            <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700">Sondaggio aperto</span>
           )}
           <span
             className={`rounded-full px-2 py-0.5 text-xs ${
@@ -735,14 +775,18 @@ export default function MatchEdit() {
             {match.status === 'completed' ? 'Completata' : 'In preparazione'}
           </span>
           {isPublished && (
-            <span className="rounded-full bg-field-orange/10 px-2 py-0.5 text-xs text-field-orange">
-              Pubblicata
-            </span>
+            <span className="rounded-full bg-field-orange/10 px-2 py-0.5 text-xs text-field-orange">Pubblicata</span>
           )}
         </div>
       </div>
 
-      {/* Info partita */}
+      {locked && (
+        <p className="mt-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-center text-sm font-medium text-gray-600">
+          🔒 Partita completata e pagelle pubblicate: non è più modificabile. È possibile solo eliminarla.
+        </p>
+      )}
+
+      {/* ===== STEP 1 — Info partita ===== */}
       <div className="mt-2 space-y-2 rounded-xl bg-white p-3 shadow">
         <div className="grid grid-cols-2 gap-2">
           <div>
@@ -750,8 +794,9 @@ export default function MatchEdit() {
             <input
               type="date"
               value={matchDate}
+              disabled={locked}
               onChange={(e) => setMatchDate(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
+              className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm disabled:bg-gray-100 disabled:text-gray-400"
             />
           </div>
           <div>
@@ -759,8 +804,9 @@ export default function MatchEdit() {
             <input
               type="time"
               value={matchTime}
+              disabled={locked}
               onChange={(e) => setMatchTime(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
+              className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm disabled:bg-gray-100 disabled:text-gray-400"
             />
           </div>
         </div>
@@ -768,9 +814,10 @@ export default function MatchEdit() {
           <label className="mb-1 block text-xs font-medium text-gray-700">Campo</label>
           <input
             value={field}
+            disabled={locked}
             onChange={(e) => setField(e.target.value)}
             list="campi-noti"
-            className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
+            className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm disabled:bg-gray-100 disabled:text-gray-400"
           />
           <datalist id="campi-noti">
             {knownFields.map((f) => (
@@ -779,85 +826,84 @@ export default function MatchEdit() {
           </datalist>
         </div>
         {infoError && <p className="text-sm text-red-600">{infoError}</p>}
-        <button
-          onClick={handleSaveInfo}
-          disabled={savingInfo || !matchDate}
-          className="w-full rounded-lg bg-field-green px-3 py-1.5 text-sm font-medium text-white hover:bg-field-green-dark disabled:opacity-50"
-        >
-          {savingInfo ? 'Salvataggio...' : 'Salva data/ora/campo'}
-        </button>
+        {!locked && (
+          <button
+            onClick={handleSaveInfo}
+            disabled={savingInfo || !matchDate}
+            className="w-full rounded-lg bg-field-green px-3 py-1.5 text-sm font-medium text-white hover:bg-field-green-dark disabled:opacity-50"
+          >
+            {savingInfo ? 'Salvataggio...' : 'Salva data/ora/campo'}
+          </button>
+        )}
       </div>
 
-      {/* ===== SEZIONE SONDAGGIO ===== */}
-      {(match.booking_open || (bookedNotInMatch.length > 0 && matchPlayers.length === 0)) && !bookingsLoading && (
-        <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-4">
-          <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-blue-800">
-              Sondaggio prenotazioni
-            </h2>
-            <span className="text-sm font-bold text-blue-700">
-              {bookings.length}/{MAX_PLAYERS}
-            </span>
-          </div>
+      {/* ===== SONDAGGIO ===== */}
+      {!locked &&
+        (match.booking_open || (bookedNotInDraft.length > 0 && draftPlayers.length === 0)) &&
+        !bookingsLoading && (
+          <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-4">
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold text-blue-800">Sondaggio prenotazioni</h2>
+              <span className="text-sm font-bold text-blue-700">
+                {bookings.length}/{MAX_PLAYERS}
+              </span>
+            </div>
 
-          {/* Lista prenotati */}
-          <div className="mt-3 space-y-1">
-            {bookings.map((b) => (
-              <div key={b.id} className="flex items-center justify-between rounded-lg bg-white px-3 py-1.5">
-                <PlayerName name={b.name} surname={b.surname} nickname={b.nickname} nameClassName="text-sm font-medium" />
-                <button
-                  onClick={() => handleRemoveBooking(b.player_id, b.name)}
-                  className="text-xs text-red-500 hover:text-red-700"
+            <div className="mt-3 space-y-1">
+              {bookings.map((b) => (
+                <div key={b.id} className="flex items-center justify-between rounded-lg bg-white px-3 py-1.5">
+                  <PlayerName name={b.name} surname={b.surname} nickname={b.nickname} nameClassName="text-sm font-medium" />
+                  <button
+                    onClick={() => handleRemoveBooking(b.player_id, b.name)}
+                    className="text-xs text-red-500 hover:text-red-700"
+                  >
+                    Rimuovi
+                  </button>
+                </div>
+              ))}
+              {bookings.length === 0 && <p className="text-sm text-blue-600">Nessuna prenotazione ancora.</p>}
+            </div>
+
+            {match.booking_open && bookings.length < MAX_PLAYERS && (
+              <div className="mt-3 flex gap-2">
+                <select
+                  value={addBookingPlayer}
+                  onChange={(e) => setAddBookingPlayer(e.target.value)}
+                  className="min-w-0 flex-1 rounded-lg border border-blue-300 bg-white px-2 py-1.5 text-sm"
                 >
-                  Rimuovi
+                  <option value="">+ Aggiungi giocatore</option>
+                  {availableToAdd.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {fullName(p)}{p.nickname ? ` (${p.nickname})` : ''}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={handleAddBooking}
+                  disabled={!addBookingPlayer || addingBooking}
+                  className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white disabled:opacity-50"
+                >
+                  Aggiungi
                 </button>
               </div>
-            ))}
-            {bookings.length === 0 && (
-              <p className="text-sm text-blue-600">Nessuna prenotazione ancora.</p>
+            )}
+
+            {addBookingError && <p className="mt-2 text-sm text-red-600">{addBookingError}</p>}
+
+            {match.booking_open && (
+              <button
+                onClick={handleCloseSurvey}
+                disabled={closingSurvey}
+                className="mt-3 w-full rounded-lg border border-blue-400 bg-white px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-50"
+              >
+                {closingSurvey ? 'Chiusura...' : 'Chiudi sondaggio'}
+              </button>
             )}
           </div>
+        )}
 
-          {/* Aggiungi giocatore manualmente */}
-          {match.booking_open && bookings.length < MAX_PLAYERS && (
-            <div className="mt-3 flex gap-2">
-              <select
-                value={addBookingPlayer}
-                onChange={(e) => setAddBookingPlayer(e.target.value)}
-                className="flex-1 rounded-lg border border-blue-300 bg-white px-2 py-1.5 text-sm"
-              >
-                <option value="">+ Aggiungi giocatore</option>
-                {availableToAdd.map(p => (
-                  <option key={p.id} value={p.id}>{fullName(p)}{p.nickname ? ` (${p.nickname})` : ''}</option>
-                ))}
-              </select>
-              <button
-                onClick={handleAddBooking}
-                disabled={!addBookingPlayer || addingBooking}
-                className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white disabled:opacity-50"
-              >
-                Aggiungi
-              </button>
-            </div>
-          )}
-
-          {addBookingError && <p className="mt-2 text-sm text-red-600">{addBookingError}</p>}
-
-          {/* Chiudi sondaggio */}
-          {match.booking_open && (
-            <button
-              onClick={handleCloseSurvey}
-              disabled={closingSurvey}
-              className="mt-3 w-full rounded-lg border border-blue-400 bg-white px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-50"
-            >
-              {closingSurvey ? 'Chiusura...' : 'Chiudi sondaggio'}
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* ===== GENERAZIONE SQUADRE ===== */}
-      {!match.booking_open && matchPlayers.length === 0 && bookings.length > 0 && (
+      {/* ===== GENERAZIONE SQUADRE (prima assegnazione, in bozza) ===== */}
+      {!match.booking_open && draftPlayers.length === 0 && bookings.length > 0 && canEditTeams && (
         <div className="mt-4 rounded-xl border border-field-green/30 bg-field-green/5 p-4">
           <h2 className="font-semibold text-field-green-dark">Genera squadre bilanciate</h2>
           <p className="mt-1 text-sm text-gray-600">
@@ -869,8 +915,8 @@ export default function MatchEdit() {
             )}
             {bookings.length > MAX_PLAYERS && (
               <span className="text-red-600">
-                {' '}Ci sono {bookings.length - MAX_PLAYERS} prenotazioni di troppo: il numero di
-                giocatori è fisso a {MAX_PLAYERS}, rimuovile per generare le squadre.
+                {' '}Ci sono {bookings.length - MAX_PLAYERS} prenotazioni di troppo: il numero di giocatori è fisso a{' '}
+                {MAX_PLAYERS}, rimuovile per generare le squadre.
               </span>
             )}
           </p>
@@ -885,26 +931,24 @@ export default function MatchEdit() {
             </button>
           ) : (
             <div className="mt-3">
-              {/* Anteprima squadre */}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {/* Squadra A */}
                 <div className="min-w-0 rounded-xl bg-white p-3 shadow">
                   <div className="mb-2 flex items-center justify-between">
                     <h3 className="font-semibold text-field-green-dark">Squadra A</h3>
                     <span className="rounded-full bg-field-green/10 px-2 py-0.5 text-xs font-bold text-field-green-dark">
-                      Overall {avgOverall(draftTeamA)}
+                      Overall {avgOverall(genTeamA)}
                     </span>
                   </div>
                   <ul className="space-y-1">
-                    {draftTeamA.map(p => (
-                      <li key={p.playerId} className="flex items-center justify-between gap-1 text-sm">
+                    {genTeamA.map((p) => (
+                      <li key={p.playerId} className="flex min-w-0 items-center justify-between gap-1 text-sm">
                         <PlayerName name={p.name} surname={p.surname} nickname={p.nickname} />
-                        <div className="flex items-center gap-1">
+                        <div className="flex shrink-0 items-center gap-1">
                           <span className="rounded bg-field-green/10 px-1.5 text-xs font-bold text-field-green-dark">
                             {p.overall}
                           </span>
                           <button
-                            onClick={() => swapPlayer('A', p.playerId)}
+                            onClick={() => swapGenPlayer('A', p.playerId)}
                             className="text-xs text-gray-400 hover:text-field-orange"
                             title="Sposta in B"
                           >
@@ -916,21 +960,20 @@ export default function MatchEdit() {
                   </ul>
                 </div>
 
-                {/* Squadra B */}
                 <div className="min-w-0 rounded-xl bg-white p-3 shadow">
                   <div className="mb-2 flex items-center justify-between">
                     <h3 className="font-semibold text-field-green-dark">Squadra B</h3>
                     <span className="rounded-full bg-field-orange/10 px-2 py-0.5 text-xs font-bold text-field-orange">
-                      Overall {avgOverall(draftTeamB)}
+                      Overall {avgOverall(genTeamB)}
                     </span>
                   </div>
                   <ul className="space-y-1">
-                    {draftTeamB.map(p => (
-                      <li key={p.playerId} className="flex items-center justify-between gap-1 text-sm">
+                    {genTeamB.map((p) => (
+                      <li key={p.playerId} className="flex min-w-0 items-center justify-between gap-1 text-sm">
                         <PlayerName name={p.name} surname={p.surname} nickname={p.nickname} />
-                        <div className="flex items-center gap-1">
+                        <div className="flex shrink-0 items-center gap-1">
                           <button
-                            onClick={() => swapPlayer('B', p.playerId)}
+                            onClick={() => swapGenPlayer('B', p.playerId)}
                             className="text-xs text-gray-400 hover:text-field-green"
                             title="Sposta in A"
                           >
@@ -947,11 +990,9 @@ export default function MatchEdit() {
               </div>
 
               <p className="mt-2 text-center text-xs text-gray-500">
-                Differenza overall: {Math.abs(avgOverall(draftTeamA) - avgOverall(draftTeamB))} punto/i
-                {draftTeamA.length !== 5 || draftTeamB.length !== 5 ? (
-                  <span className="ml-1 text-red-500">
-                    (le squadre devono avere 5 giocatori ciascuna)
-                  </span>
+                Differenza overall: {Math.abs(avgOverall(genTeamA) - avgOverall(genTeamB))} punto/i
+                {genTeamA.length !== 5 || genTeamB.length !== 5 ? (
+                  <span className="ml-1 text-red-500">(le squadre devono avere 5 giocatori ciascuna)</span>
                 ) : null}
               </p>
 
@@ -964,11 +1005,7 @@ export default function MatchEdit() {
                 </button>
                 <button
                   onClick={handleConfirmTeams}
-                  disabled={
-                    confirming ||
-                    draftTeamA.length !== 5 ||
-                    draftTeamB.length !== 5
-                  }
+                  disabled={confirming || genTeamA.length !== 5 || genTeamB.length !== 5}
                   className="flex-1 rounded-lg bg-field-green px-3 py-2 text-sm font-medium text-white hover:bg-field-green-dark disabled:opacity-50"
                 >
                   {confirming ? 'Salvataggio...' : 'Conferma squadre'}
@@ -980,7 +1017,7 @@ export default function MatchEdit() {
       )}
 
       {/* ===== NUOVE SQUADRE IN ATTESA DI SALVATAGGIO (ricalcolo/sostituzione) ===== */}
-      {matchPlayers.length > 0 && pendingTeams && (
+      {draftPlayers.length > 0 && pendingTeams && canEditTeams && (
         <div className="mt-4 rounded-xl border border-field-green/30 bg-field-green/5 p-4">
           <h2 className="font-semibold text-field-green-dark">Nuove squadre da salvare</h2>
           <p className="mt-1 text-xs text-gray-600">{pendingTeams.description}</p>
@@ -995,7 +1032,7 @@ export default function MatchEdit() {
               </div>
               <ul className="space-y-1">
                 {pendingTeams.teamA.map((p) => (
-                  <li key={p.playerId} className="flex items-center justify-between gap-1 text-sm">
+                  <li key={p.playerId} className="flex min-w-0 items-center justify-between gap-1 text-sm">
                     <PlayerName name={p.name} surname={p.surname} nickname={p.nickname} />
                     <span className="shrink-0 rounded bg-field-green/10 px-1.5 text-xs font-bold text-field-green-dark">
                       {p.overall}
@@ -1013,7 +1050,7 @@ export default function MatchEdit() {
               </div>
               <ul className="space-y-1">
                 {pendingTeams.teamB.map((p) => (
-                  <li key={p.playerId} className="flex items-center justify-between gap-1 text-sm">
+                  <li key={p.playerId} className="flex min-w-0 items-center justify-between gap-1 text-sm">
                     <PlayerName name={p.name} surname={p.surname} nickname={p.nickname} />
                     <span className="shrink-0 rounded bg-field-orange/10 px-1.5 text-xs font-bold text-field-orange">
                       {p.overall}
@@ -1025,8 +1062,8 @@ export default function MatchEdit() {
           </div>
 
           <p className="mt-2 text-center text-xs text-gray-500">
-            Differenza overall: {Math.abs(avgOverall(pendingTeams.teamA) - avgOverall(pendingTeams.teamB))} punto/i
-            — le squadre attuali restano valide finché non salvi.
+            Differenza overall: {Math.abs(avgOverall(pendingTeams.teamA) - avgOverall(pendingTeams.teamB))} punto/i — le
+            squadre in bozza attuali restano valide finché non salvi.
           </p>
 
           <div className="mt-3 flex gap-2">
@@ -1048,34 +1085,46 @@ export default function MatchEdit() {
         </div>
       )}
 
-      {/* ===== SQUADRE (già assegnate) ===== */}
-      {matchPlayers.length > 0 && !editingTeams && !substitutingOpen && !pendingTeams && (
+      {/* ===== SQUADRE IN BOZZA (già assegnate) ===== */}
+      {draftPlayers.length > 0 && !editingTeams && !substitutingOpen && !pendingTeams && (
         <div className="mt-4">
           <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-xl bg-white p-3 shadow">
+            <div className="min-w-0 rounded-xl bg-white p-3 shadow">
               <h3 className="mb-2 font-medium text-field-green-dark">Squadra A</h3>
               <ul className="space-y-1 text-sm">
-                {teamA.map((p) => (
-                  <li key={p.id}><PlayerName name={p.name} surname={p.surname} nickname={p.nickname} /></li>
+                {dTeamA.map((p) => (
+                  <li key={p.id} className="min-w-0">
+                    <PlayerName name={p.name} surname={p.surname} nickname={p.nickname} />
+                  </li>
                 ))}
               </ul>
             </div>
-            <div className="rounded-xl bg-white p-3 shadow">
+            <div className="min-w-0 rounded-xl bg-white p-3 shadow">
               <h3 className="mb-2 font-medium text-field-green-dark">Squadra B</h3>
               <ul className="space-y-1 text-sm">
-                {teamB.map((p) => (
-                  <li key={p.id}><PlayerName name={p.name} surname={p.surname} nickname={p.nickname} /></li>
+                {dTeamB.map((p) => (
+                  <li key={p.id} className="min-w-0">
+                    <PlayerName name={p.name} surname={p.surname} nickname={p.nickname} />
+                  </li>
                 ))}
               </ul>
             </div>
           </div>
-          {teamsOfficial && (
+
+          {teamsOfficial && !teamsDirty && (
             <p className="mt-2 rounded-lg bg-field-green/10 px-3 py-2 text-center text-xs font-medium text-field-green-dark">
-              ✅ Squadre ufficializzate: non sono più modificabili e lo schieramento del
-              fantacalcetto è aperto.
+              ✅ Squadre ufficializzate: sono visibili a tutti e lo schieramento del fantacalcetto è aperto.
             </p>
           )}
-          {isDraft && !teamsOfficial && (
+
+          {teamsOfficial && teamsDirty && (
+            <p className="mt-2 rounded-lg bg-field-yellow/20 px-3 py-2 text-center text-xs font-medium text-field-orange">
+              ✏️ Hai modifiche non ancora ufficializzate: i player continuano a vedere la versione precedente finché non
+              ufficializzi di nuovo.
+            </p>
+          )}
+
+          {needsOfficialization && (
             <div className="mt-2 rounded-xl border border-field-green/30 bg-field-green/5 p-3">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-semibold text-field-green-dark">👍 Approvazione squadre</p>
@@ -1084,9 +1133,9 @@ export default function MatchEdit() {
                 </span>
               </div>
               <p className="mt-1 text-xs text-gray-500">
-                I player non vedono le squadre finché non vengono ufficializzate. Quando tutti gli
-                admin approvano questa versione si può ufficializzare; ogni modifica, ricalcolo o
-                sostituzione azzera le approvazioni.
+                {teamsOfficial
+                  ? 'Hai cambiato le squadre dopo l’ufficializzazione: i player vedono ancora la versione precedente. Quando tutti gli admin approvano questa nuova versione potrai ri-ufficializzarla.'
+                  : 'I player non vedono le squadre finché non vengono ufficializzate. Quando tutti gli admin approvano questa versione si può ufficializzare; ogni modifica, ricalcolo o sostituzione azzera le approvazioni.'}
               </p>
 
               {iApproved ? (
@@ -1108,7 +1157,7 @@ export default function MatchEdit() {
                 disabled={officializing || !allApproved}
                 className="mt-2 w-full rounded-lg bg-field-green px-3 py-2 text-sm font-medium text-white hover:bg-field-green-dark disabled:opacity-50"
               >
-                {officializing ? 'Ufficializzazione...' : '✅ Ufficializza squadre'}
+                {officializing ? 'Ufficializzazione...' : teamsOfficial ? '✅ Ri-ufficializza squadre' : '✅ Ufficializza squadre'}
               </button>
               {!allApproved && (
                 <p className="mt-1 text-center text-[11px] text-gray-400">
@@ -1117,7 +1166,8 @@ export default function MatchEdit() {
               )}
             </div>
           )}
-          {isDraft && !teamsOfficial && (
+
+          {canEditTeams && (
             <div className="mt-2 flex gap-2">
               <button
                 onClick={startEditingTeams}
@@ -1135,45 +1185,44 @@ export default function MatchEdit() {
               </button>
               <button
                 onClick={startSubstitute}
-                disabled={playersNotInMatch.length === 0}
+                disabled={playersNotInDraft.length === 0}
                 className="flex-1 rounded-lg border border-field-orange/50 px-3 py-1.5 text-sm text-field-orange hover:bg-field-orange/5 disabled:opacity-50"
-                title={playersNotInMatch.length === 0 ? 'Nessun giocatore disponibile per la sostituzione' : undefined}
+                title={playersNotInDraft.length === 0 ? 'Nessun giocatore disponibile per la sostituzione' : undefined}
               >
                 🔄 Sostituisci giocatore
               </button>
             </div>
           )}
 
-          <Link
-            to={`/partite/${id}/campetto`}
-            className="mt-3 block w-full rounded-lg border border-field-green/40 bg-field-green/5 px-3 py-1.5 text-center text-sm font-medium text-field-green-dark hover:bg-field-green/10"
-          >
-            ⚽ Visualizzazione campetto
-          </Link>
+          {matchPlayers.length > 0 && (
+            <Link
+              to={`/partite/${id}/campetto`}
+              className="mt-3 block w-full rounded-lg border border-field-green/40 bg-field-green/5 px-3 py-1.5 text-center text-sm font-medium text-field-green-dark hover:bg-field-green/10"
+            >
+              ⚽ Visualizzazione campetto
+            </Link>
+          )}
         </div>
       )}
 
-      {/* ===== SOSTITUZIONE GIOCATORE (solo in bozza) ===== */}
-      {matchPlayers.length > 0 && substitutingOpen && (
+      {/* ===== SOSTITUZIONE GIOCATORE ===== */}
+      {draftPlayers.length > 0 && substitutingOpen && (
         <div className="mt-4 rounded-xl border border-field-orange/30 bg-field-orange/5 p-4">
           <h2 className="font-semibold text-field-orange">Sostituisci giocatore</h2>
           <p className="mt-1 text-xs text-gray-600">
-            Sostituisci un giocatore in campo con uno non selezionato per questa partita. Le
-            squadre verranno rigenerate automaticamente in base all'overall di tutti i giocatori,
-            incluso il nuovo entrato.
+            Sostituisci un giocatore in campo con uno non selezionato per questa partita. Le squadre verranno rigenerate
+            automaticamente in base all'overall di tutti i giocatori, incluso il nuovo entrato.
           </p>
           <div className="mt-3 space-y-2">
             <div>
-              <label className="mb-1 block text-xs font-medium text-gray-700">
-                Giocatore da sostituire
-              </label>
+              <label className="mb-1 block text-xs font-medium text-gray-700">Giocatore da sostituire</label>
               <select
                 value={subOutId}
                 onChange={(e) => setSubOutId(e.target.value)}
                 className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
               >
                 <option value="">Seleziona...</option>
-                {matchPlayers.map((mp) => (
+                {draftPlayers.map((mp) => (
                   <option key={mp.player_id} value={mp.player_id}>
                     {fullName(mp)}{mp.nickname ? ` (${mp.nickname})` : ''} - Squadra {mp.team}
                   </option>
@@ -1181,16 +1230,14 @@ export default function MatchEdit() {
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-gray-700">
-                Nuovo giocatore
-              </label>
+              <label className="mb-1 block text-xs font-medium text-gray-700">Nuovo giocatore</label>
               <select
                 value={subInId}
                 onChange={(e) => setSubInId(e.target.value)}
                 className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
               >
                 <option value="">Seleziona...</option>
-                {playersNotInMatch.map((p) => (
+                {playersNotInDraft.map((p) => (
                   <option key={p.id} value={p.id}>
                     {fullName(p)}{p.nickname ? ` (${p.nickname})` : ''}
                   </option>
@@ -1216,8 +1263,8 @@ export default function MatchEdit() {
         </div>
       )}
 
-      {/* ===== SQUADRE (modifica manuale, solo in bozza) ===== */}
-      {matchPlayers.length > 0 && editingTeams && (
+      {/* ===== SQUADRE (modifica manuale) ===== */}
+      {draftPlayers.length > 0 && editingTeams && (
         <div className="mt-4 rounded-xl border border-field-green/30 bg-field-green/5 p-4">
           <h2 className="font-semibold text-field-green-dark">Modifica squadre</h2>
           <div className="mt-3 grid grid-cols-2 gap-3">
@@ -1225,11 +1272,11 @@ export default function MatchEdit() {
               <h3 className="mb-2 font-medium text-field-green-dark">Squadra A</h3>
               <ul className="space-y-1">
                 {localTeamA.map((p) => (
-                  <li key={p.player_id} className="flex items-center justify-between gap-1 text-sm">
+                  <li key={p.player_id} className="flex min-w-0 items-center justify-between gap-1 text-sm">
                     <PlayerName name={p.name} surname={p.surname} nickname={p.nickname} />
                     <button
-                      onClick={() => swapConfirmedPlayer('A', p.player_id)}
-                      className="text-xs text-gray-400 hover:text-field-orange"
+                      onClick={() => swapDraftPlayer('A', p.player_id)}
+                      className="shrink-0 text-xs text-gray-400 hover:text-field-orange"
                       title="Sposta in B"
                     >
                       →B
@@ -1242,9 +1289,9 @@ export default function MatchEdit() {
               <h3 className="mb-2 font-medium text-field-green-dark">Squadra B</h3>
               <ul className="space-y-1">
                 {localTeamB.map((p) => (
-                  <li key={p.player_id} className="flex items-center justify-between gap-1 text-sm">
+                  <li key={p.player_id} className="flex min-w-0 items-center justify-between gap-1 text-sm">
                     <button
-                      onClick={() => swapConfirmedPlayer('B', p.player_id)}
+                      onClick={() => swapDraftPlayer('B', p.player_id)}
                       className="shrink-0 text-xs text-gray-400 hover:text-field-green"
                       title="Sposta in A"
                     >
@@ -1281,52 +1328,57 @@ export default function MatchEdit() {
         </div>
       )}
 
-      {/* ===== RISULTATO ===== */}
-      <div className="mt-4 rounded-xl bg-white p-4 shadow">
-        <h2 className="font-medium">Risultato</h2>
-        <div className="mt-2 flex flex-wrap items-center gap-3">
-          <input
-            type="number"
-            min={0}
-            value={scoreA}
-            onChange={(e) => setScoreA(e.target.value)}
-            className="w-20 rounded-lg border border-gray-300 px-3 py-2 text-center"
-          />
-          <span className="font-semibold">-</span>
-          <input
-            type="number"
-            min={0}
-            value={scoreB}
-            onChange={(e) => setScoreB(e.target.value)}
-            className="w-20 rounded-lg border border-gray-300 px-3 py-2 text-center"
-          />
-          <button
-            onClick={handleSaveResult}
-            disabled={savingResult || !infoComplete}
-            title={!infoComplete ? 'Completa data, ora e campo prima di salvare il risultato' : undefined}
-            className="w-full rounded-lg bg-field-green px-4 py-2 text-sm font-medium text-white hover:bg-field-green-dark disabled:opacity-50 disabled:cursor-not-allowed sm:ml-auto sm:w-auto"
-          >
-            Salva risultato
-          </button>
-        </div>
-        <p className="mt-2 text-xs text-gray-500">
-          Gol registrati: {goalsByTeam('A').length} - {goalsByTeam('B').length}
-          {(Number(scoreA) || 0) !== goalsByTeam('A').length || (Number(scoreB) || 0) !== goalsByTeam('B').length
-            ? ' (non coincide con il risultato inserito)'
-            : ''}
-        </p>
-        {!infoComplete && (
-          <p className="mt-1 text-xs text-red-500">
-            ⚠️ Completa data, ora e campo prima di poter salvare il risultato.
+      {/* ===== STEP 2 — RISULTATO (solo dopo ufficializzazione squadre) ===== */}
+      {teamsOfficial ? (
+        <div className="mt-4 rounded-xl bg-white p-4 shadow">
+          <h2 className="font-medium">Risultato</h2>
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <input
+              type="number"
+              min={0}
+              value={scoreA}
+              disabled={locked}
+              onChange={(e) => setScoreA(e.target.value)}
+              className="w-20 rounded-lg border border-gray-300 px-3 py-2 text-center disabled:bg-gray-100"
+            />
+            <span className="font-semibold">-</span>
+            <input
+              type="number"
+              min={0}
+              value={scoreB}
+              disabled={locked}
+              onChange={(e) => setScoreB(e.target.value)}
+              className="w-20 rounded-lg border border-gray-300 px-3 py-2 text-center disabled:bg-gray-100"
+            />
+            {!locked && (
+              <button
+                onClick={handleSaveResult}
+                disabled={savingResult || !infoComplete}
+                title={!infoComplete ? 'Completa data, ora e campo prima di salvare il risultato' : undefined}
+                className="w-full rounded-lg bg-field-green px-4 py-2 text-sm font-medium text-white hover:bg-field-green-dark disabled:cursor-not-allowed disabled:opacity-50 sm:ml-auto sm:w-auto"
+              >
+                {savingResult ? 'Salvataggio...' : 'Salva risultato'}
+              </button>
+            )}
+          </div>
+          <p className="mt-2 text-xs text-gray-500">
+            Gol registrati: {goalsByTeam('A').length} - {goalsByTeam('B').length}
+            {result && !goalsCoherent ? ' (non coincide con il risultato inserito)' : ''}
           </p>
-        )}
-      </div>
+          {!infoComplete && !locked && (
+            <p className="mt-1 text-xs text-red-500">
+              ⚠️ Completa data, ora e campo prima di poter salvare il risultato.
+            </p>
+          )}
+        </div>
+      ) : (
+        <p className="mt-4 rounded-xl border border-dashed border-gray-300 bg-white p-4 text-center text-sm text-gray-500">
+          📋 Il risultato si potrà inserire dopo aver ufficializzato le squadre.
+        </p>
+      )}
 
-      {/* ===== MARCATORI E ASSIST ===== */}
-      {/* Gol e assist si censiscono in modo indipendente: nessun legame tra i due.
-          Una colonna su mobile, due su schermi larghi; controlli impilati a tutta
-          larghezza per evitare sovrapposizioni. */}
-      {matchPlayers.length > 0 && (
+      {/* ===== STEP 3 — MARCATORI E ASSIST (solo dopo aver salvato il risultato) ===== */}
+      {result && (
         <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
           {(['A', 'B'] as Team[]).map((team) => (
             <div key={team} className="min-w-0 rounded-xl bg-white p-3 shadow">
@@ -1339,46 +1391,50 @@ export default function MatchEdit() {
                       <PlayerName name={g.name} surname={g.surname} nickname={g.nickname} />
                       {g.is_own_goal && <span className="shrink-0 text-red-600">(autogol)</span>}
                     </span>
-                    <button onClick={() => handleRemoveGoal(g.id)} className="shrink-0 text-xs text-red-600">
-                      Rimuovi
-                    </button>
+                    {!locked && (
+                      <button onClick={() => handleRemoveGoal(g.id)} className="shrink-0 text-xs text-red-600">
+                        Rimuovi
+                      </button>
+                    )}
                   </li>
                 ))}
               </ul>
-              <div className="mt-2 space-y-2">
-                <select
-                  value={newGoalPlayer[team]}
-                  onChange={(e) => setNewGoalPlayer((prev) => ({ ...prev, [team]: e.target.value }))}
-                  className="w-full min-w-0 rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
-                >
-                  <option value="">Giocatore...</option>
-                  {(ownGoal[team] ? (team === 'A' ? teamB : teamA) : team === 'A' ? teamA : teamB).map((p) => (
-                    <option key={p.player_id} value={p.player_id}>
-                      {fullName(p)}{p.nickname ? ` (${p.nickname})` : ''}
-                    </option>
-                  ))}
-                </select>
-                <label className="flex items-center gap-2 text-xs text-red-600">
-                  <input
-                    type="checkbox"
-                    checked={ownGoal[team]}
-                    onChange={(e) => {
-                      setOwnGoal((prev) => ({ ...prev, [team]: e.target.checked }))
-                      setNewGoalPlayer((prev) => ({ ...prev, [team]: '' }))
-                    }}
-                  />
-                  Autogol (giocatore della squadra avversaria)
-                </label>
-                <button
-                  onClick={() => handleAddGoal(team)}
-                  disabled={!newGoalPlayer[team]}
-                  className="w-full rounded-lg bg-field-green px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
-                >
-                  + Aggiungi gol
-                </button>
-              </div>
+              {!locked && (
+                <div className="mt-2 space-y-2">
+                  <select
+                    value={newGoalPlayer[team]}
+                    onChange={(e) => setNewGoalPlayer((prev) => ({ ...prev, [team]: e.target.value }))}
+                    className="w-full min-w-0 rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
+                  >
+                    <option value="">Giocatore...</option>
+                    {(ownGoal[team] ? (team === 'A' ? teamB : teamA) : team === 'A' ? teamA : teamB).map((p) => (
+                      <option key={p.player_id} value={p.player_id}>
+                        {fullName(p)}{p.nickname ? ` (${p.nickname})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <label className="flex items-center gap-2 text-xs text-red-600">
+                    <input
+                      type="checkbox"
+                      checked={ownGoal[team]}
+                      onChange={(e) => {
+                        setOwnGoal((prev) => ({ ...prev, [team]: e.target.checked }))
+                        setNewGoalPlayer((prev) => ({ ...prev, [team]: '' }))
+                      }}
+                    />
+                    Autogol (giocatore della squadra avversaria)
+                  </label>
+                  <button
+                    onClick={() => handleAddGoal(team)}
+                    disabled={!newGoalPlayer[team]}
+                    className="w-full rounded-lg bg-field-green px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+                  >
+                    + Aggiungi gol
+                  </button>
+                </div>
+              )}
 
-              {/* Assist (indipendenti dai gol) */}
+              {/* Assist */}
               <div className="mt-4 border-t border-gray-100 pt-3">
                 <h4 className="mb-2 text-sm font-medium text-field-green-dark">Assist Squadra {team}</h4>
                 <ul className="space-y-1 text-sm">
@@ -1388,69 +1444,81 @@ export default function MatchEdit() {
                         <span>🅰️</span>
                         <PlayerName name={a.name} surname={a.surname} nickname={a.nickname} />
                       </span>
-                      <button onClick={() => handleRemoveAssist(a.id)} className="shrink-0 text-xs text-red-600">
-                        Rimuovi
-                      </button>
+                      {!locked && (
+                        <button onClick={() => handleRemoveAssist(a.id)} className="shrink-0 text-xs text-red-600">
+                          Rimuovi
+                        </button>
+                      )}
                     </li>
                   ))}
                 </ul>
-                <div className="mt-2 space-y-2">
-                  <select
-                    value={newAssistPlayer[team]}
-                    onChange={(e) => setNewAssistPlayer((prev) => ({ ...prev, [team]: e.target.value }))}
-                    className="w-full min-w-0 rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
-                  >
-                    <option value="">Giocatore...</option>
-                    {(team === 'A' ? teamA : teamB).map((p) => (
-                      <option key={p.player_id} value={p.player_id}>
-                        {fullName(p)}{p.nickname ? ` (${p.nickname})` : ''}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    onClick={() => handleAddAssist(team)}
-                    disabled={!newAssistPlayer[team]}
-                    className="w-full rounded-lg border border-field-green px-3 py-1.5 text-sm font-medium text-field-green-dark hover:bg-field-green/5 disabled:opacity-50"
-                  >
-                    + Aggiungi assist
-                  </button>
-                </div>
+                {!locked && (
+                  <div className="mt-2 space-y-2">
+                    <select
+                      value={newAssistPlayer[team]}
+                      onChange={(e) => setNewAssistPlayer((prev) => ({ ...prev, [team]: e.target.value }))}
+                      className="w-full min-w-0 rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
+                    >
+                      <option value="">Giocatore...</option>
+                      {(team === 'A' ? teamA : teamB).map((p) => (
+                        <option key={p.player_id} value={p.player_id}>
+                          {fullName(p)}{p.nickname ? ` (${p.nickname})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => handleAddAssist(team)}
+                      disabled={!newAssistPlayer[team]}
+                      className="w-full rounded-lg border border-field-green px-3 py-1.5 text-sm font-medium text-field-green-dark hover:bg-field-green/5 disabled:opacity-50"
+                    >
+                      + Aggiungi assist
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           ))}
         </div>
       )}
 
-      {/* ===== VOTAZIONI (admin) ===== */}
-      {/* Visibili solo dopo aver salvato il risultato della partita. */}
-      {matchPlayers.length > 0 && result && (
+      {/* Avviso coerenza gol/risultato: blocca lo sblocco di voti e pagelle. */}
+      {result && !goalsCoherent && (
+        <p className="mt-4 rounded-xl border border-red-200 bg-red-50 px-3 py-3 text-sm text-red-700">
+          ⚠️ I gol registrati ({goalsByTeam('A').length}-{goalsByTeam('B').length}) non coincidono con il risultato (
+          {result.score_a}-{result.score_b}). Correggi i marcatori o il risultato: voti e pagelle si sbloccano solo
+          quando coincidono.
+        </p>
+      )}
+
+      {/* ===== STEP 4 — VOTAZIONI (admin) ===== */}
+      {result && goalsCoherent && (
         <div className="mt-4 rounded-xl border border-purple-200 bg-purple-50 p-4">
           <div className="flex items-center justify-between">
             <h2 className="font-semibold text-purple-800">🗳️ Votazioni</h2>
             <span className="text-sm font-medium text-purple-600">
-              {voterIds.size}/{matchPlayers.length} hanno votato
+              {[...voterIds].filter((v) => adminVoterIds.includes(v)).length}/{adminVoterIds.length} hanno votato
             </span>
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
-            {!match.voting_open ? (
-              <button
-                onClick={handleOpenVoting}
-                disabled={openingVoting || isPublished}
-                title={isPublished ? 'Le pagelle sono già pubblicate' : undefined}
-                className="flex-1 rounded-lg bg-purple-600 px-3 py-2 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {openingVoting ? 'Apertura...' : '🔓 Apri votazioni'}
-              </button>
-            ) : (
-              <button
-                onClick={handleCloseVoting}
-                disabled={closingVoting}
-                className="flex-1 rounded-lg border border-purple-400 bg-white px-3 py-2 text-sm font-medium text-purple-700 hover:bg-purple-100 disabled:opacity-50"
-              >
-                {closingVoting ? 'Chiusura...' : '🔒 Chiudi votazioni'}
-              </button>
-            )}
-            {averages.some((a) => a.average !== null) && (
+            {!locked &&
+              (!match.voting_open ? (
+                <button
+                  onClick={handleOpenVoting}
+                  disabled={openingVoting}
+                  className="flex-1 rounded-lg bg-purple-600 px-3 py-2 text-sm font-medium text-white hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {openingVoting ? 'Apertura...' : '🔓 Apri votazioni'}
+                </button>
+              ) : (
+                <button
+                  onClick={handleCloseVoting}
+                  disabled={closingVoting}
+                  className="flex-1 rounded-lg border border-purple-400 bg-white px-3 py-2 text-sm font-medium text-purple-700 hover:bg-purple-100 disabled:opacity-50"
+                >
+                  {closingVoting ? 'Chiusura...' : '🔒 Chiudi votazioni'}
+                </button>
+              ))}
+            {!locked && allAdminVotersVoted && averages.some((a) => a.exact !== null) && (
               <button
                 onClick={prefillFromVoting}
                 className="rounded-lg border border-purple-300 bg-white px-3 py-2 text-sm text-purple-700 hover:bg-purple-50"
@@ -1498,10 +1566,15 @@ export default function MatchEdit() {
             </div>
           )}
 
-          {averages.some((a) => a.average !== null) && (
+          {/* Media (NON arrotondata) + MVP: visibili solo quando tutti gli admin
+              che hanno partecipato alla partita hanno votato. */}
+          {allAdminVotersVoted && averages.some((a) => a.exact !== null) ? (
             <div className="mt-3 space-y-1.5">
+              <p className="text-xs text-purple-500">
+                Media voto (non arrotondata) — l'MVP è il giocatore con la media più alta; a parità, con più bonus.
+              </p>
               {[...averages]
-                .sort((a, b) => (b.average ?? 0) - (a.average ?? 0))
+                .sort((a, b) => (b.exact ?? 0) - (a.exact ?? 0))
                 .map((avg) => {
                   const p = participants.find((x) => x.player_id === avg.player_id)
                   if (!p) return null
@@ -1510,43 +1583,44 @@ export default function MatchEdit() {
                     <div
                       key={avg.player_id}
                       className={`flex items-center justify-between rounded-lg px-3 py-2 ${
-                        isMvp ? 'bg-yellow-50 border border-yellow-200' : 'bg-white'
+                        isMvp ? 'border border-yellow-200 bg-yellow-50' : 'bg-white'
                       }`}
                     >
                       <span className="flex min-w-0 items-start gap-1 text-sm font-medium text-gray-800">
                         {isMvp && <span>🏆</span>}
                         <PlayerName name={p.name} surname={p.surname} nickname={p.nickname} />
                       </span>
-                      <div className="flex items-center gap-2">
+                      <div className="flex shrink-0 items-center gap-2">
                         <span className="text-xs text-gray-400">
                           {avg.raw_count} {avg.raw_count === 1 ? 'voto' : 'voti'}
                         </span>
                         <span className="rounded-full bg-purple-100 px-2.5 py-0.5 text-sm font-bold text-purple-700">
-                          {avg.average !== null ? formatVote(avg.average) : '—'}
+                          {avg.exact !== null ? formatExact(avg.exact) : '—'}
                         </span>
                       </div>
                     </div>
                   )
                 })}
-              {provisionalMvpId === null && averages.filter((a) => a.average !== null).length > 1 && (
+              {provisionalMvpId === null && averages.filter((a) => a.exact !== null).length > 1 && (
                 <p className="mt-1 text-xs text-yellow-600">
-                  ⚠️ MVP: parimerito sulla media voto — scegli tu l'MVP nelle pagelle prima di pubblicare.
+                  ⚠️ MVP in parimerito su media e bonus: scegli tu l'MVP nelle pagelle prima di pubblicare.
                 </p>
               )}
             </div>
+          ) : (
+            <p className="mt-3 text-center text-xs text-purple-500">
+              La media voto e l'MVP saranno visibili quando tutti gli admin che hanno partecipato avranno votato.
+            </p>
           )}
 
           {match.voting_open && (
-            <p className="mt-2 text-center text-xs text-purple-500 animate-pulse">
-              Votazioni in corso...
-            </p>
+            <p className="mt-2 animate-pulse text-center text-xs text-purple-500">Votazioni in corso...</p>
           )}
         </div>
       )}
 
       {/* ===== PAGELLE ===== */}
-      {/* Visibile solo dopo aver salvato il risultato della partita. */}
-      {matchPlayers.length > 0 && result && (
+      {result && goalsCoherent && (
         <div className="mt-4">
           <h2 className="font-medium text-field-green-dark">Pagelle</h2>
           <div className="mt-2 space-y-3">
@@ -1562,6 +1636,7 @@ export default function MatchEdit() {
                         type="radio"
                         name="mvp"
                         checked={draft.is_mvp}
+                        disabled={locked}
                         onChange={() => setMvp(mp.player_id)}
                       />
                       MVP
@@ -1572,34 +1647,38 @@ export default function MatchEdit() {
                       <input
                         placeholder="Voto"
                         value={draft.voto}
+                        disabled={locked}
                         onChange={(e) => updateDraft(mp.player_id, { voto: e.target.value })}
-                        className="w-20 rounded-lg border border-gray-300 px-2 py-1 text-sm"
+                        className="w-20 rounded-lg border border-gray-300 px-2 py-1 text-sm disabled:bg-gray-100"
                       />
-                      {(() => {
-                        const avg = averages.find((a) => a.player_id === mp.player_id)
-                        return avg?.average !== null && avg?.average !== undefined ? (
-                          <button
-                            type="button"
-                            onClick={() => updateDraft(mp.player_id, { voto: formatVote(avg.average!) })}
-                            className="text-[10px] text-purple-600 hover:underline text-left"
-                          >
-                            Media: {formatVote(avg.average!)} →
-                          </button>
-                        ) : null
-                      })()}
+                      {!locked &&
+                        (() => {
+                          const avg = averages.find((a) => a.player_id === mp.player_id)
+                          return avg?.average !== null && avg?.average !== undefined ? (
+                            <button
+                              type="button"
+                              onClick={() => updateDraft(mp.player_id, { voto: formatVote(avg.average!) })}
+                              className="text-left text-[10px] text-purple-600 hover:underline"
+                            >
+                              Media: {formatVote(avg.average!)} →
+                            </button>
+                          ) : null
+                        })()}
                     </div>
                     <input
                       placeholder="Titolo"
                       value={draft.titolo}
+                      disabled={locked}
                       onChange={(e) => updateDraft(mp.player_id, { titolo: e.target.value })}
-                      className="flex-1 rounded-lg border border-gray-300 px-2 py-1 text-sm"
+                      className="flex-1 rounded-lg border border-gray-300 px-2 py-1 text-sm disabled:bg-gray-100"
                     />
                   </div>
                   <textarea
                     placeholder="Descrizione"
                     value={draft.descrizione}
+                    disabled={locked}
                     onChange={(e) => updateDraft(mp.player_id, { descrizione: e.target.value })}
-                    className="mt-2 w-full rounded-lg border border-gray-300 px-2 py-1 text-sm"
+                    className="mt-2 w-full rounded-lg border border-gray-300 px-2 py-1 text-sm disabled:bg-gray-100"
                     rows={2}
                   />
                 </div>
@@ -1607,28 +1686,32 @@ export default function MatchEdit() {
             })}
           </div>
 
-          <div className="mt-3 flex gap-2">
-            {!isPublished && (
-              <button
-                onClick={handleSaveDraft}
-                disabled={savingPagelle}
-                className="flex-1 rounded-lg border border-field-green px-4 py-2 text-sm font-medium text-field-green-dark hover:bg-field-green/5 disabled:opacity-50"
-              >
-                {savingPagelle ? 'Salvataggio...' : 'Salva bozza'}
-              </button>
-            )}
-            <button
-              onClick={handlePublish}
-              disabled={publishing || match.voting_open}
-              title={match.voting_open ? 'Chiudi prima le votazioni prima di pubblicare' : undefined}
-              className="flex-1 rounded-lg bg-field-orange px-4 py-2 text-sm font-medium text-white hover:bg-field-orange/90 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {publishing ? 'Pubblicazione...' : 'Pubblica pagelle'}
-            </button>
-          </div>
-          {match.voting_open && (
-            <p className="mt-2 text-xs text-red-500">
-              ⚠️ Chiudi le votazioni prima di pubblicare le pagelle.
+          {!locked ? (
+            <>
+              <div className="mt-3 flex gap-2">
+                <button
+                  onClick={handleSaveDraft}
+                  disabled={savingPagelle}
+                  className="flex-1 rounded-lg border border-field-green px-4 py-2 text-sm font-medium text-field-green-dark hover:bg-field-green/5 disabled:opacity-50"
+                >
+                  {savingPagelle ? 'Salvataggio...' : 'Salva bozza'}
+                </button>
+                <button
+                  onClick={handlePublish}
+                  disabled={publishing || match.voting_open}
+                  title={match.voting_open ? 'Chiudi prima le votazioni prima di pubblicare' : undefined}
+                  className="flex-1 rounded-lg bg-field-orange px-4 py-2 text-sm font-medium text-white hover:bg-field-orange/90 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {publishing ? 'Pubblicazione...' : 'Pubblica pagelle'}
+                </button>
+              </div>
+              {match.voting_open && (
+                <p className="mt-2 text-xs text-red-500">⚠️ Chiudi le votazioni prima di pubblicare le pagelle.</p>
+              )}
+            </>
+          ) : (
+            <p className="mt-3 rounded-lg bg-field-green/10 px-3 py-2 text-center text-xs font-medium text-field-green-dark">
+              ✅ Pagelle pubblicate e visibili a tutti.
             </p>
           )}
         </div>
