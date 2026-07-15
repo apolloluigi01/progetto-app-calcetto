@@ -26,6 +26,8 @@ export default function OverallAdmin() {
   const [error, setError] = useState<string | null>(null)
   const [savingId, setSavingId] = useState<string | null>(null)
   const [savedId, setSavedId] = useState<string | null>(null)
+  // Ordinamento: per nome (default) o per overall crescente/decrescente.
+  const [sortMode, setSortMode] = useState<'name' | 'overall_desc' | 'overall_asc'>('name')
 
   useEffect(() => {
     async function load() {
@@ -88,6 +90,28 @@ export default function OverallAdmin() {
 
   if (loading) return <div className="p-4 text-sm text-gray-500">Caricamento...</div>
 
+  // Ordino su savedOverall (valore persistito) così le righe non si riordinano
+  // mentre si sta digitando un nuovo overall non ancora salvato.
+  const fullName = (r: Row) => `${r.name}${r.surname ? ` ${r.surname}` : ''}`
+  const sortedRows = [...rows].sort((a, b) => {
+    if (sortMode === 'name') return fullName(a).localeCompare(fullName(b), 'it')
+    const diff = sortMode === 'overall_desc' ? b.savedOverall - a.savedOverall : a.savedOverall - b.savedOverall
+    return diff !== 0 ? diff : fullName(a).localeCompare(fullName(b), 'it')
+  })
+
+  const sortButton = (mode: typeof sortMode, label: string) => (
+    <button
+      onClick={() => setSortMode(mode)}
+      className={`rounded-lg border px-3 py-1.5 text-xs font-medium ${
+        sortMode === mode
+          ? 'border-field-green bg-field-green text-white'
+          : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-50'
+      }`}
+    >
+      {label}
+    </button>
+  )
+
   return (
     <div className="p-4 pb-12">
       <h1 className="text-xl font-semibold text-field-green-dark">Gestione overall</h1>
@@ -98,8 +122,15 @@ export default function OverallAdmin() {
 
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
 
-      <div className="mt-4 space-y-2">
-        {rows.map((row) => {
+      <div className="mt-4 flex items-center gap-2">
+        <span className="text-xs font-medium text-gray-500">Ordina:</span>
+        {sortButton('name', 'Nome')}
+        {sortButton('overall_desc', 'Overall ↓')}
+        {sortButton('overall_asc', 'Overall ↑')}
+      </div>
+
+      <div className="mt-3 space-y-2">
+        {sortedRows.map((row) => {
           const dirty = Math.round(row.overall) !== row.savedOverall
           return (
             <div key={row.id} className="rounded-xl bg-white p-3 shadow">
