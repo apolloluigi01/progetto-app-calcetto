@@ -2,13 +2,16 @@ import { supabase } from './supabase'
 import { parseVoto } from './statistiche'
 import { DEFAULT_FASCE, rangeForOverall, type FasciaRange } from './fasce'
 
+/** Budget di fallback se la configurazione non è raggiungibile
+ *  (il valore reale vive su fanta_settings.budget). */
 export const FANTA_BUDGET = 15
 export const FANTA_TEAM_SIZE = 5
 
 /**
- * Parametri bonus/malus del fantacalcetto. Non sono più hardcodati:
- * vivono nella tabella fanta_settings (riga singola) e sono manutenuti
- * dagli admin dalla sezione CDA → Gestione Fantacalcetto.
+ * Parametri del fantacalcetto. Non sono più hardcodati: vivono nella
+ * tabella fanta_settings (riga singola) e sono manutenuti dagli admin
+ * dalla sezione CDA → Gestione bonus Fantacalcetto (bonus/malus) e
+ * Gestione crediti Fantacalcetto (budget).
  */
 export interface FantaSettings {
   bonusMvp: number
@@ -17,6 +20,10 @@ export interface FantaSettings {
   malusAutogol: number
   malusPeggiore: number
   captainMultiplier: number
+  /** Crediti a disposizione del fantallenatore per formare la rosa.
+   *  Vale solo per le formazioni da schierare: quelle già salvate e le
+   *  giornate già calcolate non risentono dei cambiamenti. */
+  budget: number
 }
 
 /** Valori di fallback se la riga di configurazione non è raggiungibile. */
@@ -27,6 +34,7 @@ export const DEFAULT_FANTA_SETTINGS: FantaSettings = {
   malusAutogol: -1,
   malusPeggiore: -2,
   captainMultiplier: 1.2,
+  budget: FANTA_BUDGET,
 }
 
 export async function getFantaSettings(): Promise<FantaSettings> {
@@ -39,6 +47,7 @@ export async function getFantaSettings(): Promise<FantaSettings> {
     malusAutogol: Number(data.malus_autogol),
     malusPeggiore: Number(data.malus_peggiore),
     captainMultiplier: Number(data.captain_multiplier),
+    budget: data.budget != null ? Number(data.budget) : FANTA_BUDGET,
   }
 }
 

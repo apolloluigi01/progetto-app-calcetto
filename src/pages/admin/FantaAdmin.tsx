@@ -4,8 +4,12 @@ import { useAuth } from '../../contexts/AuthContext'
 import { logActivity, type FieldChange } from '../../lib/activityLog'
 import { DEFAULT_FANTA_SETTINGS, type FantaSettings } from '../../lib/fantacalcetto'
 
+// Questa pagina gestisce solo bonus/malus: il budget crediti si manutiene
+// dalla Gestione crediti Fantacalcetto.
+type BonusKey = Exclude<keyof FantaSettings, 'budget'>
+
 interface ParamDef {
-  key: keyof FantaSettings
+  key: BonusKey
   label: string
   hint: string
   step: string
@@ -22,7 +26,7 @@ const PARAMS: ParamDef[] = [
 
 export default function FantaAdmin() {
   const { player } = useAuth()
-  const [values, setValues] = useState<Record<keyof FantaSettings, string>>({
+  const [values, setValues] = useState<Record<BonusKey, string>>({
     bonusMvp: '', bonusGol: '', bonusAssist: '', malusAutogol: '', malusPeggiore: '', captainMultiplier: '',
   })
   const [initial, setInitial] = useState<FantaSettings>(DEFAULT_FANTA_SETTINGS)
@@ -47,6 +51,7 @@ export default function FantaAdmin() {
               malusAutogol: Number(data.malus_autogol),
               malusPeggiore: Number(data.malus_peggiore),
               captainMultiplier: Number(data.captain_multiplier),
+              budget: data.budget != null ? Number(data.budget) : DEFAULT_FANTA_SETTINGS.budget,
             }
           : DEFAULT_FANTA_SETTINGS
         setInitial(s)
@@ -62,7 +67,7 @@ export default function FantaAdmin() {
       })
   }, [])
 
-  const parsed: Partial<FantaSettings> = {}
+  const parsed: Partial<Record<BonusKey, number>> = {}
   let allValid = true
   for (const p of PARAMS) {
     const n = Number(values[p.key].replace(',', '.'))
@@ -76,7 +81,7 @@ export default function FantaAdmin() {
 
   async function handleSave() {
     if (!allValid) return
-    const next = parsed as FantaSettings
+    const next = parsed as Record<BonusKey, number>
     setSaving(true)
     setSaved(false)
     setError(null)
@@ -109,7 +114,7 @@ export default function FantaAdmin() {
     if (modifiche.length > 0) {
       logActivity('fanta_parametri_modificati', { modifiche })
     }
-    setInitial(next)
+    setInitial((prev) => ({ ...prev, ...next }))
     setSaved(true)
   }
 

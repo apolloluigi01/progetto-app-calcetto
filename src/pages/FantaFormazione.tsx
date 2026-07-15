@@ -7,7 +7,6 @@ import { usePlayerRatings } from '../hooks/usePlayerRatings'
 import { useFantaSettings } from '../hooks/useFantaSettings'
 import { useFasce } from '../hooks/useFasce'
 import {
-  FANTA_BUDGET,
   FANTA_TEAM_SIZE,
   computeLineupScore,
   creditCost,
@@ -221,6 +220,9 @@ export default function FantaFormazione() {
   // di un quarto d'ora al calcio d'inizio.
   const locked = !teamsFormed || !teamsOfficial || !!result || !isNextMatch || pastDeadline
 
+  // Budget crediti configurato dal CDA (fanta_settings.budget). Vale per le
+  // formazioni da schierare: quelle già salvate non vengono ricontrollate.
+  const budget = settings.budget
   const costOf = (playerId: string) => creditCost(ratings.get(playerId) ?? null, fasce)
   const budgetUsed = [...selected].reduce((s, id) => s + costOf(id), 0)
   const countA = teamA.filter((p) => selected.has(p.player_id)).length
@@ -228,7 +230,7 @@ export default function FantaFormazione() {
 
   const isValid =
     selected.size === FANTA_TEAM_SIZE &&
-    budgetUsed <= FANTA_BUDGET &&
+    budgetUsed <= budget &&
     countA >= 1 &&
     countB >= 1 &&
     !!captainId &&
@@ -352,7 +354,7 @@ export default function FantaFormazione() {
             const isSelected = selected.has(p.player_id)
             const cost = costOf(p.player_id)
             const disabled =
-              locked || (!isSelected && (selected.size >= FANTA_TEAM_SIZE || budgetUsed + cost > FANTA_BUDGET))
+              locked || (!isSelected && (selected.size >= FANTA_TEAM_SIZE || budgetUsed + cost > budget))
             return (
               <li key={p.player_id}>
                 <button
@@ -418,7 +420,7 @@ export default function FantaFormazione() {
       ) : (
         <>
           <p className="mt-1 text-sm text-gray-500">
-            Scegli {FANTA_TEAM_SIZE} giocatori con {FANTA_BUDGET} crediti, pescando da entrambe le squadre
+            Scegli {FANTA_TEAM_SIZE} giocatori con {budget} crediti, pescando da entrambe le squadre
             (almeno 1 per squadra), poi nomina il capitano (i suoi bonus valgono ×{settings.captainMultiplier}).
           </p>
           {deadline && (
@@ -468,7 +470,7 @@ export default function FantaFormazione() {
         <div className="mt-4 rounded-xl bg-white p-3 shadow">
           <div className="flex items-center justify-between text-sm">
             <span className="font-medium text-gray-700">
-              Budget: {budgetUsed}/{FANTA_BUDGET} crediti
+              Budget: {budgetUsed}/{budget} crediti
             </span>
             <span className={`font-semibold ${selected.size === FANTA_TEAM_SIZE ? 'text-field-green-dark' : 'text-gray-400'}`}>
               {selected.size}/{FANTA_TEAM_SIZE} giocatori
@@ -476,8 +478,8 @@ export default function FantaFormazione() {
           </div>
           <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-gray-100">
             <div
-              className={`h-full rounded-full transition-all ${budgetUsed > FANTA_BUDGET ? 'bg-red-500' : 'bg-field-green'}`}
-              style={{ width: `${Math.min((budgetUsed / FANTA_BUDGET) * 100, 100)}%` }}
+              className={`h-full rounded-full transition-all ${budgetUsed > budget ? 'bg-red-500' : 'bg-field-green'}`}
+              style={{ width: `${Math.min((budgetUsed / budget) * 100, 100)}%` }}
             />
           </div>
         </div>
@@ -536,7 +538,7 @@ export default function FantaFormazione() {
             {selected.size > 0 && (countA === 0 || countB === 0) && (
               <p className="text-red-500">• Serve almeno un giocatore per squadra</p>
             )}
-            {budgetUsed > FANTA_BUDGET && <p className="text-red-500">• Hai superato il budget di {FANTA_BUDGET} crediti</p>}
+            {budgetUsed > budget && <p className="text-red-500">• Hai superato il budget di {budget} crediti</p>}
             {selected.size === FANTA_TEAM_SIZE && !captainId && (
               <p className="text-gray-500">• Scegli il capitano</p>
             )}

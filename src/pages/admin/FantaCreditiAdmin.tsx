@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { logActivity, type FieldChange } from '../../lib/activityLog'
 import { DEFAULT_FASCE, fasciaLabel, getFasce, invalidateFasceCache, type FasciaRange } from '../../lib/fasce'
-import { FANTA_BUDGET } from '../../lib/fantacalcetto'
+import { FANTA_BUDGET, FANTA_TEAM_SIZE, getFantaSettings } from '../../lib/fantacalcetto'
 
 // Anteprima colore della carta, coerente con FasceAdmin e i template di PlayerCard.
 const TIER_SWATCH: Record<string, string> = {
@@ -15,23 +15,28 @@ const TIER_SWATCH: Record<string, string> = {
 }
 
 /**
- * Gestione dei costi in crediti fantacalcetto per fascia/carta (solo admin).
- * I valori vivono su fascia_settings.credit_cost e determinano quanto costa
- * ogni giocatore quando i partecipanti schierano la formazione.
+ * Gestione dei crediti fantacalcetto (solo admin): budget del fantallenatore
+ * (fanta_settings.budget) e costo dei giocatori per fascia/carta
+ * (fascia_settings.credit_cost). I valori valgono per le formazioni da
+ * schierare: le giornate già schierate e calcolate non vengono toccate.
  */
 export default function FantaCreditiAdmin() {
   const { player } = useAuth()
   const [rows, setRows] = useState<FasciaRange[]>(DEFAULT_FASCE)
   const [initial, setInitial] = useState<FasciaRange[]>(DEFAULT_FASCE)
+  const [budget, setBudget] = useState<number>(FANTA_BUDGET)
+  const [initialBudget, setInitialBudget] = useState<number>(FANTA_BUDGET)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    getFasce(true).then((f) => {
+    Promise.all([getFasce(true), getFantaSettings()]).then(([f, s]) => {
       setRows(f)
       setInitial(f)
+      setBudget(s.budget)
+      setInitialBudget(s.budget)
       setLoading(false)
     })
   }, [])
@@ -42,17 +47,24 @@ export default function FantaCreditiAdmin() {
   }
 
   const validationError = (() => {
+    if (isNaN(budget) || !Number.isInteger(budget)) return 'Il budget deve essere un numero intero.'
+    if (budget < 1) return 'Il budget deve essere almeno 1 credito.'
     for (const r of rows) {
       if (isNaN(r.creditCost)) return 'Inserisci un valore numerico per ogni fascia.'
       if (!Number.isInteger(r.creditCost)) return `Il costo della carta "${r.cardLabel}" deve essere un numero intero.`
       if (r.creditCost < 1) return `Il costo della carta "${r.cardLabel}" deve essere almeno 1 credito.`
-      if (r.creditCost > FANTA_BUDGET)
-        return `Il costo della carta "${r.cardLabel}" supera il budget di ${FANTA_BUDGET} crediti: nessuno potrebbe acquistarla.`
+      if (r.creditCost > budget)
+        return `Il costo della carta "${r.cardLabel}" supera il budget di ${budget} crediti: nessuno potrebbe acquistarla.`
     }
     for (let i = 1; i < rows.length; i++) {
       if (rows[i].creditCost < rows[i - 1].creditCost)
         return `La carta "${rows[i].cardLabel}" non può costare meno della carta "${rows[i - 1].cardLabel}".`
     }
+    // Con il budget deve essere sempre possibile schierare una rosa completa
+    // di giocatori della fascia più economica.
+    const minCost = Math.min(...rows.map((r) => r.creditCost))
+    if (budget < FANTA_TEAM_SIZE * minCost)
+      return `Con ${budget} crediti non si riesce a schierare una rosa di ${FANTA_TEAM_SIZE} giocatori nemmeno tutta di fascia più economica (${minCost} cr l'uno): servono almeno ${FANTA_TEAM_SIZE * minCost} crediti.`
     return null
   })()
 
@@ -77,6 +89,18 @@ export default function FantaCreditiAdmin() {
         return
       }
     }
+
+    if (budget !== initialBudget) {
+      const { error: budgetError } = await supabase
+        .from('fanta_settings')
+        .update({ budget, updated_at: new Date().toISOString(), updated_by: player?.id ?? null })
+        .eq('id', 1)
+      if (budgetError) {
+        setSaving(false)
+        setError(budgetError.message)
+        return
+      }
+    }
     setSaving(false)
 
     const modifiche: FieldChange[] = rows
@@ -92,12 +116,16 @@ export default function FantaCreditiAdmin() {
           a: `${r.creditCost} cr`,
         }
       })
+    if (budget !== initialBudget) {
+      modifiche.push({ campo: 'Budget fantallenatore', da: `${initialBudget} cr`, a: `${budget} cr` })
+    }
     if (modifiche.length > 0) {
       logActivity('fanta_crediti_modificati', { modifiche })
     }
 
     invalidateFasceCache()
     setInitial(rows)
+    setInitialBudget(budget)
     setSaved(true)
   }
 
@@ -107,10 +135,35 @@ export default function FantaCreditiAdmin() {
     <div className="p-4 pb-12">
       <h1 className="text-xl font-semibold text-field-green-dark">Gestione crediti Fantacalcetto</h1>
       <p className="mt-1 text-sm text-gray-500">
-        Costo in crediti dei giocatori per ogni fascia/carta. I partecipanti al fantacalcetto hanno
-        un budget di {FANTA_BUDGET} crediti per schierare la formazione: questi valori determinano
-        quanto costa ogni giocatore in base alla sua fascia.
+        Budget del fantallenatore e costo in crediti dei giocatori per ogni fascia/carta: questi
+        valori determinano come si compone la rosa quando si schiera la formazione.
       </p>
+
+      {/* Budget fantallenatore */}
+      <div className="mt-4 rounded-xl bg-white p-4 shadow">
+        <div className="flex items-center gap-3">
+          <span className="text-lg">💰</span>
+          <div className="min-w-0 flex-1">
+            <label className="block text-sm font-medium text-gray-700">Budget fantallenatore</label>
+            <p className="text-xs text-gray-400">
+              Crediti a disposizione per formare la rosa di {FANTA_TEAM_SIZE} giocatori
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <input
+              type="number"
+              min={1}
+              value={isNaN(budget) ? '' : budget}
+              onChange={(e) => {
+                setSaved(false)
+                setBudget(Number(e.target.value))
+              }}
+              className="w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-center font-semibold"
+            />
+            <span className="text-sm text-gray-400">crediti</span>
+          </div>
+        </div>
+      </div>
 
       {/* Modifica costi */}
       <div className="mt-4 space-y-3 rounded-xl bg-white p-4 shadow">
@@ -127,7 +180,7 @@ export default function FantaCreditiAdmin() {
               <input
                 type="number"
                 min={1}
-                max={FANTA_BUDGET}
+                max={isNaN(budget) ? undefined : budget}
                 value={isNaN(r.creditCost) ? '' : r.creditCost}
                 onChange={(e) => updateCost(r.id, Number(e.target.value))}
                 className="w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-center font-semibold"
@@ -151,8 +204,8 @@ export default function FantaCreditiAdmin() {
       </div>
 
       <p className="mt-3 text-xs text-gray-400">
-        I nuovi costi valgono per le formazioni non ancora schierate; le formazioni già salvate non
-        vengono toccate. Ogni modifica viene registrata nel registro attività.
+        Budget e costi valgono per le formazioni non ancora schierate; le giornate già schierate e
+        calcolate restano come sono. Ogni modifica viene registrata nel registro attività.
       </p>
     </div>
   )
