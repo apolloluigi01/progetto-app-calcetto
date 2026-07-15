@@ -57,13 +57,12 @@ export function lineupDeadline(matchDate: string, matchTime: string | null): Dat
 }
 
 /**
- * Costo in crediti di un giocatore, in base all'overall e alla stessa
- * griglia delle fasce/carte (configurabile dal CDA -> Gestione Fasce):
- * 1 credito per la fascia più bassa (bronzo), fino a 5 per la più alta (viola).
+ * Costo in crediti di un giocatore, in base all'overall e alla griglia
+ * delle fasce/carte. Il costo di ogni fascia è configurabile dal
+ * CDA -> Gestione crediti Fantacalcetto (colonna credit_cost).
  */
 export function creditCost(overall: number | null, fasce: FasciaRange[] = DEFAULT_FASCE): number {
-  const range = rangeForOverall(overall, fasce)
-  return fasce.indexOf(range) + 1
+  return rangeForOverall(overall, fasce).creditCost
 }
 
 export interface FantaMatchInput {

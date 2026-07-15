@@ -15,15 +15,18 @@ export interface FasciaRange {
   fascia: Fascia
   min: number
   max: number
+  /** Costo in crediti fantacalcetto dei giocatori di questa fascia
+   *  (manutenuto dal CDA -> Gestione crediti Fantacalcetto). */
+  creditCost: number
 }
 
 /** Valori di fallback se la configurazione non è raggiungibile. */
 export const DEFAULT_FASCE: FasciaRange[] = [
-  { id: 1, tier: 'bronzo', cardLabel: 'Bronzo', fascia: 'D', min: 0, max: 59 },
-  { id: 2, tier: 'argento', cardLabel: 'Argento', fascia: 'C', min: 60, max: 74 },
-  { id: 3, tier: 'oro', cardLabel: 'Oro', fascia: 'B', min: 75, max: 84 },
-  { id: 4, tier: 'blu', cardLabel: 'Blu', fascia: 'A', min: 85, max: 94 },
-  { id: 5, tier: 'viola', cardLabel: 'Viola', fascia: 'A', min: 95, max: 100 },
+  { id: 1, tier: 'bronzo', cardLabel: 'Bronzo', fascia: 'D', min: 0, max: 59, creditCost: 1 },
+  { id: 2, tier: 'argento', cardLabel: 'Argento', fascia: 'C', min: 60, max: 74, creditCost: 2 },
+  { id: 3, tier: 'oro', cardLabel: 'Oro', fascia: 'B', min: 75, max: 84, creditCost: 3 },
+  { id: 4, tier: 'blu', cardLabel: 'Blu', fascia: 'A', min: 85, max: 94, creditCost: 4 },
+  { id: 5, tier: 'viola', cardLabel: 'Viola', fascia: 'A', min: 95, max: 100, creditCost: 5 },
 ]
 
 let cached: FasciaRange[] | null = null
@@ -35,15 +38,18 @@ export async function getFasce(force = false): Promise<FasciaRange[]> {
   pending = (async () => {
     const { data } = await supabase
       .from('fascia_settings')
-      .select('id, tier, card_label, fascia, min_overall, max_overall')
+      .select('id, tier, card_label, fascia, min_overall, max_overall, credit_cost')
       .order('min_overall', { ascending: true })
-    const rows = (data ?? []).map((r) => ({
+    const rows = (data ?? []).map((r, idx) => ({
       id: r.id as number,
       tier: r.tier as CardTier,
       cardLabel: r.card_label as string,
       fascia: r.fascia as Fascia,
       min: Number(r.min_overall),
       max: Number(r.max_overall),
+      // Fallback al vecchio costo implicito (posizione fascia) se la colonna
+      // non fosse ancora valorizzata.
+      creditCost: r.credit_cost != null ? Number(r.credit_cost) : idx + 1,
     }))
     cached = rows.length > 0 ? rows : DEFAULT_FASCE
     pending = null

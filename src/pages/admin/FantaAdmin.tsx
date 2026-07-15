@@ -117,7 +117,7 @@ export default function FantaAdmin() {
 
   return (
     <div className="p-4 pb-12">
-      <h1 className="text-xl font-semibold text-field-green-dark">Gestione Fantacalcetto</h1>
+      <h1 className="text-xl font-semibold text-field-green-dark">Gestione bonus Fantacalcetto</h1>
       <p className="mt-1 text-sm text-gray-500">
         Parametri bonus/malus usati per il calcolo dei punteggi delle giornate. Le modifiche valgono
         per i prossimi calcoli (e per gli eventuali ricalcoli) delle giornate.

@@ -27,6 +27,7 @@ import StagioneEdit from './pages/admin/StagioneEdit'
 import StagioneDettaglio from './pages/admin/StagioneDettaglio'
 import StagioneStatisticaDettaglio from './pages/admin/StagioneStatisticaDettaglio'
 import FantaAdmin from './pages/admin/FantaAdmin'
+import FantaCreditiAdmin from './pages/admin/FantaCreditiAdmin'
 import OverallAdmin from './pages/admin/OverallAdmin'
 import FasceAdmin from './pages/admin/FasceAdmin'
 import AlboOroAdmin from './pages/admin/AlboOroAdmin'
@@ -77,6 +78,7 @@ function App() {
                 <Route path="/admin/giocatori" element={<GiocatoriAdmin />} />
                 <Route path="/admin/giocatori/:id" element={<GiocatoreEdit />} />
                 <Route path="/admin/fantacalcetto" element={<FantaAdmin />} />
+                <Route path="/admin/fanta-crediti" element={<FantaCreditiAdmin />} />
                 <Route path="/admin/overall" element={<OverallAdmin />} />
                 <Route path="/admin/fasce" element={<FasceAdmin />} />
                 <Route path="/admin/albo-oro" element={<AlboOroAdmin />} />
