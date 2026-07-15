@@ -24,6 +24,7 @@ const actionColors: Record<ActivityAction, string> = {
   gol_rimosso:           'bg-red-50 text-red-600',
   assist_aggiunto:       'bg-field-green/10 text-field-green-dark',
   assist_rimosso:        'bg-red-50 text-red-600',
+  statistiche_salvate:   'bg-blue-50 text-blue-700',
   pagelle_bozza:         'bg-field-yellow/20 text-field-orange',
   pagelle_pubblicate:    'bg-field-orange/10 text-field-orange',
   partita_eliminata:     'bg-red-50 text-red-700',

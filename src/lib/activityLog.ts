@@ -19,6 +19,7 @@ export type ActivityAction =
   | 'gol_rimosso'
   | 'assist_aggiunto'
   | 'assist_rimosso'
+  | 'statistiche_salvate'
   | 'pagelle_bozza'
   | 'pagelle_pubblicate'
   | 'partita_eliminata'
@@ -57,6 +58,7 @@ export const actionLabels: Record<ActivityAction, string> = {
   gol_rimosso:           'Gol rimosso',
   assist_aggiunto:       'Assist aggiunto',
   assist_rimosso:        'Assist rimosso',
+  statistiche_salvate:   'Statistiche salvate',
   pagelle_bozza:         'Pagelle salvate in bozza',
   pagelle_pubblicate:    'Pagelle pubblicate',
   partita_eliminata:     'Partita eliminata',

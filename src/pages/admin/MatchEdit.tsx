@@ -49,6 +49,7 @@ export default function MatchEdit() {
   const [scoreA, setScoreA] = useState('')
   const [scoreB, setScoreB] = useState('')
   const [savingResult, setSavingResult] = useState(false)
+  const [savingStats, setSavingStats] = useState(false)
 
   const [matchDate, setMatchDate] = useState('')
   const [matchTime, setMatchTime] = useState('')
@@ -268,12 +269,21 @@ export default function MatchEdit() {
   // numero di gol per squadra coincide con il risultato inserito.
   const goalsCoherent =
     !!result && goalsByTeam('A').length === result.score_a && goalsByTeam('B').length === result.score_b
+  // Statistiche (gol/assist) fissate dall'admin: sblocca il box votazioni.
+  const statsConfirmed = !!match.stats_confirmed_at
 
   // [APPROVAZIONE SQUADRE — disattivata] Derivati del quorum di approvazione.
   // const adminIds = allPlayers.filter((p) => p.role === 'admin' || p.role === 'superadmin').map((p) => p.id)
   // const allApproved = adminIds.length > 0 && adminIds.every((aid) => approvals.includes(aid))
   // const iApproved = !!currentAdmin && approvals.includes(currentAdmin.id)
   const infoComplete = !!matchDate && !!matchTime && !!field
+
+  // Le statistiche (gol/assist) confermate non sono più valide se cambia il
+  // risultato o i marcatori: si azzera il flag e vanno risalvate (rilocka i voti).
+  async function resetStatsConfirmation() {
+    if (!id || !match.stats_confirmed_at) return
+    await supabase.from('matches').update({ stats_confirmed_at: null }).eq('id', id)
+  }
 
   // --- Info partita ---
   async function handleSaveResult() {
@@ -283,8 +293,26 @@ export default function MatchEdit() {
       .from('match_results')
       .upsert({ match_id: id, score_a: Number(scoreA) || 0, score_b: Number(scoreB) || 0 }, { onConflict: 'match_id' })
     await supabase.from('matches').update({ status: 'completed' }).eq('id', id)
+    // Cambiare il risultato invalida le statistiche eventualmente già confermate.
+    await resetStatsConfirmation()
     setSavingResult(false)
     logActivity('risultato_salvato', { matchId: id, data: match.match_date, scoreA: Number(scoreA) || 0, scoreB: Number(scoreB) || 0 })
+    refetch()
+  }
+
+  // --- Salva statistiche (gol/assist): le fissa e sblocca le votazioni ---
+  async function handleSaveStats() {
+    if (!id || locked) return
+    if (!goalsCoherent) {
+      alert(
+        'I gol registrati non coincidono con il risultato: correggi i marcatori o il risultato prima di salvare le statistiche.'
+      )
+      return
+    }
+    setSavingStats(true)
+    await supabase.from('matches').update({ stats_confirmed_at: new Date().toISOString() }).eq('id', id)
+    setSavingStats(false)
+    logActivity('statistiche_salvate', { matchId: id, data: match.match_date })
     refetch()
   }
 
@@ -331,6 +359,7 @@ export default function MatchEdit() {
       })
     const playerName = matchPlayers.find((p) => p.player_id === newGoalPlayer[team])?.name
     logActivity('gol_aggiunto', { matchId: id, data: match.match_date, squadra: team, giocatore: playerName, autogol: ownGoal[team] })
+    await resetStatsConfirmation()
     setNewGoalPlayer((prev) => ({ ...prev, [team]: '' }))
     setOwnGoal((prev) => ({ ...prev, [team]: false }))
     refetch()
@@ -341,6 +370,7 @@ export default function MatchEdit() {
     const goal = goals.find((g) => g.id === goalId)
     await supabase.from('goals').delete().eq('id', goalId)
     logActivity('gol_rimosso', { matchId: id, data: match.match_date, giocatore: goal?.name })
+    await resetStatsConfirmation()
     refetch()
   }
 
@@ -351,6 +381,7 @@ export default function MatchEdit() {
       .insert({ match_id: id, player_id: newAssistPlayer[team], team })
     const playerName = matchPlayers.find((p) => p.player_id === newAssistPlayer[team])?.name
     logActivity('assist_aggiunto', { matchId: id, data: match.match_date, squadra: team, giocatore: playerName })
+    await resetStatsConfirmation()
     setNewAssistPlayer((prev) => ({ ...prev, [team]: '' }))
     refetch()
   }
@@ -360,6 +391,7 @@ export default function MatchEdit() {
     const assist = assists.find((a) => a.id === assistId)
     await supabase.from('assists').delete().eq('id', assistId)
     logActivity('assist_rimosso', { matchId: id, data: match.match_date, giocatore: assist?.name })
+    await resetStatsConfirmation()
     refetch()
   }
 
@@ -1518,17 +1550,40 @@ export default function MatchEdit() {
         </div>
       )}
 
-      {/* Avviso coerenza gol/risultato: blocca lo sblocco di voti e pagelle. */}
-      {result && !goalsCoherent && (
-        <p className="mt-4 rounded-xl border border-red-200 bg-red-50 px-3 py-3 text-sm text-red-700">
-          ⚠️ I gol registrati ({goalsByTeam('A').length}-{goalsByTeam('B').length}) non coincidono con il risultato (
-          {result.score_a}-{result.score_b}). Correggi i marcatori o il risultato: voti e pagelle si sbloccano solo
-          quando coincidono.
-        </p>
+      {/* ===== SALVA STATISTICHE: fissa gol/assist e sblocca le votazioni ===== */}
+      {result && (
+        <div className="mt-4">
+          {!goalsCoherent ? (
+            <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-3 text-sm text-red-700">
+              ⚠️ I gol registrati ({goalsByTeam('A').length}-{goalsByTeam('B').length}) non coincidono con il risultato (
+              {result.score_a}-{result.score_b}). Correggi i marcatori o il risultato: potrai salvare le statistiche e
+              sbloccare le votazioni solo quando coincidono.
+            </p>
+          ) : !statsConfirmed ? (
+            <div className="rounded-xl border border-field-green/30 bg-field-green/5 p-4">
+              <p className="text-sm text-gray-600">
+                Gol e assist coincidono con il risultato. Salva le statistiche per fissarle e sbloccare le votazioni.
+              </p>
+              {!locked && (
+                <button
+                  onClick={handleSaveStats}
+                  disabled={savingStats}
+                  className="mt-3 w-full rounded-lg bg-field-green px-4 py-2 text-sm font-medium text-white hover:bg-field-green-dark disabled:opacity-50"
+                >
+                  {savingStats ? 'Salvataggio...' : '💾 Salva statistiche'}
+                </button>
+              )}
+            </div>
+          ) : (
+            <p className="rounded-xl bg-field-green/10 px-3 py-2 text-center text-sm font-medium text-field-green-dark">
+              ✓ Statistiche salvate.{!locked && ' Modificare gol o assist richiederà di risalvarle.'}
+            </p>
+          )}
+        </div>
       )}
 
-      {/* ===== STEP 4 — VOTAZIONI (admin) ===== */}
-      {result && goalsCoherent && (
+      {/* ===== STEP 4 — VOTAZIONI (admin) — dopo il salvataggio delle statistiche ===== */}
+      {result && goalsCoherent && statsConfirmed && (
         <div className="mt-4 rounded-xl border border-purple-200 bg-purple-50 p-4">
           <div className="flex items-center justify-between">
             <h2 className="font-semibold text-purple-800">🗳️ Votazioni</h2>
@@ -1657,7 +1712,7 @@ export default function MatchEdit() {
       )}
 
       {/* ===== PAGELLE ===== */}
-      {result && goalsCoherent && (
+      {result && goalsCoherent && statsConfirmed && (
         <div className="mt-4">
           <h2 className="font-medium text-field-green-dark">Pagelle</h2>
           <div className="mt-2 space-y-3">

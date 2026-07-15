@@ -41,6 +41,10 @@ export interface Match {
   /** Quando l'admin ha ufficializzato le squadre: da lì non si toccano più
    *  e si apre lo schieramento delle formazioni fantacalcetto. */
   teams_official_at: string | null
+  /** Quando l'admin ha salvato/fissato le statistiche (gol e assist) censite
+   *  dopo il risultato: da qui si sblocca il box votazioni. Ogni modifica a
+   *  gol/assist o al risultato lo azzera (vanno risalvate). */
+  stats_confirmed_at: string | null
   created_at: string
 }
 
