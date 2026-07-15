@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
@@ -90,6 +90,8 @@ export default function MatchEdit() {
 
   // Bozza squadre (workflow snapshot): tutto il lavoro sulle squadre avviene qui.
   const [draftPlayers, setDraftPlayers] = useState<DraftPlayer[]>([])
+  const [draftLoaded, setDraftLoaded] = useState(false)
+  const seededRef = useRef(false)
 
   // Generazione squadre (prima assegnazione)
   const [generatedTeams, setGeneratedTeams] = useState<GeneratedTeams | null>(null)
@@ -154,12 +156,31 @@ export default function MatchEdit() {
         nickname: r.players?.nickname ?? null,
       }))
     )
+    setDraftLoaded(true)
   }
 
   useEffect(() => {
+    seededRef.current = false
+    setDraftLoaded(false)
     loadDraft()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
+
+  // Auto-riparazione: partite con squadre ufficiali ma senza bozza (create prima
+  // del workflow snapshot, es. vecchia modalità manuale). Ricostruiamo la bozza
+  // dalle squadre esistenti così tornano gestibili (modifica/approva/ufficializza).
+  useEffect(() => {
+    if (!id || !data || !draftLoaded || seededRef.current) return
+    if (draftPlayers.length === 0 && data.matchPlayers.length > 0) {
+      seededRef.current = true
+      const rows = data.matchPlayers.map((mp) => ({ match_id: id, player_id: mp.player_id, team: mp.team }))
+      supabase
+        .from('match_players_draft')
+        .upsert(rows, { onConflict: 'match_id,player_id' })
+        .then(() => loadDraft())
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, data, draftLoaded, draftPlayers.length])
 
   useEffect(() => {
     if (!id) return
