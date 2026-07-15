@@ -34,9 +34,10 @@ export default function GiocatoreDetail() {
       .from('players')
       .select('*')
       .eq('id', id)
-      .single()
+      .maybeSingle()
       .then(({ data, error }) => {
         if (error) setError(error.message)
+        else if (!data) setError('Giocatore non trovato')
         setPlayer((data as Player) ?? null)
         setLoading(false)
       })

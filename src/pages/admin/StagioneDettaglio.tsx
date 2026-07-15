@@ -75,7 +75,7 @@ export default function StagioneDettaglio() {
       setError(null)
 
       const [seasonRes, matchesRes] = await Promise.all([
-        supabase.from('seasons').select('*').eq('id', id).single(),
+        supabase.from('seasons').select('*').eq('id', id).maybeSingle(),
         supabase
           .from('matches')
           .select('*, result:match_results(score_a, score_b, id, match_id)')
@@ -90,6 +90,11 @@ export default function StagioneDettaglio() {
       }
       if (matchesRes.error) {
         setError(matchesRes.error.message)
+        setLoading(false)
+        return
+      }
+      if (!seasonRes.data) {
+        setError('Stagione non trovata')
         setLoading(false)
         return
       }

@@ -52,7 +52,7 @@ export function useFantaLeague(leagueId: string | undefined, myPlayerId: string 
       .from('fanta_leagues')
       .select('id, name, season_id, seasons(name)')
       .eq('id', leagueId)
-      .single()
+      .maybeSingle()
 
     if (leagueRes.error || !leagueRes.data) {
       setError(leagueRes.error?.message ?? 'Lega non trovata')

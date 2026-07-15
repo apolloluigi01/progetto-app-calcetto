@@ -36,7 +36,7 @@ export default function StagioneEdit() {
       .from('seasons')
       .select('*')
       .eq('id', id)
-      .single()
+      .maybeSingle()
       .then(({ data }) => {
         if (data) {
           const s = data as Season

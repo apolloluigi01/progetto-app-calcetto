@@ -117,11 +117,15 @@ export default function PartitaForm() {
 
       if (modalita === 'manuale') {
         if (!generatedTeams) throw new Error('Squadre non ancora generate')
+        // Le squadre create manualmente entrano come BOZZA: l'admin le
+        // approva e ufficializza dalla schermata di gestione partita (stesso
+        // flusso della generazione da sondaggio). match_players viene scritto
+        // solo all'ufficializzazione.
         const rows = [
           ...generatedTeams.teamA.map((p) => ({ match_id: match.id, player_id: p.playerId, team: 'A' as Team })),
           ...generatedTeams.teamB.map((p) => ({ match_id: match.id, player_id: p.playerId, team: 'B' as Team })),
         ]
-        const { error: playersError } = await supabase.from('match_players').insert(rows)
+        const { error: playersError } = await supabase.from('match_players_draft').insert(rows)
         if (playersError) throw new Error(playersError.message)
         logActivity('partita_creata', { matchId: match.id, data: matchDate, campo: field || null, modalita: 'manuale' })
       } else {
