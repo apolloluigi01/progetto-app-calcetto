@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
-import { useAuth } from '../../contexts/AuthContext'
+// [APPROVAZIONE SQUADRE — regressa/disattivata, codice conservato per riuso futuro]
+// import { useAuth } from '../../contexts/AuthContext'
 import { useMatchDetail } from '../../hooks/useMatchDetail'
 import { useMatchBookings } from '../../hooks/useMatchBookings'
 import { useMatchVoting } from '../../hooks/useMatchVoting'
@@ -37,7 +38,7 @@ interface DraftPlayer {
 export default function MatchEdit() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { player: currentAdmin } = useAuth()
+  // [APPROVAZIONE SQUADRE — disattivata] const { player: currentAdmin } = useAuth()
   const { data, loading, error, refetch } = useMatchDetail(id)
   const {
     bookings,
@@ -110,11 +111,15 @@ export default function MatchEdit() {
   const [recalculating, setRecalculating] = useState(false)
   const [officializing, setOfficializing] = useState(false)
 
-  // Approvazione squadre: prima dell'ufficializzazione tutti gli admin devono
-  // approvare la versione corrente (ogni modifica azzera i flag).
-  const [approvals, setApprovals] = useState<string[]>([])
-  const [approvalsVersion, setApprovalsVersion] = useState(0)
-  const [approving, setApproving] = useState(false)
+  // [APPROVAZIONE SQUADRE — regressa/disattivata, conservata per riuso futuro]
+  // Prima dell'ufficializzazione tutti gli admin dovevano approvare la versione
+  // corrente (ogni modifica azzerava i flag). Per riattivare: decommentare qui,
+  // l'effetto di caricamento, gli handler handleApproveTeams/clearTeamApprovals,
+  // i derivati adminIds/allApproved/iApproved, il blocco UI di approvazione e
+  // ripristinare il gate `!allApproved` in handleOfficializeTeams.
+  // const [approvals, setApprovals] = useState<string[]>([])
+  // const [approvalsVersion, setApprovalsVersion] = useState(0)
+  // const [approving, setApproving] = useState(false)
 
   // Nuove squadre (da ricalcolo o sostituzione) in attesa del salvataggio.
   interface PendingTeams {
@@ -182,20 +187,21 @@ export default function MatchEdit() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, data, draftLoaded, draftPlayers.length])
 
-  useEffect(() => {
-    if (!id) return
-    let cancelled = false
-    supabase
-      .from('team_approvals')
-      .select('admin_id')
-      .eq('match_id', id)
-      .then(({ data: ap }) => {
-        if (!cancelled) setApprovals(((ap ?? []) as { admin_id: string }[]).map((a) => a.admin_id))
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [id, approvalsVersion])
+  // [APPROVAZIONE SQUADRE — disattivata] Caricamento dei flag di approvazione.
+  // useEffect(() => {
+  //   if (!id) return
+  //   let cancelled = false
+  //   supabase
+  //     .from('team_approvals')
+  //     .select('admin_id')
+  //     .eq('match_id', id)
+  //     .then(({ data: ap }) => {
+  //       if (!cancelled) setApprovals(((ap ?? []) as { admin_id: string }[]).map((a) => a.admin_id))
+  //     })
+  //   return () => {
+  //     cancelled = true
+  //   }
+  // }, [id, approvalsVersion])
 
   useEffect(() => {
     getKnownFields().then(setKnownFields)
@@ -263,9 +269,10 @@ export default function MatchEdit() {
   const goalsCoherent =
     !!result && goalsByTeam('A').length === result.score_a && goalsByTeam('B').length === result.score_b
 
-  const adminIds = allPlayers.filter((p) => p.role === 'admin' || p.role === 'superadmin').map((p) => p.id)
-  const allApproved = adminIds.length > 0 && adminIds.every((aid) => approvals.includes(aid))
-  const iApproved = !!currentAdmin && approvals.includes(currentAdmin.id)
+  // [APPROVAZIONE SQUADRE — disattivata] Derivati del quorum di approvazione.
+  // const adminIds = allPlayers.filter((p) => p.role === 'admin' || p.role === 'superadmin').map((p) => p.id)
+  // const allApproved = adminIds.length > 0 && adminIds.every((aid) => approvals.includes(aid))
+  // const iApproved = !!currentAdmin && approvals.includes(currentAdmin.id)
   const infoComplete = !!matchDate && !!matchTime && !!field
 
   // --- Info partita ---
@@ -576,7 +583,7 @@ export default function MatchEdit() {
       ...genTeamB.map((p) => ({ match_id: id, player_id: p.playerId, team: 'B' as Team })),
     ]
     await supabase.from('match_players_draft').insert(rows)
-    await clearTeamApprovals()
+    // [APPROVAZIONE SQUADRE — disattivata] await clearTeamApprovals()
     setConfirming(false)
     setGeneratedTeams(null)
     loadDraft()
@@ -603,32 +610,33 @@ export default function MatchEdit() {
     await supabase.from('fanta_lineups').delete().eq('match_id', id)
   }
 
+  // [APPROVAZIONE SQUADRE — regressa/disattivata, conservata per riuso futuro]
   // --- Approvazione squadre ---
-  async function handleApproveTeams() {
-    if (!id || !currentAdmin) return
-    setApproving(true)
-    const { error: apError } = await supabase
-      .from('team_approvals')
-      .insert({ match_id: id, admin_id: currentAdmin.id })
-    setApproving(false)
-    if (!apError || apError.code === '23505') {
-      if (!apError) logActivity('squadre_approvate', { matchId: id, data: match.match_date })
-      setApprovalsVersion((v) => v + 1)
-    }
-  }
-
-  // Le squadre in bozza sono cambiate: la versione approvata non esiste più.
-  async function clearTeamApprovals() {
-    if (!id) return
-    await supabase.from('team_approvals').delete().eq('match_id', id)
-    setApprovalsVersion((v) => v + 1)
-  }
+  // async function handleApproveTeams() {
+  //   if (!id || !currentAdmin) return
+  //   setApproving(true)
+  //   const { error: apError } = await supabase
+  //     .from('team_approvals')
+  //     .insert({ match_id: id, admin_id: currentAdmin.id })
+  //   setApproving(false)
+  //   if (!apError || apError.code === '23505') {
+  //     if (!apError) logActivity('squadre_approvate', { matchId: id, data: match.match_date })
+  //     setApprovalsVersion((v) => v + 1)
+  //   }
+  // }
+  //
+  // // Le squadre in bozza sono cambiate: la versione approvata non esiste più.
+  // async function clearTeamApprovals() {
+  //   if (!id) return
+  //   await supabase.from('team_approvals').delete().eq('match_id', id)
+  //   setApprovalsVersion((v) => v + 1)
+  // }
 
   // --- Ufficializzazione: copia la BOZZA in match_players (visibile a tutti) ---
   async function handleOfficializeTeams() {
     if (
       !id ||
-      !allApproved ||
+      // [APPROVAZIONE SQUADRE — disattivata] !allApproved ||
       !confirm(
         teamsOfficial
           ? 'Ufficializzare la nuova versione delle squadre? Diventerà quella visibile a tutti al posto della precedente, e le formazioni del fantacalcetto verranno azzerate perché le squadre sono cambiate.'
@@ -687,7 +695,7 @@ export default function MatchEdit() {
     await Promise.all(
       changed.map((p) => supabase.from('match_players_draft').update({ team: p.team }).eq('id', p.id))
     )
-    await clearTeamApprovals()
+    // [APPROVAZIONE SQUADRE — disattivata] await clearTeamApprovals()
     setSavingTeams(false)
     setEditingTeams(false)
     logActivity('squadre_modificate', { matchId: id, data: match.match_date })
@@ -721,7 +729,7 @@ export default function MatchEdit() {
       ...pendingTeams.teamB.map((p) => ({ match_id: id, player_id: p.playerId, team: 'B' as Team })),
     ]
     await supabase.from('match_players_draft').insert(rows)
-    await clearTeamApprovals()
+    // [APPROVAZIONE SQUADRE — disattivata] await clearTeamApprovals()
     logActivity(pendingTeams.action, { matchId: id, data: match.match_date, ...pendingTeams.logDetails })
     setSavingPendingTeams(false)
     setPendingTeams(null)
@@ -1147,6 +1155,21 @@ export default function MatchEdit() {
 
           {needsOfficialization && (
             <div className="mt-2 rounded-xl border border-field-green/30 bg-field-green/5 p-3">
+              <p className="text-xs text-gray-500">
+                {teamsOfficial
+                  ? 'Hai cambiato le squadre dopo l’ufficializzazione: i player vedono ancora la versione precedente. Ufficializza di nuovo per rendere visibili le modifiche.'
+                  : 'I player non vedono le squadre finché non vengono ufficializzate.'}
+              </p>
+              <button
+                onClick={handleOfficializeTeams}
+                disabled={officializing}
+                className="mt-2 w-full rounded-lg bg-field-green px-3 py-2 text-sm font-medium text-white hover:bg-field-green-dark disabled:opacity-50"
+              >
+                {officializing ? 'Ufficializzazione...' : teamsOfficial ? '✅ Ri-ufficializza squadre' : '✅ Ufficializza squadre'}
+              </button>
+
+              {/* [APPROVAZIONE SQUADRE — regressa/disattivata, conservata per riuso futuro]
+                  Vecchio box con quorum di approvazione admin prima dell'ufficializzazione:
               <div className="flex items-center justify-between">
                 <p className="text-sm font-semibold text-field-green-dark">👍 Approvazione squadre</p>
                 <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-field-green-dark shadow-sm">
@@ -1158,7 +1181,6 @@ export default function MatchEdit() {
                   ? 'Hai cambiato le squadre dopo l’ufficializzazione: i player vedono ancora la versione precedente. Quando tutti gli admin approvano questa nuova versione potrai ri-ufficializzarla.'
                   : 'I player non vedono le squadre finché non vengono ufficializzate. Quando tutti gli admin approvano questa versione si può ufficializzare; ogni modifica, ricalcolo o sostituzione azzera le approvazioni.'}
               </p>
-
               {iApproved ? (
                 <p className="mt-2 rounded-lg bg-white px-3 py-2 text-center text-xs font-medium text-field-green-dark shadow-sm">
                   ✓ Hai approvato questa versione delle squadre.
@@ -1172,19 +1194,13 @@ export default function MatchEdit() {
                   {approving ? 'Approvazione...' : '👍 Approva squadre'}
                 </button>
               )}
-
-              <button
-                onClick={handleOfficializeTeams}
-                disabled={officializing || !allApproved}
-                className="mt-2 w-full rounded-lg bg-field-green px-3 py-2 text-sm font-medium text-white hover:bg-field-green-dark disabled:opacity-50"
-              >
-                {officializing ? 'Ufficializzazione...' : teamsOfficial ? '✅ Ri-ufficializza squadre' : '✅ Ufficializza squadre'}
-              </button>
+              (bottone ufficializza con: disabled={officializing || !allApproved})
               {!allApproved && (
                 <p className="mt-1 text-center text-[11px] text-gray-400">
                   L'ufficializzazione si sblocca quando tutti gli admin hanno approvato.
                 </p>
               )}
+              */}
             </div>
           )}
 
