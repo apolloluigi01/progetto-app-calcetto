@@ -77,13 +77,14 @@ Deno.serve(async (req: Request) => {
   const { matchId } = (await req.json()) as { matchId?: string };
   if (!matchId) return json({ error: "matchId obbligatorio" }, 400);
 
-  const [matchRes, resultRes, goalsRes, pagelleRes, matchPlayersRes] = await Promise.all([
+  const [matchRes, resultRes, goalsRes, assistsRes, pagelleRes, matchPlayersRes] = await Promise.all([
     adminClient.from("matches").select("match_date, field").eq("id", matchId).single(),
     adminClient.from("match_results").select("score_a, score_b").eq("match_id", matchId).maybeSingle(),
-    adminClient.from("goals").select("team, is_own_goal, players(name, nickname)").eq("match_id", matchId),
+    adminClient.from("goals").select("team, is_own_goal, players(name, surname, nickname)").eq("match_id", matchId),
+    adminClient.from("assists").select("team, players(name, surname, nickname)").eq("match_id", matchId),
     adminClient
       .from("pagelle")
-      .select("player_id, voto, titolo, descrizione, is_mvp, players(name, nickname)")
+      .select("player_id, voto, titolo, descrizione, is_mvp, players(name, surname, nickname)")
       .eq("match_id", matchId)
       .not("published_at", "is", null),
     adminClient.from("match_players").select("player_id, team").eq("match_id", matchId),
@@ -91,10 +92,17 @@ Deno.serve(async (req: Request) => {
 
   if (matchRes.error || !matchRes.data) return json({ error: "Partita non trovata" }, 404);
 
-  // Nei riepiloghi si mostra il nickname (univoco), col nome come fallback.
-  type Named = { players: { name: string; nickname: string | null } | null };
-  const displayName = (p: Named) => p.players?.nickname ?? p.players?.name ?? "?";
+  // I nomi seguono la stessa convenzione dell'app (PlayerName): nome e cognome,
+  // con il soprannome come riferimento piccolo sotto.
+  type Named = { players: { name: string; surname: string | null; nickname: string | null } | null };
+  const displayName = (p: Named) =>
+    p.players ? (p.players.surname ? `${p.players.name} ${p.players.surname}` : p.players.name) : "?";
+  const nicknameLine = (p: Named, extraStyle = "") =>
+    p.players?.nickname
+      ? `<p style="margin:0;font-size:11px;color:#9ca3af;${extraStyle}">${p.players.nickname}</p>`
+      : "";
   const goals = (goalsRes.data ?? []) as unknown as (Named & { team: string; is_own_goal: boolean })[];
+  const assists = (assistsRes.data ?? []) as unknown as (Named & { team: string })[];
   const pagelle = (pagelleRes.data ?? []) as unknown as (Named & {
     player_id: string;
     voto: string;
@@ -114,19 +122,37 @@ Deno.serve(async (req: Request) => {
     ? `<p style="text-align:center;color:#666;margin:0 0 16px;">📍 ${matchRes.data.field}</p>`
     : "";
 
-  function goalRow(g: Named & { is_own_goal: boolean }) {
-    return `<p style="margin:2px 0;font-size:13px;color:#374151;">⚽ ${displayName(g)}${g.is_own_goal ? ' <span style="color:#dc2626;font-size:11px;">(ag)</span>' : ""}</p>`;
+  function goalRow(g: Named & { is_own_goal: boolean }, align: "left" | "right") {
+    return `
+      <div style="margin:2px 0 6px;text-align:${align};">
+        <p style="margin:0;font-size:13px;color:#374151;">⚽ ${displayName(g)}${g.is_own_goal ? ' <span style="color:#dc2626;font-size:11px;">(ag)</span>' : ""}</p>
+        ${nicknameLine(g)}
+      </div>`;
   }
 
-  const goalsA = goals.filter((g) => g.team === "A");
-  const goalsB = goals.filter((g) => g.team === "B");
+  function assistRow(a: Named, align: "left" | "right") {
+    return `
+      <div style="margin:2px 0 6px;text-align:${align};">
+        <p style="margin:0;font-size:13px;color:#6b7280;">🅰️ ${displayName(a)} <span style="color:#9ca3af;font-size:11px;">(assist)</span></p>
+        ${nicknameLine(a)}
+      </div>`;
+  }
+
+  function teamScorersHtml(team: "A" | "B", align: "left" | "right") {
+    const teamGoals = goals.filter((g) => g.team === team);
+    const teamAssists = assists.filter((a) => a.team === team);
+    if (teamGoals.length === 0 && teamAssists.length === 0) {
+      return '<p style="margin:0;font-size:13px;color:#9ca3af;">—</p>';
+    }
+    return `${teamGoals.map((g) => goalRow(g, align)).join("")}${teamAssists.map((a) => assistRow(a, align)).join("")}`;
+  }
 
   const scoreboardHtml = `
     <table role="presentation" style="width:100%;border-collapse:collapse;margin:8px 0 16px;">
       <tr>
         <td style="width:33%;vertical-align:top;text-align:left;">
           <p style="margin:0 0 6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#2e7d32;">Squadra A</p>
-          ${goalsA.length ? goalsA.map(goalRow).join("") : '<p style="margin:0;font-size:13px;color:#9ca3af;">—</p>'}
+          ${teamScorersHtml("A", "left")}
         </td>
         <td style="width:34%;vertical-align:middle;text-align:center;">
           ${resultRes.data
@@ -135,7 +161,7 @@ Deno.serve(async (req: Request) => {
         </td>
         <td style="width:33%;vertical-align:top;text-align:right;">
           <p style="margin:0 0 6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#e65100;">Squadra B</p>
-          ${goalsB.length ? goalsB.map(goalRow).join("") : '<p style="margin:0;font-size:13px;color:#9ca3af;">—</p>'}
+          ${teamScorersHtml("B", "right")}
         </td>
       </tr>
     </table>`;
@@ -150,6 +176,7 @@ Deno.serve(async (req: Request) => {
               ${p.is_mvp
                 ? '<span style="margin-left:6px;background:#fff8e1;color:#ef6c00;border:1px solid #f9a825;border-radius:999px;padding:1px 8px;font-weight:700;font-size:11px;">★ MVP</span>'
                 : ""}
+              ${nicknameLine(p)}
             </td>
             <td style="text-align:right;">
               <span style="background:#2e7d32;color:white;border-radius:6px;padding:2px 10px;font-weight:700;font-size:15px;">${p.voto}</span>
