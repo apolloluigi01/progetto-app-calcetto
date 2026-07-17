@@ -60,6 +60,7 @@ export default function GiocatoreDetail() {
     voteCount: 0,
     overall: null,
     winStreak: 0,
+    totalSeasonMatches: 0,
   }
   const playerStats = isStorica ? zeroStats : seasonStats.find((s) => s.player.id === id) ?? null
   const winPercentage =

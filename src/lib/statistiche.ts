@@ -15,6 +15,8 @@ export interface PlayerStats {
   voteCount: number
   overall: number | null
   winStreak: number
+  /** Totale partite giocate (con risultato) nella stagione: base per la soglia % presenze del format. */
+  totalSeasonMatches: number
 }
 
 export function playerFullName(player: Pick<Player, 'name' | 'surname'>): string {
@@ -62,6 +64,7 @@ export async function computeStatistiche(seasonId: string): Promise<PlayerStats[
   ])
 
   const statsByPlayer = new Map<string, PlayerStats>()
+  const totalSeasonMatches = resultByMatch.size
 
   function ensurePlayer(player: Player): PlayerStats {
     const existing = statsByPlayer.get(player.id)
@@ -80,6 +83,7 @@ export async function computeStatistiche(seasonId: string): Promise<PlayerStats[
       voteCount: 0,
       overall: null,
       winStreak: 0,
+      totalSeasonMatches,
     }
     statsByPlayer.set(player.id, created)
     return created
@@ -178,17 +182,24 @@ interface StatConfig {
   compare?: (a: PlayerStats, b: PlayerStats) => number
 }
 
-export const FORMAT_MIN_PRESENZE = 20
+/** Soglia presenze del format: servono PIÙ del 40% delle partite stagionali giocate. */
+export const FORMAT_MIN_PRESENZE_RATIO = 0.4
+
+/** Il giocatore rientra nella classifica format? Presenze > 40% del totale
+ *  partite stagionali (es. su 10 partite: 5 presenze sì, 4 no). */
+export function meetsFormatPresenze(p: PlayerStats): boolean {
+  return p.totalSeasonMatches > 0 && p.partiteGiocate / p.totalSeasonMatches > FORMAT_MIN_PRESENZE_RATIO
+}
 
 /**
  * Classifica Format: criteri in ordine di importanza.
- * 1. Almeno 20 presenze stagionali (chi le raggiunge sta sopra)
+ * 1. Presenze superiori al 40% delle partite stagionali (chi supera la soglia sta sopra)
  * 2. Media voto (NON fantavoto)  3. Gol fatti  4. % vittorie
  * 5. Numero vittorie  6. Numero MVP  7. Assist fatti
  */
 export function compareFormat(a: PlayerStats, b: PlayerStats): number {
   const criteria: ((p: PlayerStats) => number)[] = [
-    (p) => (p.partiteGiocate >= FORMAT_MIN_PRESENZE ? 1 : 0),
+    (p) => (meetsFormatPresenze(p) ? 1 : 0),
     (p) => p.voteAvg ?? 0,
     (p) => p.golFatti,
     (p) => (p.partiteGiocate > 0 ? p.vittorie / p.partiteGiocate : 0),
@@ -216,7 +227,7 @@ export const STAT_CONFIG: Record<StatKey, StatConfig> = {
   format: {
     title: 'Classifica Format',
     description:
-      'Classifica complessiva del format: almeno 20 presenze stagionali, poi media voto, gol fatti, % vittorie, vittorie, MVP e assist',
+      'Classifica complessiva del format: presenze superiori al 40% delle partite stagionali, poi media voto, gol fatti, % vittorie, vittorie, MVP e assist',
     color: 'green',
     sortDir: 'desc',
     unit: '',

@@ -140,6 +140,37 @@ export default function Fantacalcetto() {
 
       {!loading && (
         <>
+          {/* Pannello Admin: scorciatoie di gestione del fantacalcetto (solo admin) */}
+          {isAdmin && (
+            <div className="mt-6 rounded-xl border border-field-orange/30 bg-field-orange/5 p-4">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-field-orange">
+                Pannello Admin
+              </h2>
+              <div className="mt-3 space-y-2">
+                <Link
+                  to="/admin/fantacalcetto"
+                  className="flex items-center gap-3 rounded-xl bg-white px-4 py-3 text-sm font-medium shadow-sm hover:bg-gray-50"
+                >
+                  <span className="text-lg">🎮</span>
+                  <div>
+                    <p className="font-semibold text-field-green-dark">Gestione bonus Fantacalcetto</p>
+                    <p className="text-xs text-gray-500">Parametri bonus e malus del fantacalcetto</p>
+                  </div>
+                </Link>
+                <Link
+                  to="/admin/fanta-crediti"
+                  className="flex items-center gap-3 rounded-xl bg-white px-4 py-3 text-sm font-medium shadow-sm hover:bg-gray-50"
+                >
+                  <span className="text-lg">💰</span>
+                  <div>
+                    <p className="font-semibold text-field-green-dark">Gestione crediti Fantacalcetto</p>
+                    <p className="text-xs text-gray-500">Costo in crediti dei giocatori per ogni fascia</p>
+                  </div>
+                </Link>
+              </div>
+            </div>
+          )}
+
           {/* Le mie leghe */}
           <h2 className="mt-6 text-sm font-semibold uppercase tracking-wide text-gray-500">Le mie leghe</h2>
           <div className="mt-2 space-y-2">

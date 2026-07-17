@@ -36,46 +36,13 @@ export default function AdminHome() {
         </Link>
 
         <Link
-          to="/admin/partite"
+          to="/admin/fasce"
           className="flex items-center gap-3 rounded-xl bg-field-green px-4 py-3 text-sm font-medium text-white hover:bg-field-green-dark"
         >
-          <span className="text-lg">⚽</span>
+          <span className="text-lg">🃏</span>
           <div>
-            <p className="font-semibold">Gestione partite</p>
-            <p className="text-xs opacity-80">Crea, modifica e gestisci le partite</p>
-          </div>
-        </Link>
-
-        <Link
-          to="/admin/stagioni"
-          className="flex items-center gap-3 rounded-xl bg-field-green px-4 py-3 text-sm font-medium text-white hover:bg-field-green-dark"
-        >
-          <span className="text-lg">🏆</span>
-          <div>
-            <p className="font-semibold">Gestione stagioni</p>
-            <p className="text-xs opacity-80">Crea e gestisci le stagioni del campionato</p>
-          </div>
-        </Link>
-
-        <Link
-          to="/admin/fantacalcetto"
-          className="flex items-center gap-3 rounded-xl bg-field-green px-4 py-3 text-sm font-medium text-white hover:bg-field-green-dark"
-        >
-          <span className="text-lg">🎮</span>
-          <div>
-            <p className="font-semibold">Gestione bonus Fantacalcetto</p>
-            <p className="text-xs opacity-80">Parametri bonus e malus del fantacalcetto</p>
-          </div>
-        </Link>
-
-        <Link
-          to="/admin/fanta-crediti"
-          className="flex items-center gap-3 rounded-xl bg-field-green px-4 py-3 text-sm font-medium text-white hover:bg-field-green-dark"
-        >
-          <span className="text-lg">💰</span>
-          <div>
-            <p className="font-semibold">Gestione crediti Fantacalcetto</p>
-            <p className="text-xs opacity-80">Costo in crediti dei giocatori per ogni fascia</p>
+            <p className="font-semibold">Gestione Fasce</p>
+            <p className="text-xs opacity-80">Range di overall per fasce e carte dei giocatori</p>
           </div>
         </Link>
 
@@ -91,13 +58,13 @@ export default function AdminHome() {
         </Link>
 
         <Link
-          to="/admin/fasce"
+          to="/admin/stagioni"
           className="flex items-center gap-3 rounded-xl bg-field-green px-4 py-3 text-sm font-medium text-white hover:bg-field-green-dark"
         >
-          <span className="text-lg">🃏</span>
+          <span className="text-lg">🏆</span>
           <div>
-            <p className="font-semibold">Gestione Fasce</p>
-            <p className="text-xs opacity-80">Range di overall per fasce e carte dei giocatori</p>
+            <p className="font-semibold">Gestione stagioni</p>
+            <p className="text-xs opacity-80">Crea e gestisci le stagioni del campionato</p>
           </div>
         </Link>
 

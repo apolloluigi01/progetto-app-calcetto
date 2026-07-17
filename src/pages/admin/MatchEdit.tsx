@@ -94,6 +94,8 @@ export default function MatchEdit() {
   const [draftPlayers, setDraftPlayers] = useState<DraftPlayer[]>([])
   const [draftLoaded, setDraftLoaded] = useState(false)
   const seededRef = useRef(false)
+  // Overall dei giocatori in bozza (per mostrarlo accanto a ogni nome e la media squadra).
+  const [draftOveralls, setDraftOveralls] = useState<Map<string, number>>(new Map())
 
   // Generazione squadre (prima assegnazione)
   const [generatedTeams, setGeneratedTeams] = useState<GeneratedTeams | null>(null)
@@ -203,6 +205,18 @@ export default function MatchEdit() {
   //     cancelled = true
   //   }
   // }, [id, approvalsVersion])
+
+  useEffect(() => {
+    let cancelled = false
+    computeOverallsForPlayers(
+      draftPlayers.map((mp) => ({ id: mp.player_id, name: mp.name, surname: mp.surname, nickname: mp.nickname }))
+    ).then((res) => {
+      if (!cancelled) setDraftOveralls(new Map(res.map((p) => [p.playerId, p.overall])))
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [draftPlayers])
 
   useEffect(() => {
     getKnownFields().then(setKnownFields)
@@ -606,6 +620,14 @@ export default function MatchEdit() {
     return arr.length === 0 ? 0 : Math.round(arr.reduce((s, p) => s + p.overall, 0) / arr.length)
   }
 
+  // Media overall di una squadra in bozza (null finché gli overall non sono caricati).
+  function avgDraftOverall(arr: DraftPlayer[]) {
+    const vals = arr
+      .map((p) => draftOveralls.get(p.player_id))
+      .filter((v): v is number => v !== undefined)
+    return vals.length === 0 ? null : Math.round(vals.reduce((s, v) => s + v, 0) / vals.length)
+  }
+
   async function handleConfirmTeams() {
     if (!id) return
     setConfirming(true)
@@ -850,24 +872,24 @@ export default function MatchEdit() {
       {/* ===== STEP 1 — Info partita ===== */}
       <div className="mt-2 space-y-2 rounded-xl bg-white p-3 shadow">
         <div className="grid grid-cols-2 gap-2">
-          <div>
+          <div className="min-w-0">
             <label className="mb-1 block text-xs font-medium text-gray-700">Data</label>
             <input
               type="date"
               value={matchDate}
               disabled={locked}
               onChange={(e) => setMatchDate(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm disabled:bg-gray-100 disabled:text-gray-400"
+              className="w-full min-w-0 rounded-lg border border-gray-300 px-2 py-1.5 text-sm disabled:bg-gray-100 disabled:text-gray-400"
             />
           </div>
-          <div>
+          <div className="min-w-0">
             <label className="mb-1 block text-xs font-medium text-gray-700">Ora</label>
             <input
               type="time"
               value={matchTime}
               disabled={locked}
               onChange={(e) => setMatchTime(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm disabled:bg-gray-100 disabled:text-gray-400"
+              className="w-full min-w-0 rounded-lg border border-gray-300 px-2 py-1.5 text-sm disabled:bg-gray-100 disabled:text-gray-400"
             />
           </div>
         </div>
@@ -1154,21 +1176,41 @@ export default function MatchEdit() {
               <h3 className="mb-2 font-medium text-field-green-dark">Squadra A</h3>
               <ul className="space-y-1 text-sm">
                 {dTeamA.map((p) => (
-                  <li key={p.id} className="min-w-0">
+                  <li key={p.id} className="flex min-w-0 items-center justify-between gap-1">
                     <PlayerName name={p.name} surname={p.surname} nickname={p.nickname} />
+                    {draftOveralls.has(p.player_id) && (
+                      <span className="shrink-0 rounded bg-field-green/10 px-1.5 text-xs font-bold text-field-green-dark">
+                        {draftOveralls.get(p.player_id)}
+                      </span>
+                    )}
                   </li>
                 ))}
               </ul>
+              {avgDraftOverall(dTeamA) !== null && (
+                <p className="mt-2 border-t border-gray-100 pt-2 text-center text-xs font-semibold text-field-green-dark">
+                  Overall medio: {avgDraftOverall(dTeamA)}
+                </p>
+              )}
             </div>
             <div className="min-w-0 rounded-xl bg-white p-3 shadow">
               <h3 className="mb-2 font-medium text-field-green-dark">Squadra B</h3>
               <ul className="space-y-1 text-sm">
                 {dTeamB.map((p) => (
-                  <li key={p.id} className="min-w-0">
+                  <li key={p.id} className="flex min-w-0 items-center justify-between gap-1">
                     <PlayerName name={p.name} surname={p.surname} nickname={p.nickname} />
+                    {draftOveralls.has(p.player_id) && (
+                      <span className="shrink-0 rounded bg-field-orange/10 px-1.5 text-xs font-bold text-field-orange">
+                        {draftOveralls.get(p.player_id)}
+                      </span>
+                    )}
                   </li>
                 ))}
               </ul>
+              {avgDraftOverall(dTeamB) !== null && (
+                <p className="mt-2 border-t border-gray-100 pt-2 text-center text-xs font-semibold text-field-orange">
+                  Overall medio: {avgDraftOverall(dTeamB)}
+                </p>
+              )}
             </div>
           </div>
 

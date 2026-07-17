@@ -297,12 +297,13 @@ export default function MatchDetail() {
         </p>
       )}
 
-      {/* Squadre non ancora ufficializzate: i player normali non le vedono
-          (le righe di match_players sono filtrate anche dalle policy RLS). */}
-      {!isAdmin && matchPlayers.length === 0 && !match.booking_open && !result && !match.teams_official_at && (
+      {/* Squadre non ancora ufficializzate: nessuno le vede qui (i player sono
+          filtrati anche dalle policy RLS) — mostriamo lo stato di generazione
+          sia ai player che agli admin finché non vengono ufficializzate. */}
+      {matchPlayers.length === 0 && !match.booking_open && !result && !match.teams_official_at && (
         <p className="mt-4 rounded-xl bg-white p-4 text-sm text-gray-500 shadow">
-          🔒 Le squadre non sono ancora state ufficializzate dagli admin: saranno visibili a tutti
-          dopo l'ufficializzazione.
+          ⚙️ Squadre in fase di generazione: saranno visibili a tutti dopo l'ufficializzazione degli
+          admin.
         </p>
       )}
 
