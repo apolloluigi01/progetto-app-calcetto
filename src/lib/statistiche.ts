@@ -37,13 +37,39 @@ export async function computeStatistiche(seasonId: string): Promise<PlayerStats[
     .select('id, match_date, result:match_results(score_a, score_b)')
     .eq('season_id', seasonId)
     .order('match_date', { ascending: true })
+  return aggregateStatistiche((matches ?? []) as MatchStatsRow[])
+}
 
-  const matchIds = (matches ?? []).map((m) => m.id)
+/**
+ * Statistiche aggregate su un mese solare (monthKey 'YYYY-MM'), indipendenti
+ * dalla stagione: servono agli admin per scegliere i candidati MVP del mese.
+ */
+export async function computeStatisticheMensili(monthKey: string): Promise<PlayerStats[]> {
+  const [year, month] = monthKey.split('-').map(Number)
+  const start = `${monthKey}-01`
+  const end = month === 12 ? `${year + 1}-01-01` : `${year}-${String(month + 1).padStart(2, '0')}-01`
+  const { data: matches } = await supabase
+    .from('matches')
+    .select('id, match_date, result:match_results(score_a, score_b)')
+    .gte('match_date', start)
+    .lt('match_date', end)
+    .order('match_date', { ascending: true })
+  return aggregateStatistiche((matches ?? []) as MatchStatsRow[])
+}
+
+interface MatchStatsRow {
+  id: string
+  match_date: string
+  result: { score_a: number; score_b: number } | { score_a: number; score_b: number }[] | null
+}
+
+async function aggregateStatistiche(matches: MatchStatsRow[]): Promise<PlayerStats[]> {
+  const matchIds = matches.map((m) => m.id)
   if (matchIds.length === 0) return []
 
   const resultByMatch = new Map<string, { score_a: number; score_b: number }>()
   const dateByMatch = new Map<string, string>()
-  for (const m of matches ?? []) {
+  for (const m of matches) {
     const result = Array.isArray(m.result) ? m.result[0] : m.result
     if (result) resultByMatch.set(m.id, result)
     dateByMatch.set(m.id, m.match_date)
