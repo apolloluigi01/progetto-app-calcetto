@@ -12,6 +12,7 @@ import { logActivity } from '../../lib/activityLog'
 import { computeOverallsForPlayers, generateBalancedTeams } from '../../lib/teamGeneration'
 import { formatVote, formatExact } from '../../lib/voting'
 import PlayerName, { fullName } from '../../components/PlayerName'
+import GuestPlayerForm from '../../components/GuestPlayerForm'
 import type { Player, Team } from '../../types/database'
 import type { PlayerOverall, GeneratedTeams } from '../../lib/teamGeneration'
 
@@ -140,6 +141,7 @@ export default function MatchEdit() {
   const [subOutId, setSubOutId] = useState('')
   const [subInId, setSubInId] = useState('')
   const [substituting, setSubstituting] = useState(false)
+  const [addingGuestSub, setAddingGuestSub] = useState(false)
 
   // --- Caricamento bozza squadre ---
   async function loadDraft() {
@@ -799,6 +801,13 @@ export default function MatchEdit() {
 
   function cancelSubstitute() {
     setSubstitutingOpen(false)
+    setAddingGuestSub(false)
+  }
+
+  function handleGuestSubCreated(guest: Player) {
+    setAllPlayers((prev) => [...prev, guest])
+    setSubInId(guest.id)
+    setAddingGuestSub(false)
   }
 
   async function handleConfirmSubstitute() {
@@ -1354,6 +1363,17 @@ export default function MatchEdit() {
                   </option>
                 ))}
               </select>
+              {!addingGuestSub ? (
+                <button
+                  type="button"
+                  onClick={() => setAddingGuestSub(true)}
+                  className="mt-1 text-xs font-medium text-field-orange hover:underline"
+                >
+                  + Aggiungi ospite
+                </button>
+              ) : (
+                <GuestPlayerForm matchId={id ?? null} onCreated={handleGuestSubCreated} onCancel={() => setAddingGuestSub(false)} />
+              )}
             </div>
           </div>
           <div className="mt-3 flex gap-2">

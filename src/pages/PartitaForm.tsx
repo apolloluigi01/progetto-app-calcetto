@@ -6,6 +6,7 @@ import { getKnownFields } from '../lib/fields'
 import { logActivity } from '../lib/activityLog'
 import { computeOverallsForPlayers, generateBalancedTeams } from '../lib/teamGeneration'
 import PlayerName from '../components/PlayerName'
+import GuestPlayerForm from '../components/GuestPlayerForm'
 import type { Player, Team } from '../types/database'
 import type { GeneratedTeams } from '../lib/teamGeneration'
 
@@ -24,6 +25,8 @@ export default function PartitaForm() {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [addingGuest, setAddingGuest] = useState(false)
+  const [guestIds, setGuestIds] = useState<Set<string>>(new Set())
 
   const [generatedTeams, setGeneratedTeams] = useState<GeneratedTeams | null>(null)
   const [generatingTeams, setGeneratingTeams] = useState(false)
@@ -52,6 +55,13 @@ export default function PartitaForm() {
       }
       return next
     })
+  }
+
+  function handleGuestCreated(guest: Player) {
+    setPlayers((prev) => [...prev, guest])
+    setGuestIds((prev) => new Set(prev).add(guest.id))
+    setSelected((prev) => (prev.size >= MAX_PLAYERS ? prev : new Set(prev).add(guest.id)))
+    setAddingGuest(false)
   }
 
   const selectedIds = Array.from(selected)
@@ -114,6 +124,13 @@ export default function PartitaForm() {
         .single()
 
       if (matchError || !match) throw new Error(matchError?.message ?? 'Errore creazione partita')
+
+      if (guestIds.size > 0) {
+        await supabase
+          .from('players')
+          .update({ guest_match_id: match.id })
+          .in('id', Array.from(guestIds))
+      }
 
       if (modalita === 'manuale') {
         if (!generatedTeams) throw new Error('Squadre non ancora generate')
@@ -248,10 +265,28 @@ export default function PartitaForm() {
                       onChange={() => toggleSelected(p.id)}
                     />
                     <PlayerName name={p.name} surname={p.surname} nickname={p.nickname} />
+                    {p.is_guest && (
+                      <span className="shrink-0 rounded-full bg-field-orange/10 px-2 py-0.5 text-[10px] font-semibold text-field-orange">
+                        Ospite
+                      </span>
+                    )}
                   </label>
                 )
               })}
             </div>
+
+            {!addingGuest ? (
+              <button
+                type="button"
+                onClick={() => setAddingGuest(true)}
+                disabled={selectedIds.length >= MAX_PLAYERS}
+                className="mt-2 text-sm font-medium text-field-orange hover:underline disabled:opacity-40"
+              >
+                + Aggiungi ospite
+              </button>
+            ) : (
+              <GuestPlayerForm matchId={null} onCreated={handleGuestCreated} onCancel={() => setAddingGuest(false)} />
+            )}
           </div>
 
           {selectedIds.length > 0 && (

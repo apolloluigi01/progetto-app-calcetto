@@ -16,6 +16,8 @@ export interface Player {
   jersey_number: number | null
   must_change_password: boolean
   created_at: string
+  is_guest: boolean
+  guest_match_id: string | null
 }
 
 export type SeasonType = 'amichevole' | 'format'

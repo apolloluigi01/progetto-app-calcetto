@@ -119,7 +119,8 @@ async function aggregateStatistiche(matches: MatchStatsRow[]): Promise<PlayerSta
 
   type MatchPlayerJoin = { match_id: string; player_id: string; team: 'A' | 'B'; players: Player | null }
   for (const mp of (matchPlayersRes.data ?? []) as unknown as MatchPlayerJoin[]) {
-    if (!mp.players) continue
+    // Gli ospiti non hanno anagrafica permanente: esclusi dalle classifiche/statistiche di stagione.
+    if (!mp.players || mp.players.is_guest) continue
     const stats = ensurePlayer(mp.players)
     const result = resultByMatch.get(mp.match_id)
     if (!result) continue
