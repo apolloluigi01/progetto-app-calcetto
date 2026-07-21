@@ -14,8 +14,8 @@ import PartitaForm from './pages/PartitaForm'
 import MatchDetail from './pages/MatchDetail'
 import MatchPitch from './pages/MatchPitch'
 import Statistiche from './pages/Statistiche'
+import StatisticheStagione from './pages/StatisticheStagione'
 import StatisticheElenco from './pages/StatisticheElenco'
-import StatisticaDettaglio from './pages/StatisticaDettaglio'
 import Impostazioni from './pages/Impostazioni'
 import AdminHome from './pages/admin/AdminHome'
 import GiocatoriAdmin from './pages/admin/GiocatoriAdmin'
@@ -56,12 +56,12 @@ function App() {
               <Route path="/giocatori/:id" element={<GiocatoreDetail />} />
               <Route path="/partite" element={<Partite />} />
               <Route path="/partite/stagione/:id" element={<StagionePartite />} />
-              <Route path="/partite/stagione/:id/statistiche/:key" element={<StagioneStatisticaDettaglio />} />
               <Route path="/partite/:id" element={<MatchDetail />} />
               <Route path="/partite/:id/campetto" element={<MatchPitch />} />
               <Route path="/statistiche" element={<Statistiche />} />
-              <Route path="/statistiche/elenco" element={<StatisticheElenco />} />
-              <Route path="/statistiche/:key" element={<StatisticaDettaglio />} />
+              <Route path="/statistiche/stagione/:id" element={<StatisticheStagione />} />
+              <Route path="/statistiche/stagione/:id/elenco" element={<StatisticheElenco />} />
+              <Route path="/statistiche/stagione/:id/:key" element={<StagioneStatisticaDettaglio />} />
               <Route path="/albo-oro" element={<AlboOro />} />
               <Route path="/impostazioni" element={<Impostazioni />} />
               <Route path="/ufficio-stampa" element={<UfficioStampa />} />

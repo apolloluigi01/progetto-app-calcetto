@@ -271,7 +271,7 @@ export default function Home() {
 
           <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
             <Link
-              to="/statistiche/marcatori"
+              to={season ? `/statistiche/stagione/${season.id}/marcatori` : '/statistiche'}
               className="flex items-center justify-between border-b border-gray-200 px-4 py-3 hover:bg-gray-50"
             >
               <h2 className="font-medium text-field-green-dark">Gol</h2>

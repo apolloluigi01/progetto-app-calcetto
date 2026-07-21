@@ -3,17 +3,10 @@ import { Link, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import ErrorNotice from '../components/ErrorNotice'
-import { useStatistiche } from '../hooks/useStatistiche'
 import { getSeasonStatus } from '../lib/seasons'
-import { STAT_CONFIG, getRanking, playerFullName, type StatKey } from '../lib/statistiche'
 import type { Match, MatchResult, Season } from '../types/database'
 
 const MAX_PLAYERS = 10
-
-// Griglia statistiche di stagione: prima le "positive" (verdi), poi Sconfitte e
-// Autogol in fondo (rosse). La media voto è verde come nelle altre viste.
-const PREVIEW_STAT_KEYS: StatKey[] = ['overall', 'format', 'marcatori', 'assist', 'presenze', 'mvp', 'winrate', 'mediavoto', 'schieramenti', 'sconfitte', 'autogol']
-const RED_STAT_KEYS: StatKey[] = ['sconfitte', 'autogol']
 
 type MatchWithResult = Match & {
   result: MatchResult | null
@@ -21,62 +14,12 @@ type MatchWithResult = Match & {
   match_bookings: { id: string }[]
 }
 
-function StatPreviewCard({
-  statKey,
-  stats,
-  seasonId,
-}: {
-  statKey: StatKey
-  stats: ReturnType<typeof useStatistiche>['stats']
-  seasonId: string
-}) {
-  const config = STAT_CONFIG[statKey]
-  const ranking = getRanking(stats, statKey).slice(0, 3)
-  const isGreen = !RED_STAT_KEYS.includes(statKey)
-  const valueColor = isGreen ? 'text-field-green-dark' : 'text-red-600'
-  const valueBg = isGreen ? 'bg-field-green/10' : 'bg-red-50'
-
-  return (
-    <Link
-      to={`/partite/stagione/${seasonId}/statistiche/${statKey}`}
-      className="block overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition hover:shadow-md"
-    >
-      <h2 className="truncate border-b border-gray-200 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-field-green-dark">
-        {config.title}
-      </h2>
-      <ul>
-        {ranking.length === 0 && <li className="px-3 py-2 text-xs text-gray-400">-</li>}
-        {ranking.map((entry, i) => (
-          <li
-            key={entry.stats.player.id}
-            className="flex items-center gap-2 border-t border-gray-100 px-3 py-2 first:border-t-0"
-          >
-            <span className="w-3 shrink-0 text-center text-[11px] font-semibold text-gray-300">{i + 1}</span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-xs font-medium leading-snug text-gray-700">
-                {playerFullName(entry.stats.player)}
-              </span>
-              {entry.stats.player.nickname && (
-                <span className="block truncate text-[10px] font-normal leading-tight text-gray-400">
-                  {entry.stats.player.nickname}
-                </span>
-              )}
-            </span>
-            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${valueColor} ${valueBg}`}>
-              {config.formatValue(entry.value)}
-            </span>
-          </li>
-        ))}
-      </ul>
-    </Link>
-  )
-}
-
 /**
- * Dettaglio di una stagione dentro il pannello Partite: partite della stagione
- * e statistiche relative a quella sola stagione. Gli admin possono creare una
- * nuova partita (con la data vincolata al periodo della stagione) e modificare
- * la stagione.
+ * Dettaglio di una stagione dentro il pannello Partite: mostra le partite di
+ * quella stagione. Le statistiche NON vivono qui: si consultano dalla sezione
+ * Statistiche (selezionando la stagione). Gli admin possono creare una nuova
+ * partita (con la data vincolata al periodo della stagione) e modificare la
+ * stagione.
  */
 export default function StagionePartite() {
   const { id } = useParams<{ id: string }>()
@@ -86,8 +29,6 @@ export default function StagionePartite() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [reloadToken, setReloadToken] = useState(0)
-
-  const { stats, loading: statsLoading, error: statsError } = useStatistiche(id)
 
   useEffect(() => {
     if (!id) return
@@ -146,7 +87,6 @@ export default function StagionePartite() {
   if (!season || !id) return <div className="p-4 text-sm text-red-600">Stagione non trovata</div>
 
   const isCurrent = getSeasonStatus(season) === 'corrente'
-  const previewKeys = PREVIEW_STAT_KEYS.filter((k) => season.season_type !== 'amichevole' || k !== 'format')
 
   return (
     <div className="p-4 pb-8">
@@ -185,24 +125,6 @@ export default function StagionePartite() {
           </Link>
         )}
       </div>
-
-      {/* Statistiche della stagione */}
-      <h2 className="mt-6 text-sm font-semibold uppercase tracking-wide text-gray-500">Statistiche della stagione</h2>
-
-      {statsLoading && <p className="mt-2 text-sm text-gray-500">Caricamento statistiche...</p>}
-      {statsError && <p className="mt-2 text-sm text-red-600">{statsError}</p>}
-
-      {!statsLoading && !statsError && stats.length === 0 && (
-        <p className="mt-2 text-sm text-gray-500">Nessuna partita giocata in questa stagione.</p>
-      )}
-
-      {!statsLoading && !statsError && stats.length > 0 && (
-        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-          {previewKeys.map((key) => (
-            <StatPreviewCard key={key} statKey={key} stats={stats} seasonId={id} />
-          ))}
-        </div>
-      )}
 
       {/* Partite della stagione */}
       <div className="mt-6 flex items-center justify-between">

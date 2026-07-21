@@ -1,20 +1,42 @@
-import { Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useParams } from 'react-router-dom'
+import { supabase } from '../lib/supabase'
 import { STAT_CONFIG, type StatKey } from '../lib/statistiche'
-import { useCurrentSeason } from '../hooks/useCurrentSeason'
+import type { Season } from '../types/database'
 
 const STAT_KEYS: StatKey[] = ['overall', 'format', 'marcatori', 'assist', 'presenze', 'mvp', 'winrate', 'sconfitte', 'mediavoto', 'autogol', 'schieramenti']
 
+/** Elenco completo delle statistiche di una stagione, con drill-down alla
+ *  tabella di ogni singola statistica (sempre relativa a quella stagione). */
 export default function StatisticheElenco() {
-  const { season } = useCurrentSeason()
+  const { id } = useParams<{ id: string }>()
+  const [season, setSeason] = useState<Season | null>(null)
+
+  useEffect(() => {
+    if (!id) return
+    supabase
+      .from('seasons')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) setSeason(data as Season)
+      })
+  }, [id])
+
   // Nelle stagioni amichevoli la Classifica Format non viene conteggiata.
   const keys = STAT_KEYS.filter((k) => season?.season_type !== 'amichevole' || k !== 'format')
 
+  if (!id) return <div className="p-4 text-sm text-red-600">Stagione non trovata</div>
+
   return (
     <div className="p-4">
-      <Link to="/statistiche" className="text-sm text-field-green underline">
+      <Link to={`/statistiche/stagione/${id}`} className="text-sm text-field-green underline">
         ← Torna alle statistiche
       </Link>
-      <h1 className="mt-2 text-xl font-semibold text-field-green-dark">Tutte le statistiche</h1>
+      <h1 className="mt-2 text-xl font-semibold text-field-green-dark">
+        Tutte le statistiche{season ? ` — ${season.name}` : ''}
+      </h1>
 
       <div className="mt-4 space-y-2">
         {keys.map((key) => {
@@ -23,7 +45,7 @@ export default function StatisticheElenco() {
           return (
             <Link
               key={key}
-              to={`/statistiche/${key}`}
+              to={`/statistiche/stagione/${id}/${key}`}
               className="block rounded-xl bg-white p-4 shadow hover:bg-gray-50"
             >
               <p className={`font-medium ${colorClass}`}>{config.title}</p>
