@@ -25,3 +25,6 @@ dev-dist
 *.sw?
 
 .vercel
+
+# Supabase CLI local temp files
+supabase/.temp
