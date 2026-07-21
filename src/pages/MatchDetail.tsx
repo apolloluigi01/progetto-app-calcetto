@@ -118,7 +118,7 @@ export default function MatchDetail() {
               to={`/admin/partite/${id}`}
               className="rounded-lg border border-field-green px-3 py-1 text-sm font-medium text-field-green-dark hover:bg-field-green/10"
             >
-              ✏️ Modifica
+              ✏️ Modifica Partita
             </Link>
           )}
           {match.booking_open && (

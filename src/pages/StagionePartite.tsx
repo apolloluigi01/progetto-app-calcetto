@@ -119,9 +119,9 @@ export default function StagionePartite() {
         {isAdmin && (
           <Link
             to={`/partite/stagione/${id}/modifica`}
-            className="shrink-0 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
+            className="shrink-0 rounded-lg border border-field-green px-3 py-1 text-sm font-medium text-field-green-dark hover:bg-field-green/10"
           >
-            Modifica
+            ✏️ Modifica Stagione
           </Link>
         )}
       </div>
