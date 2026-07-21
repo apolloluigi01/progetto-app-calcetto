@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { STAT_CONFIG, type StatKey } from '../lib/statistiche'
+import { ALL_TIME_KEY, ALL_TIME_LABEL, STAT_CONFIG, type StatKey } from '../lib/statistiche'
 import type { Season } from '../types/database'
 
 const STAT_KEYS: StatKey[] = ['overall', 'format', 'marcatori', 'assist', 'presenze', 'mvp', 'winrate', 'sconfitte', 'mediavoto', 'autogol', 'schieramenti']
@@ -12,8 +12,10 @@ export default function StatisticheElenco() {
   const { id } = useParams<{ id: string }>()
   const [season, setSeason] = useState<Season | null>(null)
 
+  const isAllTime = id === ALL_TIME_KEY
+
   useEffect(() => {
-    if (!id) return
+    if (!id || id === ALL_TIME_KEY) return
     supabase
       .from('seasons')
       .select('*')
@@ -35,7 +37,7 @@ export default function StatisticheElenco() {
         ← Torna alle statistiche
       </Link>
       <h1 className="mt-2 text-xl font-semibold text-field-green-dark">
-        Tutte le statistiche{season ? ` — ${season.name}` : ''}
+        {isAllTime ? `Tutte le statistiche — ${ALL_TIME_LABEL}` : `Tutte le statistiche${season ? ` — ${season.name}` : ''}`}
       </h1>
 
       <div className="mt-4 space-y-2">

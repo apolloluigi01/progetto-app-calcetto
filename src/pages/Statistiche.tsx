@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import ErrorNotice from '../components/ErrorNotice'
 import { getSeasonStatus, type SeasonStatus } from '../lib/seasons'
+import { ALL_TIME_KEY, ALL_TIME_LABEL } from '../lib/statistiche'
 import type { Season } from '../types/database'
 
 const STATUS_BADGE: Record<SeasonStatus, { label: string; className: string }> = {
@@ -77,7 +78,29 @@ export default function Statistiche() {
         <p className="mt-6 text-sm text-gray-500">Nessuna stagione disponibile.</p>
       )}
 
-      <div className="mt-4 space-y-2">
+      {!loading && !error && (
+        <div className="mt-4">
+          {/* Voce speciale: statistiche di tutti i giocatori su tutte le stagioni. */}
+          <Link
+            to={`/statistiche/stagione/${ALL_TIME_KEY}`}
+            className="flex items-center justify-between rounded-xl border border-field-orange/40 bg-field-orange/5 p-4 shadow-sm hover:bg-field-orange/10"
+          >
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-lg">🏅</span>
+                <span className="font-semibold text-gray-800">{ALL_TIME_LABEL}</span>
+                <span className="rounded-full bg-field-orange/15 px-2 py-0.5 text-[11px] font-semibold text-field-orange">
+                  All time
+                </span>
+              </div>
+              <p className="mt-0.5 text-xs text-gray-500">Tutte le stagioni · tutti i giocatori</p>
+            </div>
+            <span className="text-lg text-gray-300">›</span>
+          </Link>
+        </div>
+      )}
+
+      <div className="mt-2 space-y-2">
         {seasons.map((s) => {
           const badge = STATUS_BADGE[getSeasonStatus(s)]
           return (

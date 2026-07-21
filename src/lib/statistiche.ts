@@ -44,6 +44,22 @@ export async function computeStatistiche(seasonId: string): Promise<PlayerStats[
   return aggregateStatistiche((matches ?? []) as MatchStatsRow[])
 }
 
+/** Chiave/sentinella usata al posto dell'id stagione per le statistiche "all time". */
+export const ALL_TIME_KEY = 'all-time'
+export const ALL_TIME_LABEL = 'Statistiche all time'
+
+/**
+ * Statistiche "all time": aggregano tutte le partite di ogni stagione, per
+ * dare la classifica storica complessiva di tutti i giocatori dell'app.
+ */
+export async function computeStatisticheAllTime(): Promise<PlayerStats[]> {
+  const { data: matches } = await supabase
+    .from('matches')
+    .select('id, match_date, result:match_results(score_a, score_b)')
+    .order('match_date', { ascending: true })
+  return aggregateStatistiche((matches ?? []) as MatchStatsRow[])
+}
+
 /**
  * Statistiche aggregate su un mese solare (monthKey 'YYYY-MM'), indipendenti
  * dalla stagione: servono agli admin per scegliere i candidati MVP del mese.

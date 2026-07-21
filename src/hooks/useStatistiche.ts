@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getCurrentSeasonId } from '../lib/seasons'
-import { computeStatistiche, type PlayerStats } from '../lib/statistiche'
+import { ALL_TIME_KEY, computeStatistiche, computeStatisticheAllTime, type PlayerStats } from '../lib/statistiche'
 import { computeOverallsForPlayers } from '../lib/teamGeneration'
 
 export function useStatistiche(seasonId?: string, enabled = true) {
@@ -19,8 +19,13 @@ export function useStatistiche(seasonId?: string, enabled = true) {
       setLoading(true)
       setError(null)
       try {
-        const resolvedSeasonId = seasonId ?? (await getCurrentSeasonId())
-        const seasonStats = resolvedSeasonId ? await computeStatistiche(resolvedSeasonId) : []
+        let seasonStats: PlayerStats[]
+        if (seasonId === ALL_TIME_KEY) {
+          seasonStats = await computeStatisticheAllTime()
+        } else {
+          const resolvedSeasonId = seasonId ?? (await getCurrentSeasonId())
+          seasonStats = resolvedSeasonId ? await computeStatistiche(resolvedSeasonId) : []
+        }
         const overalls = await computeOverallsForPlayers(
           seasonStats.map((s) => ({ id: s.player.id, name: s.player.name }))
         )

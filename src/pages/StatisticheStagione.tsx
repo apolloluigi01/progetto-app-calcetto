@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useStatistiche } from '../hooks/useStatistiche'
-import { STAT_CONFIG, getRanking, playerFullName, type StatKey } from '../lib/statistiche'
+import { ALL_TIME_KEY, ALL_TIME_LABEL, STAT_CONFIG, getRanking, playerFullName, type StatKey } from '../lib/statistiche'
 import type { Season } from '../types/database'
 
 // Tabella statistiche personali: identica alla scheda del giocatore
@@ -86,9 +86,10 @@ export default function StatisticheStagione() {
   const { stats, loading, error } = useStatistiche(id)
   const [season, setSeason] = useState<Season | null>(null)
   const [tab, setTab] = useState<Tab>('generali')
+  const isAllTime = id === ALL_TIME_KEY
 
   useEffect(() => {
-    if (!id) return
+    if (!id || id === ALL_TIME_KEY) return
     supabase
       .from('seasons')
       .select('*')
@@ -114,7 +115,7 @@ export default function StatisticheStagione() {
         ← Torna alle stagioni
       </Link>
       <h1 className="mt-2 text-xl font-semibold text-field-green-dark">
-        Statistiche{season ? ` — ${season.name}` : ''}
+        {isAllTime ? ALL_TIME_LABEL : `Statistiche${season ? ` — ${season.name}` : ''}`}
       </h1>
 
       <div className="mt-3 flex gap-2 rounded-lg bg-gray-100 p-1">
@@ -143,7 +144,9 @@ export default function StatisticheStagione() {
         <>
           {stats.length === 0 && (
             <p className="mt-4 text-sm text-gray-500">
-              Nessuna statistica disponibile per questa stagione.
+              {isAllTime
+                ? 'Nessuna statistica disponibile.'
+                : 'Nessuna statistica disponibile per questa stagione.'}
             </p>
           )}
 
@@ -174,7 +177,9 @@ export default function StatisticheStagione() {
         <>
           {!own && (
             <p className="mt-4 text-sm text-gray-500">
-              Non hai partecipato a nessuna partita in questa stagione.
+              {isAllTime
+                ? 'Non hai ancora partecipato a nessuna partita.'
+                : 'Non hai partecipato a nessuna partita in questa stagione.'}
             </p>
           )}
 

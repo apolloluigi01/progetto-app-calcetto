@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useStatistiche } from '../../hooks/useStatistiche'
-import { STAT_CONFIG, getRanking, playerFullName, rankingCsv, type RankedEntry, type StatKey } from '../../lib/statistiche'
+import { ALL_TIME_KEY, ALL_TIME_LABEL, STAT_CONFIG, getRanking, playerFullName, rankingCsv, type RankedEntry, type StatKey } from '../../lib/statistiche'
 import DownloadCsvButton from '../../components/DownloadCsvButton'
 import type { SeasonType } from '../../types/database'
 
@@ -96,7 +96,7 @@ export default function StagioneStatisticaDettaglio() {
           <p className="text-sm text-gray-500">{config.description}</p>
         </div>
         <DownloadCsvButton
-          filename={`Statistiche stagione - ${config.title}`}
+          filename={`${id === ALL_TIME_KEY ? ALL_TIME_LABEL : 'Statistiche stagione'} - ${config.title}`}
           {...rankingCsv(key as StatKey, sorted)}
         />
       </div>
