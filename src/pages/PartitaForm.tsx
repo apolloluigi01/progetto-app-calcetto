@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { findSeasonForDate } from '../lib/seasons'
 import { getKnownFields } from '../lib/fields'
@@ -7,15 +7,24 @@ import { logActivity } from '../lib/activityLog'
 import { computeOverallsForPlayers, generateBalancedTeams } from '../lib/teamGeneration'
 import PlayerName from '../components/PlayerName'
 import GuestPlayerForm from '../components/GuestPlayerForm'
-import type { Player, Team } from '../types/database'
+import type { Player, Season, Team } from '../types/database'
 import type { GeneratedTeams } from '../lib/teamGeneration'
 
 type Modalita = 'manuale' | 'sondaggio'
 
 const MAX_PLAYERS = 10
 
+function formatDate(d: string) {
+  return new Date(d).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })
+}
+
 export default function PartitaForm() {
   const navigate = useNavigate()
+  // Quando si crea la partita da dentro una stagione, l'id della stagione è
+  // nell'URL: la partita nasce in quella stagione e la data va vincolata al
+  // suo periodo.
+  const { id: seasonId } = useParams<{ id: string }>()
+  const [season, setSeason] = useState<Season | null>(null)
   const [players, setPlayers] = useState<Player[]>([])
   const [knownFields, setKnownFields] = useState<string[]>([])
   const [matchDate, setMatchDate] = useState('')
@@ -42,6 +51,26 @@ export default function PartitaForm() {
       })
     getKnownFields().then(setKnownFields)
   }, [])
+
+  useEffect(() => {
+    if (!seasonId) return
+    supabase
+      .from('seasons')
+      .select('*')
+      .eq('id', seasonId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) setSeason(data as Season)
+      })
+  }, [seasonId])
+
+  // La data della partita deve rientrare nel periodo della stagione scelta
+  // (end_date nullo = stagione ancora aperta).
+  const dateOutOfSeason = !!(
+    season &&
+    matchDate &&
+    (matchDate < season.start_date || (season.end_date != null && matchDate > season.end_date))
+  )
 
   // Il numero di giocatori per partita è fisso a 10: oltre non si può selezionare.
   function toggleSelected(playerId: string) {
@@ -89,6 +118,8 @@ export default function PartitaForm() {
   // In modalità manuale servono esattamente 10 giocatori, né di più né di meno.
   const canSubmit =
     matchDate &&
+    !dateOutOfSeason &&
+    (!seasonId || season !== null) &&
     (modalita === 'sondaggio' ||
       (selectedIds.length === MAX_PLAYERS && generatedTeams !== null && !generatingTeams))
 
@@ -97,23 +128,38 @@ export default function PartitaForm() {
     setSubmitting(true)
 
     try {
-      const season = await findSeasonForDate(matchDate)
-      if (!season) {
-        throw new Error(
-          'Nessuna stagione copre questa data. Crea o estendi una stagione che includa questa data prima di creare la partita.'
-        )
+      let resolvedSeasonId: string
+      if (seasonId) {
+        // Creazione dentro una stagione specifica: la data deve rientrare nel
+        // suo periodo.
+        if (!season) throw new Error('Stagione non ancora caricata, riprova.')
+        if (matchDate < season.start_date || (season.end_date != null && matchDate > season.end_date)) {
+          throw new Error(
+            `La data della partita è fuori dal periodo della stagione "${season.name}" ` +
+              `(${formatDate(season.start_date)} → ${season.end_date ? formatDate(season.end_date) : 'in corso'}). ` +
+              'Scegli una data compresa nel periodo della stagione.'
+          )
+        }
+        resolvedSeasonId = season.id
+      } else {
+        const found = await findSeasonForDate(matchDate)
+        if (!found) {
+          throw new Error(
+            'Nessuna stagione copre questa data. Crea o estendi una stagione che includa questa data prima di creare la partita.'
+          )
+        }
+        if (found.status === 'conclusa') {
+          throw new Error(
+            'La stagione che copre questa data è già conclusa: non è possibile aggiungere nuove partite.'
+          )
+        }
+        resolvedSeasonId = found.id
       }
-      if (season.status === 'conclusa') {
-        throw new Error(
-          'La stagione che copre questa data è già conclusa: non è possibile aggiungere nuove partite.'
-        )
-      }
-      const seasonId = season.id
 
       const { data: match, error: matchError } = await supabase
         .from('matches')
         .insert({
-          season_id: seasonId,
+          season_id: resolvedSeasonId,
           match_date: matchDate,
           match_time: matchTime || null,
           field: field || null,
@@ -158,7 +204,19 @@ export default function PartitaForm() {
 
   return (
     <div className="p-4">
-      <h1 className="text-xl font-semibold text-field-green-dark">Nuova Partita</h1>
+      {seasonId && (
+        <Link to={`/partite/stagione/${seasonId}`} className="text-sm text-field-green underline">
+          ← Torna alla stagione
+        </Link>
+      )}
+      <h1 className="mt-2 text-xl font-semibold text-field-green-dark">Nuova Partita</h1>
+      {season && (
+        <p className="mt-0.5 text-sm text-gray-500">
+          Stagione <span className="font-medium text-gray-700">{season.name}</span> (
+          {formatDate(season.start_date)}
+          {season.end_date ? ` → ${formatDate(season.end_date)}` : ' → in corso'})
+        </p>
+      )}
 
       <div className="mt-4 space-y-3 rounded-xl bg-white p-4 shadow">
         <div>
@@ -167,9 +225,17 @@ export default function PartitaForm() {
             type="date"
             required
             value={matchDate}
+            min={season?.start_date}
+            max={season?.end_date ?? undefined}
             onChange={(e) => setMatchDate(e.target.value)}
             className="w-full rounded-lg border border-gray-300 px-3 py-2"
           />
+          {dateOutOfSeason && season && (
+            <p className="mt-1 text-xs text-red-600">
+              La data è fuori dal periodo della stagione ({formatDate(season.start_date)}
+              {season.end_date ? ` → ${formatDate(season.end_date)}` : ' → in corso'}).
+            </p>
+          )}
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">Ora (opzionale)</label>

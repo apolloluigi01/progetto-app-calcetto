@@ -58,17 +58,6 @@ export default function AdminHome() {
         </Link>
 
         <Link
-          to="/admin/stagioni"
-          className="flex items-center gap-3 rounded-xl bg-field-green px-4 py-3 text-sm font-medium text-white hover:bg-field-green-dark"
-        >
-          <span className="text-lg">🏆</span>
-          <div>
-            <p className="font-semibold">Gestione stagioni</p>
-            <p className="text-xs opacity-80">Crea e gestisci le stagioni del campionato</p>
-          </div>
-        </Link>
-
-        <Link
           to="/admin/albo-oro"
           className="flex items-center gap-3 rounded-xl bg-field-green px-4 py-3 text-sm font-medium text-white hover:bg-field-green-dark"
         >

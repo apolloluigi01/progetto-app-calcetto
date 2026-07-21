@@ -3,19 +3,25 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import ErrorNotice from '../components/ErrorNotice'
-import type { Match, MatchResult } from '../types/database'
+import { getSeasonStatus, type SeasonStatus } from '../lib/seasons'
+import type { Season } from '../types/database'
 
-const MAX_PLAYERS = 10
-
-type MatchWithResult = Match & {
-  result: MatchResult | null
-  pagelle: { published_at: string | null }[]
-  match_bookings: { id: string }[]
+const STATUS_BADGE: Record<SeasonStatus, { label: string; className: string }> = {
+  corrente: { label: 'Corrente', className: 'bg-field-green/10 text-field-green-dark' },
+  conclusa: { label: 'Conclusa', className: 'bg-gray-100 text-gray-500' },
+  programmata: { label: 'Programmata', className: 'bg-field-yellow/20 text-field-orange' },
 }
 
+/**
+ * Pannello Partite: si entra dall'elenco delle stagioni. La stagione corrente
+ * ha sempre la priorità (esce per prima), poi tutte le altre in ordine
+ * decrescente per data di inizio. Selezionando una stagione si vedono le sue
+ * partite e le sue statistiche. Gli admin creano nuove stagioni da qui.
+ */
 export default function Partite() {
   const { isAdmin } = useAuth()
-  const [matches, setMatches] = useState<MatchWithResult[]>([])
+  const [seasons, setSeasons] = useState<Season[]>([])
+  const [matchCounts, setMatchCounts] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [reloadToken, setReloadToken] = useState(0)
@@ -25,9 +31,9 @@ export default function Partite() {
       setLoading(true)
       setError(null)
       const { data, error } = await supabase
-        .from('matches')
-        .select('*, result:match_results(score_a, score_b, id, match_id), pagelle(published_at), match_bookings(id)')
-        .order('match_date', { ascending: false })
+        .from('seasons')
+        .select('*')
+        .order('start_date', { ascending: false })
 
       if (error) {
         setError(error.message)
@@ -35,16 +41,44 @@ export default function Partite() {
         return
       }
 
-      setMatches(
-        (data ?? []).map((m) => ({
-          ...m,
-          result: Array.isArray(m.result) ? m.result[0] ?? null : m.result,
-        })) as MatchWithResult[]
-      )
+      // La stagione corrente esce sempre per prima; le altre restano in ordine
+      // decrescente per data di inizio (già ordinate dalla query).
+      const list = (data ?? []) as Season[]
+      const ordered = [...list].sort((a, b) => {
+        const aCurrent = getSeasonStatus(a) === 'corrente' ? 1 : 0
+        const bCurrent = getSeasonStatus(b) === 'corrente' ? 1 : 0
+        if (aCurrent !== bCurrent) return bCurrent - aCurrent
+        return b.start_date.localeCompare(a.start_date)
+      })
+      setSeasons(ordered)
+
+      if (ordered.length > 0) {
+        const { data: counts, error: countsError } = await supabase
+          .from('matches')
+          .select('season_id')
+          .in('season_id', ordered.map((s) => s.id))
+
+        if (countsError) {
+          setError(countsError.message)
+          setLoading(false)
+          return
+        }
+
+        const map: Record<string, number> = {}
+        for (const row of counts ?? []) {
+          map[row.season_id] = (map[row.season_id] ?? 0) + 1
+        }
+        setMatchCounts(map)
+      }
+
       setLoading(false)
     }
     load()
   }, [reloadToken])
+
+  function formatDate(d: string) {
+    return new Date(d).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })
+  }
 
   return (
     <div className="p-4">
@@ -52,69 +86,77 @@ export default function Partite() {
         <h1 className="text-xl font-semibold text-field-green-dark">Partite</h1>
         {isAdmin && (
           <Link
-            to="/partite/nuova"
+            to="/partite/stagione/nuova"
             className="rounded-lg bg-field-green px-3 py-2 text-sm font-medium text-white hover:bg-field-green-dark"
           >
-            Nuova partita
+            + Aggiungi Stagione
           </Link>
         )}
       </div>
+      <p className="mt-1 text-sm text-gray-500">
+        Seleziona una stagione per vederne le partite e le statistiche.
+      </p>
+
+      {loading && <p className="mt-4 text-sm text-gray-500">Caricamento...</p>}
+
+      {!loading && error && (
+        <div className="mt-4">
+          <ErrorNotice message={error} onRetry={() => setReloadToken((t) => t + 1)} />
+        </div>
+      )}
+
+      {!loading && !error && seasons.length === 0 && (
+        <div className="mt-6 rounded-xl border border-dashed border-gray-300 p-8 text-center">
+          <p className="text-sm text-gray-500">Nessuna stagione creata.</p>
+          {isAdmin && (
+            <Link
+              to="/partite/stagione/nuova"
+              className="mt-3 inline-block rounded-lg bg-field-green px-4 py-2 text-sm font-medium text-white hover:bg-field-green-dark"
+            >
+              Crea la prima stagione
+            </Link>
+          )}
+        </div>
+      )}
 
       <div className="mt-4 space-y-2">
-        {loading && <p className="text-sm text-gray-500">Caricamento...</p>}
-        {!loading && error && <ErrorNotice message={error} onRetry={() => setReloadToken((t) => t + 1)} />}
-        {!loading && !error && matches.length === 0 && (
-          <p className="text-sm text-gray-500">Nessuna partita registrata.</p>
-        )}
-        {matches.map((m) => (
-          <Link
-            key={m.id}
-            to={`/partite/${m.id}`}
-            className="block rounded-xl bg-white p-4 shadow hover:bg-gray-50"
-          >
-            <div className="flex items-center justify-between">
-              <p className="font-medium">
-                {new Date(m.match_date).toLocaleDateString('it-IT', {
-                  day: 'numeric',
-                  month: 'long',
-                  year: 'numeric',
-                })}
-              </p>
-              <div className="flex gap-2">
-                {m.booking_open && (
-                  <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700">
-                    Sondaggio {m.match_bookings.length}/{MAX_PLAYERS}
+        {seasons.map((s) => {
+          const badge = STATUS_BADGE[getSeasonStatus(s)]
+          const count = matchCounts[s.id] ?? 0
+          return (
+            <Link
+              key={s.id}
+              to={`/partite/stagione/${s.id}`}
+              className="flex items-center justify-between rounded-xl bg-white p-4 shadow-sm hover:bg-gray-50"
+            >
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-gray-800">{s.name}</span>
+                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${badge.className}`}>
+                    {badge.label}
                   </span>
-                )}
-                {isAdmin && m.voting_open && (
-                  <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs text-purple-700">
-                    Votazioni in corso
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                      s.season_type === 'amichevole'
+                        ? 'bg-blue-100 text-blue-700'
+                        : 'bg-purple-100 text-purple-700'
+                    }`}
+                  >
+                    {s.season_type === 'amichevole' ? 'Amichevole' : 'Format'}
                   </span>
-                )}
-                <span
-                  className={`rounded-full px-2 py-0.5 text-xs ${
-                    m.status === 'completed'
-                      ? 'bg-field-green/10 text-field-green-dark'
-                      : 'bg-field-yellow/20 text-field-orange'
-                  }`}
-                >
-                  {m.status === 'completed' ? 'Completata' : 'In preparazione'}
-                </span>
-                {m.pagelle.length > 0 && m.pagelle.every((p) => p.published_at) && (
-                  <span className="rounded-full bg-field-orange/10 px-2 py-0.5 text-xs text-field-orange">
-                    Pubblicata
-                  </span>
-                )}
+                </div>
+                <p className="mt-0.5 text-xs text-gray-500">
+                  {formatDate(s.start_date)}
+                  {s.end_date ? ` → ${formatDate(s.end_date)}` : ' → In corso'}
+                </p>
+                <p className="mt-0.5 text-xs text-gray-400">
+                  {count} {count === 1 ? 'partita' : 'partite'}
+                </p>
               </div>
-            </div>
-            {m.field && <p className="text-sm text-gray-500">{m.field}</p>}
-            {m.result && (
-              <p className="mt-1 text-lg font-semibold text-field-green-dark">
-                {m.result.score_a} - {m.result.score_b}
-              </p>
-            )}
-          </Link>
-        ))}
+              <span className="text-lg text-gray-300">›</span>
+            </Link>
+          )
+        })}
       </div>
     </div>
   )

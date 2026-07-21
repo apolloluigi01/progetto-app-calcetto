@@ -22,9 +22,8 @@ import GiocatoriAdmin from './pages/admin/GiocatoriAdmin'
 import GiocatoreEdit from './pages/admin/GiocatoreEdit'
 import PartiteAdmin from './pages/admin/PartiteAdmin'
 import MatchEdit from './pages/admin/MatchEdit'
-import Stagioni from './pages/admin/Stagioni'
+import StagionePartite from './pages/StagionePartite'
 import StagioneEdit from './pages/admin/StagioneEdit'
-import StagioneDettaglio from './pages/admin/StagioneDettaglio'
 import StagioneStatisticaDettaglio from './pages/admin/StagioneStatisticaDettaglio'
 import FantaAdmin from './pages/admin/FantaAdmin'
 import FantaCreditiAdmin from './pages/admin/FantaCreditiAdmin'
@@ -56,6 +55,8 @@ function App() {
               <Route path="/giocatori" element={<Giocatori />} />
               <Route path="/giocatori/:id" element={<GiocatoreDetail />} />
               <Route path="/partite" element={<Partite />} />
+              <Route path="/partite/stagione/:id" element={<StagionePartite />} />
+              <Route path="/partite/stagione/:id/statistiche/:key" element={<StagioneStatisticaDettaglio />} />
               <Route path="/partite/:id" element={<MatchDetail />} />
               <Route path="/partite/:id/campetto" element={<MatchPitch />} />
               <Route path="/statistiche" element={<Statistiche />} />
@@ -71,11 +72,9 @@ function App() {
 
               <Route element={<AdminRoute />}>
                 <Route path="/admin" element={<AdminHome />} />
-                <Route path="/admin/stagioni" element={<Stagioni />} />
-                <Route path="/admin/stagioni/nuova" element={<StagioneEdit />} />
-                <Route path="/admin/stagioni/:id" element={<StagioneDettaglio />} />
-                <Route path="/admin/stagioni/:id/modifica" element={<StagioneEdit />} />
-                <Route path="/admin/stagioni/:id/statistiche/:key" element={<StagioneStatisticaDettaglio />} />
+                <Route path="/partite/stagione/nuova" element={<StagioneEdit />} />
+                <Route path="/partite/stagione/:id/modifica" element={<StagioneEdit />} />
+                <Route path="/partite/stagione/:id/nuova-partita" element={<PartitaForm />} />
                 <Route path="/admin/giocatori" element={<GiocatoriAdmin />} />
                 <Route path="/admin/giocatori/:id" element={<GiocatoreEdit />} />
                 <Route path="/admin/fantacalcetto" element={<FantaAdmin />} />
@@ -86,7 +85,6 @@ function App() {
                 <Route path="/admin/statistiche-mensili" element={<StatisticheMensili />} />
                 <Route path="/admin/partite" element={<PartiteAdmin />} />
                 <Route path="/admin/partite/:id" element={<MatchEdit />} />
-                <Route path="/partite/nuova" element={<PartitaForm />} />
               </Route>
             </Route>
           </Route>

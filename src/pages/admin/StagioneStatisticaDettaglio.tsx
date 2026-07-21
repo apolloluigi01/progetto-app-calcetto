@@ -55,7 +55,7 @@ export default function StagioneStatisticaDettaglio() {
   if (key === 'format' && seasonType === 'amichevole') {
     return (
       <div className="p-4">
-        <Link to={`/admin/stagioni/${id}`} className="text-sm text-field-green underline">
+        <Link to={`/partite/stagione/${id}`} className="text-sm text-field-green underline">
           ← Torna alla stagione
         </Link>
         <h1 className="mt-2 text-xl font-semibold text-field-green-dark">Classifica Format</h1>
@@ -87,7 +87,7 @@ export default function StagioneStatisticaDettaglio() {
 
   return (
     <div className="p-4">
-      <Link to={`/admin/stagioni/${id}`} className="text-sm text-field-green underline">
+      <Link to={`/partite/stagione/${id}`} className="text-sm text-field-green underline">
         ← Torna alla stagione
       </Link>
       <div className="mt-2 flex items-start justify-between gap-3">

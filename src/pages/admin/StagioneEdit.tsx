@@ -89,14 +89,14 @@ export default function StagioneEdit() {
       const { data, error: err } = await supabase.from('seasons').insert(payload).select('id').single()
       setSaving(false)
       if (err || !data) { setError(err?.message ?? 'Errore creazione stagione'); return }
-      navigate(`/admin/stagioni/${data.id}`)
+      navigate(`/partite/stagione/${data.id}`)
       return
     }
 
     const { error: err } = await supabase.from('seasons').update(payload).eq('id', id)
     setSaving(false)
     if (err) { setError(err.message); return }
-    navigate(`/admin/stagioni/${id}`)
+    navigate(`/partite/stagione/${id}`)
   }
 
   async function handleDelete() {
@@ -106,14 +106,14 @@ export default function StagioneEdit() {
     const { error: err } = await supabase.from('seasons').delete().eq('id', id)
     setDeleting(false)
     if (err) { setError(err.message); return }
-    navigate('/admin/stagioni')
+    navigate('/partite')
   }
 
   if (loading) return <div className="p-4 text-sm text-gray-500">Caricamento...</div>
 
   return (
     <div className="p-4">
-      <Link to={isNew ? '/admin/stagioni' : `/admin/stagioni/${id}`} className="text-sm text-field-green underline">
+      <Link to={isNew ? '/partite' : `/partite/stagione/${id}`} className="text-sm text-field-green underline">
         ← Torna indietro
       </Link>
       <h1 className="mt-2 text-xl font-semibold text-field-green-dark">
