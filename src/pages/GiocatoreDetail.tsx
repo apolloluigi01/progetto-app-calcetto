@@ -7,7 +7,13 @@ import { STAT_CONFIG, type PlayerStats, type StatKey } from '../lib/statistiche'
 import PlayerCard from '../components/PlayerCard'
 import type { Player } from '../types/database'
 
-const STAT_KEYS: StatKey[] = ['overall', 'marcatori', 'assist', 'presenze', 'mvp', 'winrate', 'sconfitte', 'mediavoto', 'autogol', 'schieramenti']
+// Vista personale del giocatore: prima tutte le statistiche "positive" (verdi),
+// in fondo le due negative (rosse). Qui la media voto è mostrata in verde come
+// le altre statistiche personali (nella classifica generale resta rossa).
+const STAT_KEYS: StatKey[] = ['overall', 'marcatori', 'assist', 'presenze', 'mvp', 'winrate', 'mediavoto', 'schieramenti', 'sconfitte', 'autogol']
+
+/** In questa vista sono rosse soltanto Sconfitte e Autogol. */
+const RED_STAT_KEYS: StatKey[] = ['sconfitte', 'autogol']
 
 export default function GiocatoreDetail() {
   const { id } = useParams<{ id: string }>()
@@ -122,7 +128,7 @@ export default function GiocatoreDetail() {
                 {STAT_KEYS.map((key, i) => {
                   const config = STAT_CONFIG[key]
                   const value = config.getValue(playerStats)
-                  const isGreen = config.color === 'green'
+                  const isGreen = !RED_STAT_KEYS.includes(key)
                   const valueColor = isGreen ? 'text-field-green-dark' : 'text-red-600'
                   const valueBg = isGreen ? 'bg-field-green/10' : 'bg-red-50'
 
