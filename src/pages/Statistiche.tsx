@@ -5,7 +5,10 @@ import { useStatistiche } from '../hooks/useStatistiche'
 import { useCurrentSeason } from '../hooks/useCurrentSeason'
 import { STAT_CONFIG, getRanking, playerFullName, type StatKey } from '../lib/statistiche'
 
-const STAT_KEYS: StatKey[] = ['overall', 'marcatori', 'assist', 'presenze', 'mvp', 'winrate', 'sconfitte', 'mediavoto', 'autogol', 'schieramenti']
+// Tabella statistiche personali: identica alla scheda del giocatore
+// (pannello Giocatori) per ordine, numero di voci e colori. Prima tutte le
+// "positive" (verdi, media voto inclusa), poi Sconfitte e Autogol in fondo.
+const STAT_KEYS: StatKey[] = ['overall', 'marcatori', 'assist', 'presenze', 'mvp', 'winrate', 'mediavoto', 'schieramenti', 'sconfitte', 'autogol']
 // Griglia della vista Generali: prima tutte le statistiche "positive" (verdi),
 // poi come ultime due le negative Sconfitte e Autogol.
 const PREVIEW_STAT_KEYS: StatKey[] = ['overall', 'format', 'marcatori', 'assist', 'presenze', 'mvp', 'winrate', 'mediavoto', 'schieramenti', 'sconfitte', 'autogol']
@@ -166,13 +169,20 @@ export default function Statistiche() {
                     {STAT_KEYS.map((key, i) => {
                       const config = STAT_CONFIG[key]
                       const value = config.getValue(own)
-                      const isGreen = config.color === 'green'
+                      const isGreen = !RED_STAT_KEYS.includes(key)
                       const valueColor = isGreen ? 'text-field-green-dark' : 'text-red-600'
                       const valueBg = isGreen ? 'bg-field-green/10' : 'bg-red-50'
 
                       return (
                         <tr key={key} className={`border-t border-gray-100 ${i === 0 ? 'border-t-0' : ''}`}>
-                          <td className="px-4 py-3.5 font-medium text-gray-700">{config.title}</td>
+                          <td className="px-4 py-3.5 font-medium text-gray-700">
+                            {config.title}
+                            {config.extraColumn && (
+                              <span className="block text-xs font-normal text-gray-400">
+                                {config.extraColumn.label}: {config.extraColumn.getValue(own)}
+                              </span>
+                            )}
+                          </td>
                           <td className="px-4 py-3.5 text-right">
                             <span className={`inline-flex items-center rounded-full px-3 py-1 text-base font-semibold ${valueColor} ${valueBg}`}>
                               {value !== null ? config.formatValue(value) : '-'}
