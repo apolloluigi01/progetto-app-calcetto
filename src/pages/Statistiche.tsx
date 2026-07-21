@@ -6,15 +6,16 @@ import { useCurrentSeason } from '../hooks/useCurrentSeason'
 import { STAT_CONFIG, getRanking, playerFullName, type StatKey } from '../lib/statistiche'
 
 const STAT_KEYS: StatKey[] = ['overall', 'marcatori', 'assist', 'presenze', 'mvp', 'winrate', 'sconfitte', 'mediavoto', 'autogol', 'schieramenti']
-const TOP_STAT_KEYS: StatKey[] = ['overall', 'format', 'marcatori']
-const BOTTOM_STAT_KEYS: StatKey[] = ['assist', 'presenze', 'mvp']
-const THIRD_STAT_KEYS: StatKey[] = ['winrate', 'sconfitte', 'mediavoto']
-const FOURTH_STAT_KEYS: StatKey[] = ['schieramenti']
+// Griglia della vista Generali: prima tutte le statistiche "positive" (verdi),
+// poi come ultime due le negative Sconfitte e Autogol.
+const PREVIEW_STAT_KEYS: StatKey[] = ['overall', 'format', 'marcatori', 'assist', 'presenze', 'mvp', 'winrate', 'mediavoto', 'schieramenti', 'sconfitte', 'autogol']
+/** In questa vista sono rosse soltanto Sconfitte e Autogol (la media voto è verde). */
+const RED_STAT_KEYS: StatKey[] = ['sconfitte', 'autogol']
 
 function StatPreviewCard({ statKey, stats }: { statKey: StatKey; stats: ReturnType<typeof useStatistiche>['stats'] }) {
   const config = STAT_CONFIG[statKey]
   const ranking = getRanking(stats, statKey).slice(0, 3)
-  const isGreen = config.color === 'green'
+  const isGreen = !RED_STAT_KEYS.includes(statKey)
   const valueColor = isGreen ? 'text-field-green-dark' : 'text-red-600'
   const valueBg = isGreen ? 'bg-field-green/10' : 'bg-red-50'
 
@@ -70,7 +71,7 @@ export default function Statistiche() {
 
   // Nelle stagioni amichevoli la Classifica Format non viene conteggiata.
   const showFormat = season?.season_type !== 'amichevole'
-  const topKeys = TOP_STAT_KEYS.filter((k) => showFormat || k !== 'format')
+  const previewKeys = PREVIEW_STAT_KEYS.filter((k) => showFormat || k !== 'format')
 
   const own = player ? stats.find((s) => s.player.id === player.id) ?? null : null
   const winPercentage = own && own.partiteGiocate > 0 ? (own.vittorie / own.partiteGiocate) * 100 : null
@@ -113,7 +114,7 @@ export default function Statistiche() {
             /* Mobile-first: 2 colonne su telefono (card larghe e nomi
                leggibili), 3 colonne da tablet in su. */
             <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {[...topKeys, ...BOTTOM_STAT_KEYS, ...THIRD_STAT_KEYS, ...FOURTH_STAT_KEYS].map((key) => (
+              {previewKeys.map((key) => (
                 <StatPreviewCard key={key} statKey={key} stats={stats} />
               ))}
             </div>
