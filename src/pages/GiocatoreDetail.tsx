@@ -60,6 +60,8 @@ export default function GiocatoreDetail() {
     voteCount: 0,
     overall: null,
     winStreak: 0,
+    fantaSchieramenti: 0,
+    fantaCapitano: 0,
     totalSeasonMatches: 0,
   }
   const playerStats = isStorica ? zeroStats : seasonStats.find((s) => s.player.id === id) ?? null

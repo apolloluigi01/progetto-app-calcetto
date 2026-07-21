@@ -5,10 +5,11 @@ import { useStatistiche } from '../hooks/useStatistiche'
 import { useCurrentSeason } from '../hooks/useCurrentSeason'
 import { STAT_CONFIG, getRanking, playerFullName, type StatKey } from '../lib/statistiche'
 
-const STAT_KEYS: StatKey[] = ['overall', 'marcatori', 'assist', 'presenze', 'mvp', 'winrate', 'sconfitte', 'mediavoto', 'autogol']
+const STAT_KEYS: StatKey[] = ['overall', 'marcatori', 'assist', 'presenze', 'mvp', 'winrate', 'sconfitte', 'mediavoto', 'autogol', 'schieramenti']
 const TOP_STAT_KEYS: StatKey[] = ['overall', 'format', 'marcatori']
 const BOTTOM_STAT_KEYS: StatKey[] = ['assist', 'presenze', 'mvp']
 const THIRD_STAT_KEYS: StatKey[] = ['winrate', 'sconfitte', 'mediavoto']
+const FOURTH_STAT_KEYS: StatKey[] = ['schieramenti']
 
 function StatPreviewCard({ statKey, stats }: { statKey: StatKey; stats: ReturnType<typeof useStatistiche>['stats'] }) {
   const config = STAT_CONFIG[statKey]
@@ -112,7 +113,7 @@ export default function Statistiche() {
             /* Mobile-first: 2 colonne su telefono (card larghe e nomi
                leggibili), 3 colonne da tablet in su. */
             <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {[...topKeys, ...BOTTOM_STAT_KEYS, ...THIRD_STAT_KEYS].map((key) => (
+              {[...topKeys, ...BOTTOM_STAT_KEYS, ...THIRD_STAT_KEYS, ...FOURTH_STAT_KEYS].map((key) => (
                 <StatPreviewCard key={key} statKey={key} stats={stats} />
               ))}
             </div>

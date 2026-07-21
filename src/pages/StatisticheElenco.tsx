@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { STAT_CONFIG, type StatKey } from '../lib/statistiche'
 import { useCurrentSeason } from '../hooks/useCurrentSeason'
 
-const STAT_KEYS: StatKey[] = ['overall', 'format', 'marcatori', 'assist', 'presenze', 'mvp', 'winrate', 'sconfitte', 'mediavoto', 'autogol']
+const STAT_KEYS: StatKey[] = ['overall', 'format', 'marcatori', 'assist', 'presenze', 'mvp', 'winrate', 'sconfitte', 'mediavoto', 'autogol', 'schieramenti']
 
 export default function StatisticheElenco() {
   const { season } = useCurrentSeason()

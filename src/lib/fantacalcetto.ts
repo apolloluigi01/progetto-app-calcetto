@@ -57,7 +57,13 @@ export async function getFantaSettings(): Promise<FantaSettings> {
 export function computeFantaBudget(fieldCosts: number[]): number {
   if (fieldCosts.length === 0) return 0
   const avgCost = fieldCosts.reduce((s, c) => s + c, 0) / fieldCosts.length
-  return Math.round(avgCost * FANTA_TEAM_SIZE) - 1
+  const base = Math.round(avgCost * FANTA_TEAM_SIZE)
+  // Il -1 rende il budget "stretto". Unica eccezione: se tutti i giocatori
+  // in campo costano uguale, sottrarre 1 renderebbe impossibile comporre
+  // qualsiasi rosa (ogni rosa costerebbe esattamente base), quindi in quel
+  // solo caso non lo applichiamo.
+  const allEqual = fieldCosts.every((c) => c === fieldCosts[0])
+  return allEqual ? base : base - 1
 }
 
 /** Minuti prima del calcio d'inizio oltre i quali le formazioni sono bloccate. */

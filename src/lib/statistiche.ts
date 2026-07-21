@@ -15,6 +15,10 @@ export interface PlayerStats {
   voteCount: number
   overall: number | null
   winStreak: number
+  /** Quante volte il giocatore è stato schierato nelle formazioni fantacalcetto. */
+  fantaSchieramenti: number
+  /** Di questi schieramenti, quante volte è stato scelto come capitano. */
+  fantaCapitano: number
   /** Totale partite giocate (con risultato) nella stagione: base per la soglia % presenze del format. */
   totalSeasonMatches: number
 }
@@ -75,7 +79,7 @@ async function aggregateStatistiche(matches: MatchStatsRow[]): Promise<PlayerSta
     dateByMatch.set(m.id, m.match_date)
   }
 
-  const [matchPlayersRes, goalsRes, assistsRes, pagelleRes] = await Promise.all([
+  const [matchPlayersRes, goalsRes, assistsRes, pagelleRes, fantaLineupsRes] = await Promise.all([
     supabase
       .from('match_players')
       .select('match_id, player_id, team, players(*)')
@@ -87,6 +91,10 @@ async function aggregateStatistiche(matches: MatchStatsRow[]): Promise<PlayerSta
       .select('match_id, player_id, voto, is_mvp')
       .in('match_id', matchIds)
       .not('published_at', 'is', null),
+    supabase
+      .from('fanta_lineups')
+      .select('match_id, captain_id, fanta_lineup_players(player_id)')
+      .in('match_id', matchIds),
   ])
 
   const statsByPlayer = new Map<string, PlayerStats>()
@@ -109,6 +117,8 @@ async function aggregateStatistiche(matches: MatchStatsRow[]): Promise<PlayerSta
       voteCount: 0,
       overall: null,
       winStreak: 0,
+      fantaSchieramenti: 0,
+      fantaCapitano: 0,
       totalSeasonMatches,
     }
     statsByPlayer.set(player.id, created)
@@ -181,6 +191,19 @@ async function aggregateStatistiche(matches: MatchStatsRow[]): Promise<PlayerSta
     }
   }
 
+  // Schieramenti al fantacalcetto: quante volte ogni giocatore è stato incluso
+  // nelle formazioni (e di queste, quante da capitano). Si conteggiano solo i
+  // giocatori con anagrafica permanente già presenti nelle statistiche.
+  type FantaLineupJoin = { match_id: string; captain_id: string; fanta_lineup_players: { player_id: string }[] }
+  for (const lineup of (fantaLineupsRes.data ?? []) as unknown as FantaLineupJoin[]) {
+    for (const lp of lineup.fanta_lineup_players) {
+      const stats = statsByPlayer.get(lp.player_id)
+      if (!stats) continue
+      stats.fantaSchieramenti += 1
+      if (lp.player_id === lineup.captain_id) stats.fantaCapitano += 1
+    }
+  }
+
   return [...statsByPlayer.values()]
 }
 
@@ -195,6 +218,7 @@ export type StatKey =
   | 'sconfitte'
   | 'mediavoto'
   | 'autogol'
+  | 'schieramenti'
 
 interface StatConfig {
   title: string
@@ -335,6 +359,17 @@ export const STAT_CONFIG: Record<StatKey, StatConfig> = {
     unit: 'autogol',
     getValue: (p) => p.autogol,
     formatValue: (v) => String(v),
+  },
+  schieramenti: {
+    title: 'Schieramenti Fanta',
+    description:
+      'Numero di volte in cui il giocatore è stato schierato nelle formazioni del fantacalcetto, con il dettaglio di quante da capitano',
+    color: 'green',
+    sortDir: 'desc',
+    unit: 'schieramenti',
+    getValue: (p) => p.fantaSchieramenti,
+    formatValue: (v) => String(v),
+    extraColumn: { label: 'Da capitano', getValue: (p) => String(p.fantaCapitano) },
   },
 }
 
