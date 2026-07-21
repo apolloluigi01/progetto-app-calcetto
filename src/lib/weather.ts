@@ -36,25 +36,49 @@ export function describeWeatherCode(code: number): { label: string; icon: string
 
 async function geocodeQuery(query: string): Promise<{ lat: number; lon: number; name: string } | null> {
   const res = await fetch(
-    `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=1&language=it&format=json`
+    `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=5&language=it&format=json`
   )
   if (!res.ok) return null
   const data = await res.json()
-  const result = data?.results?.[0]
-  if (!result) return null
-  return { lat: result.latitude, lon: result.longitude, name: result.name }
+  const results: { latitude: number; longitude: number; name: string; country_code?: string }[] =
+    data?.results ?? []
+  if (results.length === 0) return null
+  // App italiana: a parità di nome preferisci il risultato in Italia, per
+  // evitare omonimi esteri (es. la sigla "NA" che altrimenti geocodifica a un
+  // villaggio in Thailandia, restituendo un meteo completamente sbagliato).
+  const chosen = results.find((r) => r.country_code === 'IT') ?? results[0]
+  return { lat: chosen.latitude, lon: chosen.longitude, name: chosen.name }
 }
 
-// Il campo inserito è spesso il nome dell'impianto (es. "Centro Sportivo Comunale") e non una
-// città, quindi la geocodifica sull'intera stringa fallisce quasi sempre. Come fallback si
-// prova con le ultime 1-2 parole, che di solito corrispondono al toponimo/città.
+// Parole che non sono toponimi (tipo di via, tipo di impianto): vanno scartate
+// dai candidati, altrimenti la geocodifica sceglie luoghi a caso.
+const NON_TOPONIMO = new Set([
+  'via', 'viale', 'piazza', 'piazzale', 'largo', 'corso', 'vicolo', 'strada',
+  'traversa', 'contrada', 'localita', 'località', 'campo', 'centro', 'sportivo',
+  'stadio', 'club', 'complesso', 'impianto', 'comunale', 'polisportiva',
+])
+
+// Il campo inserito è spesso l'indirizzo dell'impianto (es. "Club Saggese - Via
+// Club Saggese, 80021 Afragola NA") e non una città, quindi la geocodifica
+// sull'intera stringa fallisce quasi sempre. Come fallback si prova con le
+// singole parole "significative": si scartano CAP/numeri, le sigle di provincia
+// (2 lettere, es. "NA") e le parole non toponimo (Via, Club, ...). Il comune di
+// solito è l'ultima parola significativa, quindi si prova dall'ultima.
 async function geocodeField(query: string): Promise<{ lat: number; lon: number; name: string } | null> {
   const trimmed = query.trim()
-  const words = trimmed.split(/[\s,]+/).filter(Boolean)
-  const candidates = [trimmed]
-  if (words.length > 1) {
-    candidates.push(words.slice(-2).join(' '))
-    candidates.push(words[words.length - 1])
+  const words = trimmed
+    .replace(/[,\-–—]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+  const meaningful = words.filter(
+    (w) => !/^\d+$/.test(w) && w.length > 2 && !NON_TOPONIMO.has(w.toLowerCase())
+  )
+
+  // Prima la stringa intera (utile se è già una città), poi le parole
+  // significative dall'ultima alla prima (senza duplicati).
+  const candidates: string[] = [trimmed]
+  for (let i = meaningful.length - 1; i >= 0; i--) {
+    if (!candidates.includes(meaningful[i])) candidates.push(meaningful[i])
   }
 
   for (const candidate of candidates) {
