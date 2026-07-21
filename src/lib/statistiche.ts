@@ -79,7 +79,7 @@ async function aggregateStatistiche(matches: MatchStatsRow[]): Promise<PlayerSta
     dateByMatch.set(m.id, m.match_date)
   }
 
-  const [matchPlayersRes, goalsRes, assistsRes, pagelleRes, fantaLineupsRes] = await Promise.all([
+  const [matchPlayersRes, goalsRes, assistsRes, pagelleRes, fantaLineupsRes, fantaCalcRes] = await Promise.all([
     supabase
       .from('match_players')
       .select('match_id, player_id, team, players(*)')
@@ -93,8 +93,9 @@ async function aggregateStatistiche(matches: MatchStatsRow[]): Promise<PlayerSta
       .not('published_at', 'is', null),
     supabase
       .from('fanta_lineups')
-      .select('match_id, captain_id, fanta_lineup_players(player_id)')
+      .select('league_id, match_id, captain_id, fanta_lineup_players(player_id)')
       .in('match_id', matchIds),
+    supabase.from('fanta_calculations').select('league_id, match_id').in('match_id', matchIds),
   ])
 
   const statsByPlayer = new Map<string, PlayerStats>()
@@ -192,10 +193,24 @@ async function aggregateStatistiche(matches: MatchStatsRow[]): Promise<PlayerSta
   }
 
   // Schieramenti al fantacalcetto: quante volte ogni giocatore è stato incluso
-  // nelle formazioni (e di queste, quante da capitano). Si conteggiano solo i
-  // giocatori con anagrafica permanente già presenti nelle statistiche.
-  type FantaLineupJoin = { match_id: string; captain_id: string; fanta_lineup_players: { player_id: string }[] }
+  // nelle formazioni (e di queste, quante da capitano). Si conteggiano solo le
+  // formazioni di giornate concluse e calcolate dall'admin (presenti in
+  // fanta_calculations, per lega+partita): finché la giornata non è calcolata
+  // gli schieramenti non fanno statistica. E solo i giocatori con anagrafica
+  // permanente già presenti nelle statistiche.
+  const calculatedKeys = new Set(
+    ((fantaCalcRes.data ?? []) as { league_id: string; match_id: string }[]).map(
+      (c) => `${c.league_id}|${c.match_id}`,
+    ),
+  )
+  type FantaLineupJoin = {
+    league_id: string
+    match_id: string
+    captain_id: string
+    fanta_lineup_players: { player_id: string }[]
+  }
   for (const lineup of (fantaLineupsRes.data ?? []) as unknown as FantaLineupJoin[]) {
+    if (!calculatedKeys.has(`${lineup.league_id}|${lineup.match_id}`)) continue
     for (const lp of lineup.fanta_lineup_players) {
       const stats = statsByPlayer.get(lp.player_id)
       if (!stats) continue
