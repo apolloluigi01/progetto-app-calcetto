@@ -4,9 +4,10 @@ import { useAuth } from '../../contexts/AuthContext'
 import { logActivity, type FieldChange } from '../../lib/activityLog'
 import { DEFAULT_FANTA_SETTINGS, type FantaSettings } from '../../lib/fantacalcetto'
 
-// Questa pagina gestisce solo bonus/malus: il budget crediti si manutiene
-// dalla Gestione crediti Fantacalcetto.
-type BonusKey = Exclude<keyof FantaSettings, 'budget'>
+// Questa pagina gestisce solo bonus/malus: i costi in crediti delle fasce si
+// manutengono dalla Gestione crediti Fantacalcetto, mentre il budget è
+// dinamico e non si imposta più a mano.
+type BonusKey = keyof FantaSettings
 
 interface ParamDef {
   key: BonusKey
@@ -51,7 +52,6 @@ export default function FantaAdmin() {
               malusAutogol: Number(data.malus_autogol),
               malusPeggiore: Number(data.malus_peggiore),
               captainMultiplier: Number(data.captain_multiplier),
-              budget: data.budget != null ? Number(data.budget) : DEFAULT_FANTA_SETTINGS.budget,
             }
           : DEFAULT_FANTA_SETTINGS
         setInitial(s)

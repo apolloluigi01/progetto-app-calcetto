@@ -8,6 +8,7 @@ import { useFantaSettings } from '../hooks/useFantaSettings'
 import { useFasce } from '../hooks/useFasce'
 import {
   FANTA_TEAM_SIZE,
+  computeFantaBudget,
   computeLineupScore,
   creditCost,
   formatFantaPoints,
@@ -220,10 +221,13 @@ export default function FantaFormazione() {
   // di un quarto d'ora al calcio d'inizio.
   const locked = !teamsFormed || !teamsOfficial || !!result || !isNextMatch || pastDeadline
 
-  // Budget crediti configurato dal CDA (fanta_settings.budget). Vale per le
-  // formazioni da schierare: quelle già salvate non vengono ricontrollate.
-  const budget = settings.budget
   const costOf = (playerId: string) => creditCost(ratings.get(playerId) ?? null, fasce)
+  // Budget crediti dinamico: media del costo dei 10 in campo × giocatori da
+  // schierare − 1. Si ricalcola da sé quando cambiano squadre o fasce/costi.
+  // Vale per le formazioni da schierare: quelle già salvate non vengono
+  // ricontrollate.
+  const fieldPlayers = [...teamA, ...teamB]
+  const budget = computeFantaBudget(fieldPlayers.map((p) => costOf(p.player_id)))
   const budgetUsed = [...selected].reduce((s, id) => s + costOf(id), 0)
   const countA = teamA.filter((p) => selected.has(p.player_id)).length
   const countB = teamB.filter((p) => selected.has(p.player_id)).length
@@ -422,6 +426,7 @@ export default function FantaFormazione() {
           <p className="mt-1 text-sm text-gray-500">
             Scegli {FANTA_TEAM_SIZE} giocatori con {budget} crediti, pescando da entrambe le squadre
             (almeno 1 per squadra), poi nomina il capitano (i suoi bonus valgono ×{settings.captainMultiplier}).
+            Il budget è calcolato in automatico sulle squadre di questa giornata.
           </p>
           {deadline && (
             <p className="mt-2 rounded-lg bg-field-yellow/15 px-3 py-2 text-xs font-medium text-field-orange">
@@ -479,7 +484,7 @@ export default function FantaFormazione() {
           <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-gray-100">
             <div
               className={`h-full rounded-full transition-all ${budgetUsed > budget ? 'bg-red-500' : 'bg-field-green'}`}
-              style={{ width: `${Math.min((budgetUsed / budget) * 100, 100)}%` }}
+              style={{ width: `${budget > 0 ? Math.min((budgetUsed / budget) * 100, 100) : 0}%` }}
             />
           </div>
         </div>

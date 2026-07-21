@@ -2,16 +2,15 @@ import { supabase } from './supabase'
 import { parseVoto } from './statistiche'
 import { DEFAULT_FASCE, rangeForOverall, type FasciaRange } from './fasce'
 
-/** Budget di fallback se la configurazione non è raggiungibile
- *  (il valore reale vive su fanta_settings.budget). */
-export const FANTA_BUDGET = 15
+/** Numero di giocatori che compongono la rosa da schierare al fantacalcetto. */
 export const FANTA_TEAM_SIZE = 5
 
 /**
  * Parametri del fantacalcetto. Non sono più hardcodati: vivono nella
  * tabella fanta_settings (riga singola) e sono manutenuti dagli admin
- * dalla sezione CDA → Gestione bonus Fantacalcetto (bonus/malus) e
- * Gestione crediti Fantacalcetto (budget).
+ * dalla sezione CDA → Gestione bonus Fantacalcetto (bonus/malus).
+ * Il budget non fa più parte di questi parametri: è dinamico e si
+ * ricalcola a ogni giornata (vedi computeFantaBudget).
  */
 export interface FantaSettings {
   bonusMvp: number
@@ -20,10 +19,6 @@ export interface FantaSettings {
   malusAutogol: number
   malusPeggiore: number
   captainMultiplier: number
-  /** Crediti a disposizione del fantallenatore per formare la rosa.
-   *  Vale solo per le formazioni da schierare: quelle già salvate e le
-   *  giornate già calcolate non risentono dei cambiamenti. */
-  budget: number
 }
 
 /** Valori di fallback se la riga di configurazione non è raggiungibile. */
@@ -34,7 +29,6 @@ export const DEFAULT_FANTA_SETTINGS: FantaSettings = {
   malusAutogol: -1,
   malusPeggiore: -2,
   captainMultiplier: 1.2,
-  budget: FANTA_BUDGET,
 }
 
 export async function getFantaSettings(): Promise<FantaSettings> {
@@ -47,8 +41,23 @@ export async function getFantaSettings(): Promise<FantaSettings> {
     malusAutogol: Number(data.malus_autogol),
     malusPeggiore: Number(data.malus_peggiore),
     captainMultiplier: Number(data.captain_multiplier),
-    budget: data.budget != null ? Number(data.budget) : FANTA_BUDGET,
   }
+}
+
+/**
+ * Budget dinamico del fantallenatore per una giornata. Non è più un valore
+ * fisso manutenuto dagli admin: si ricava dai costi in crediti dei giocatori
+ * che scendono in campo, così si ricalcola da sé ogni volta che cambiano le
+ * squadre o i parametri (fasce e relativi costi in crediti).
+ *
+ * Formula: media del costo in crediti dei giocatori in campo (somma dei
+ * costi / numero dei giocatori in campo), moltiplicata per la dimensione
+ * della rosa da schierare (FANTA_TEAM_SIZE) e diminuita di 1.
+ */
+export function computeFantaBudget(fieldCosts: number[]): number {
+  if (fieldCosts.length === 0) return 0
+  const avgCost = fieldCosts.reduce((s, c) => s + c, 0) / fieldCosts.length
+  return Math.round(avgCost * FANTA_TEAM_SIZE) - 1
 }
 
 /** Minuti prima del calcio d'inizio oltre i quali le formazioni sono bloccate. */
