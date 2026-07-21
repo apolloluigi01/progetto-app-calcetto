@@ -25,6 +25,21 @@ function safeFilename(name: string): string {
   return base.toLowerCase().endsWith('.csv') ? base : `${base}.csv`
 }
 
+/**
+ * True solo su dispositivi mobili. Su desktop la condivisione file di sistema
+ * (Windows/macOS) apre canali come la mail invece di salvare in locale, quindi
+ * lì si usa sempre il download classico su disco.
+ */
+function isMobileDevice(): boolean {
+  if (typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)) {
+    return true
+  }
+  if (typeof matchMedia === 'function') {
+    return matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches
+  }
+  return false
+}
+
 export async function downloadCsv(
   filename: string,
   headers: string[],
@@ -34,11 +49,11 @@ export async function downloadCsv(
   const name = safeFilename(filename)
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
 
-  // Su mobile, se disponibile, usa la condivisione file nativa ("Salva su
-  // File" / "Condividi"), più comoda del download classico.
+  // Solo su mobile, se disponibile, usa la condivisione file nativa ("Salva su
+  // File" / "Condividi"). Su desktop si va sempre di download su disco.
   const file = new File([blob], name, { type: 'text/csv' })
   const nav = navigator as Navigator & { canShare?: (data: { files: File[] }) => boolean }
-  if (typeof navigator.share === 'function' && nav.canShare?.({ files: [file] })) {
+  if (isMobileDevice() && typeof navigator.share === 'function' && nav.canShare?.({ files: [file] })) {
     try {
       await navigator.share({ files: [file], title: name })
       return
