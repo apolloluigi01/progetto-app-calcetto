@@ -340,13 +340,22 @@ export const STAT_CONFIG: Record<StatKey, StatConfig> = {
   },
   winrate: {
     title: 'Percentuale vittorie',
-    description: 'Percentuale di partite vinte sul totale giocate in stagione',
+    description:
+      'Percentuale di partite vinte sul totale giocate in stagione, ordinata per numero di partite giocate e poi per percentuale di vittorie',
     color: 'green',
     sortDir: 'desc',
     unit: '%',
     getValue: (p) => (p.partiteGiocate > 0 ? (p.vittorie / p.partiteGiocate) * 100 : null),
     formatValue: (v) => `${v.toFixed(0)}%`,
     extraColumn: { label: 'Partite', getValue: (p) => String(p.partiteGiocate) },
+    // Prima chi ha giocato più partite (decrescente), a parità chi ha la
+    // percentuale di vittorie più alta (decrescente).
+    compare: (a, b) => {
+      if (b.partiteGiocate !== a.partiteGiocate) return b.partiteGiocate - a.partiteGiocate
+      const wa = a.partiteGiocate > 0 ? a.vittorie / a.partiteGiocate : 0
+      const wb = b.partiteGiocate > 0 ? b.vittorie / b.partiteGiocate : 0
+      return wb - wa
+    },
   },
   sconfitte: {
     title: 'Sconfitte',
@@ -359,9 +368,9 @@ export const STAT_CONFIG: Record<StatKey, StatConfig> = {
   },
   mediavoto: {
     title: 'Media voto',
-    description: 'Media dei voti ricevuti in pagella durante la stagione (ordine crescente)',
-    color: 'red',
-    sortDir: 'asc',
+    description: 'Media dei voti ricevuti in pagella durante la stagione (ordine decrescente)',
+    color: 'green',
+    sortDir: 'desc',
     unit: '',
     getValue: (p) => (p.voteCount > 0 ? p.voteAvg : null),
     formatValue: (v) => v.toFixed(2),
