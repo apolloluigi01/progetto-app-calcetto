@@ -7,7 +7,7 @@ import { STAT_CONFIG, type PlayerStats, type StatKey } from '../lib/statistiche'
 import PlayerCard from '../components/PlayerCard'
 import type { Player } from '../types/database'
 
-const STAT_KEYS: StatKey[] = ['overall', 'marcatori', 'assist', 'presenze', 'mvp', 'winrate', 'sconfitte', 'mediavoto', 'autogol']
+const STAT_KEYS: StatKey[] = ['overall', 'marcatori', 'assist', 'presenze', 'mvp', 'winrate', 'sconfitte', 'mediavoto', 'autogol', 'schieramenti']
 
 export default function GiocatoreDetail() {
   const { id } = useParams<{ id: string }>()
@@ -128,7 +128,14 @@ export default function GiocatoreDetail() {
 
                   return (
                     <tr key={key} className={`border-t border-gray-100 ${i === 0 ? 'border-t-0' : ''}`}>
-                      <td className="px-4 py-3 font-medium text-gray-700">{config.title}</td>
+                      <td className="px-4 py-3 font-medium text-gray-700">
+                        {config.title}
+                        {config.extraColumn && (
+                          <span className="block text-xs font-normal text-gray-400">
+                            {config.extraColumn.label}: {config.extraColumn.getValue(playerStats)}
+                          </span>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-right">
                         <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-sm font-semibold ${valueColor} ${valueBg}`}>
                           {value !== null ? config.formatValue(value) : '-'}
