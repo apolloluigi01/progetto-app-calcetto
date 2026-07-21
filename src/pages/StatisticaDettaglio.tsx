@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useStatistiche } from '../hooks/useStatistiche'
 import { useCurrentSeason } from '../hooks/useCurrentSeason'
-import { STAT_CONFIG, getRanking, playerFullName, type RankedEntry, type StatKey } from '../lib/statistiche'
+import { STAT_CONFIG, getRanking, playerFullName, rankingCsv, type RankedEntry, type StatKey } from '../lib/statistiche'
+import DownloadCsvButton from '../components/DownloadCsvButton'
 
 type SortColumn = 'name' | 'extra' | 'value'
 
@@ -77,8 +78,16 @@ export default function StatisticaDettaglio() {
       <Link to="/statistiche" className="text-sm text-field-green underline">
         ← Torna alle statistiche
       </Link>
-      <h1 className={`mt-2 text-xl font-semibold ${valueColor}`}>{config.title}</h1>
-      <p className="text-sm text-gray-500">{config.description}</p>
+      <div className="mt-2 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className={`text-xl font-semibold ${valueColor}`}>{config.title}</h1>
+          <p className="text-sm text-gray-500">{config.description}</p>
+        </div>
+        <DownloadCsvButton
+          filename={`Statistiche - ${config.title}`}
+          {...rankingCsv(key as StatKey, sorted)}
+        />
+      </div>
 
       <div className="mt-4 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
         <table className="w-full text-base">

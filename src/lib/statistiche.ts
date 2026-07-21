@@ -402,6 +402,25 @@ export interface RankedEntry {
   value: number
 }
 
+/**
+ * Prepara i dati di una classifica per l'export CSV (intestazioni + righe già
+ * formattate come stringhe, coerenti con la tabella a schermo).
+ */
+export function rankingCsv(key: StatKey, sorted: RankedEntry[]): { headers: string[]; rows: string[][] } {
+  const config = STAT_CONFIG[key]
+  const headers = ['#', 'Giocatore', 'Soprannome']
+  if (config.extraColumn) headers.push(config.extraColumn.label)
+  headers.push(config.title)
+
+  const rows = sorted.map((entry, i) => {
+    const row = [String(i + 1), playerFullName(entry.stats.player), entry.stats.player.nickname ?? '']
+    if (config.extraColumn) row.push(config.extraColumn.getValue(entry.stats))
+    row.push(config.formatValue(entry.value))
+    return row
+  })
+  return { headers, rows }
+}
+
 export function getRanking(stats: PlayerStats[], key: StatKey): RankedEntry[] {
   const config = STAT_CONFIG[key]
   const entries = stats

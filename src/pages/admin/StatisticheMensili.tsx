@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { computeStatisticheMensili, playerFullName, type PlayerStats } from '../../lib/statistiche'
+import DownloadCsvButton from '../../components/DownloadCsvButton'
 
 const MONTH_NAMES = [
   'Gennaio',
@@ -101,6 +102,20 @@ export default function StatisticheMensili() {
 
   const totalMatches = stats.length > 0 ? stats[0].totalSeasonMatches : 0
 
+  const csvHeaders = ['Giocatore', 'Soprannome', 'Presenze', 'Vittorie', 'Pareggi', 'Sconfitte', 'Gol', 'Assist', 'MVP', 'Media voto']
+  const csvRows = sorted.map((s) => [
+    playerFullName(s.player),
+    s.player.nickname ?? '',
+    String(s.partiteGiocate),
+    String(s.vittorie),
+    String(s.pareggi),
+    String(s.sconfitte),
+    String(s.golFatti),
+    String(s.assist),
+    String(s.mvp),
+    s.voteAvg !== null ? s.voteAvg.toFixed(2) : '',
+  ])
+
   function handleSort(col: SortColumn) {
     if (sortCol === col) {
       setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
@@ -161,11 +176,18 @@ export default function StatisticheMensili() {
             <p className="mt-4 text-sm text-gray-500">Caricamento statistiche...</p>
           ) : (
             <>
-              <p className="mt-4 text-sm text-gray-600">
-                <strong>{monthLabel(selectedMonth)}</strong>: {totalMatches}{' '}
-                {totalMatches === 1 ? 'partita giocata' : 'partite giocate'} · {stats.length}{' '}
-                {stats.length === 1 ? 'giocatore coinvolto' : 'giocatori coinvolti'}
-              </p>
+              <div className="mt-4 flex items-start justify-between gap-3">
+                <p className="text-sm text-gray-600">
+                  <strong>{monthLabel(selectedMonth)}</strong>: {totalMatches}{' '}
+                  {totalMatches === 1 ? 'partita giocata' : 'partite giocate'} · {stats.length}{' '}
+                  {stats.length === 1 ? 'giocatore coinvolto' : 'giocatori coinvolti'}
+                </p>
+                <DownloadCsvButton
+                  filename={`Statistiche mensili - ${monthLabel(selectedMonth)}`}
+                  headers={csvHeaders}
+                  rows={csvRows}
+                />
+              </div>
 
               <div className="mt-2 overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
                 <table className="w-full text-sm">
