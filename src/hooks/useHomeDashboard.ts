@@ -11,6 +11,14 @@ export interface DashboardGoal {
   is_own_goal: boolean
 }
 
+export interface DashboardAssist {
+  player_id: string
+  team: Team
+  name: string
+  surname: string | null
+  nickname: string | null
+}
+
 export interface DashboardMatchPlayer {
   player_id: string
   team: Team
@@ -23,6 +31,7 @@ export interface LastMatch {
   match: Match
   result: MatchResult | null
   goals: DashboardGoal[]
+  assists: DashboardAssist[]
 }
 
 export interface NextMatch {
@@ -66,12 +75,19 @@ export function useHomeDashboard() {
 
         if (lastRes.data) {
           const m = lastRes.data as Match & { result: MatchResult[] | MatchResult | null }
-          const { data: goalsData, error: goalsError } = await supabase
-            .from('goals')
-            .select('player_id, team, is_own_goal, players(name, surname, nickname)')
-            .eq('match_id', m.id)
+          const [goalsRes, assistsRes] = await Promise.all([
+            supabase
+              .from('goals')
+              .select('player_id, team, is_own_goal, players(name, surname, nickname)')
+              .eq('match_id', m.id),
+            supabase
+              .from('assists')
+              .select('player_id, team, players(name, surname, nickname)')
+              .eq('match_id', m.id),
+          ])
 
-          if (goalsError) throw goalsError
+          if (goalsRes.error) throw goalsRes.error
+          if (assistsRes.error) throw assistsRes.error
 
           type GoalJoin = {
             player_id: string
@@ -79,16 +95,28 @@ export function useHomeDashboard() {
             is_own_goal: boolean
             players: { name: string; surname: string | null; nickname: string | null } | null
           }
+          type AssistJoin = {
+            player_id: string
+            team: Team
+            players: { name: string; surname: string | null; nickname: string | null } | null
+          }
           setLastMatch({
             match: m,
             result: Array.isArray(m.result) ? m.result[0] ?? null : m.result,
-            goals: ((goalsData ?? []) as unknown as GoalJoin[]).map((g) => ({
+            goals: ((goalsRes.data ?? []) as unknown as GoalJoin[]).map((g) => ({
               player_id: g.player_id,
               team: g.team,
               is_own_goal: g.is_own_goal,
               name: g.players?.name ?? '',
               surname: g.players?.surname ?? null,
               nickname: g.players?.nickname ?? null,
+            })),
+            assists: ((assistsRes.data ?? []) as unknown as AssistJoin[]).map((a) => ({
+              player_id: a.player_id,
+              team: a.team,
+              name: a.players?.name ?? '',
+              surname: a.players?.surname ?? null,
+              nickname: a.players?.nickname ?? null,
             })),
           })
         } else {

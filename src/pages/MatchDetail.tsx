@@ -7,6 +7,8 @@ import { useMatchBookings } from '../hooks/useMatchBookings'
 import { useMatchVoting } from '../hooks/useMatchVoting'
 import { formatVote } from '../lib/voting'
 import PlayerName from '../components/PlayerName'
+import ScorerBadges from '../components/ScorerBadges'
+import { aggregateScorers } from '../lib/scorers'
 import type { Team } from '../types/database'
 
 const MAX_PLAYERS = 10
@@ -86,8 +88,6 @@ export default function MatchDetail() {
   const { match, matchPlayers, goals, assists, result, pagelle } = data
   const teamA = matchPlayers.filter((p) => p.team === 'A')
   const teamB = matchPlayers.filter((p) => p.team === 'B')
-  const goalsByTeam = (team: Team) => goals.filter((g) => g.team === team)
-  const assistsByTeam = (team: Team) => assists.filter((a) => a.team === team)
   const isPublished = pagelle.length > 0 && pagelle.every((p) => p.published_at)
   const bookingCount = bookings.length
   const bookingFull = bookingCount >= MAX_PLAYERS
@@ -344,18 +344,10 @@ export default function MatchDetail() {
           <div className="grid grid-cols-2 gap-3 text-sm">
             {(['A', 'B'] as Team[]).map((team) => (
               <ul key={team} className="min-w-0 space-y-1">
-                {goalsByTeam(team).map((g) => (
-                  <li key={g.id} className="flex items-start gap-1">
-                    <span>⚽</span>
-                    <PlayerName name={g.name} surname={g.surname} nickname={g.nickname} />
-                    {g.is_own_goal && <span className="shrink-0 text-red-600">(autogol)</span>}
-                  </li>
-                ))}
-                {assistsByTeam(team).map((a) => (
-                  <li key={a.id} className="flex items-start gap-1 text-gray-600">
-                    <span>🅰️</span>
-                    <PlayerName name={a.name} surname={a.surname} nickname={a.nickname} />
-                    <span className="shrink-0 text-xs text-gray-400">(assist)</span>
+                {aggregateScorers(goals, assists, team).map((e) => (
+                  <li key={e.player_id} className="flex items-start gap-1.5">
+                    <PlayerName name={e.name} surname={e.surname} nickname={e.nickname} />
+                    <ScorerBadges entry={e} />
                   </li>
                 ))}
               </ul>

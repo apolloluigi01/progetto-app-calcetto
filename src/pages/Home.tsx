@@ -9,6 +9,8 @@ import { getRanking, playerFullName } from '../lib/statistiche'
 import { describeWeatherCode, getMatchWeather, type WeatherForecast } from '../lib/weather'
 import ErrorNotice from '../components/ErrorNotice'
 import PlayerName from '../components/PlayerName'
+import ScorerBadges from '../components/ScorerBadges'
+import { aggregateScorers } from '../lib/scorers'
 
 function formatDate(date: string) {
   return new Date(date).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })
@@ -174,10 +176,10 @@ export default function Home() {
             {lastMatch && (
               <Link to={`/partite/${lastMatch.match.id}`} className="block px-4 py-4">
                 <p className="text-center text-xs text-gray-500">{formatDate(lastMatch.match.match_date)}</p>
-                {lastMatch.goals.length > 0 ? (
+                {lastMatch.goals.length > 0 || lastMatch.assists.length > 0 ? (
                   (() => {
-                    const goalsA = lastMatch.goals.filter((g) => g.team === 'A')
-                    const goalsB = lastMatch.goals.filter((g) => g.team === 'B')
+                    const scorersA = aggregateScorers(lastMatch.goals, lastMatch.assists, 'A')
+                    const scorersB = aggregateScorers(lastMatch.goals, lastMatch.assists, 'B')
                     return (
                       <div className="mt-2 grid grid-cols-[1fr_auto_1fr] items-start gap-3">
                         {/* min-w-0: senza, i nomi con "truncate" impediscono alle
@@ -186,14 +188,13 @@ export default function Home() {
                           <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-field-green-dark">
                             Squadra A
                           </p>
-                          {goalsA.length === 0 ? (
+                          {scorersA.length === 0 ? (
                             <p className="text-sm text-gray-400">—</p>
                           ) : (
-                            goalsA.map((g, i) => (
-                              <div key={i} className="mb-1 flex items-start gap-1 text-sm text-gray-700">
-                                <span>⚽</span>
-                                <PlayerName name={g.name} surname={g.surname} nickname={g.nickname} />
-                                {g.is_own_goal && <span className="shrink-0 text-xs text-red-500">(ag)</span>}
+                            scorersA.map((e) => (
+                              <div key={e.player_id} className="mb-1 flex items-start gap-1.5 text-sm text-gray-700">
+                                <PlayerName name={e.name} surname={e.surname} nickname={e.nickname} />
+                                <ScorerBadges entry={e} />
                               </div>
                             ))
                           )}
@@ -207,14 +208,13 @@ export default function Home() {
                           <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-field-orange">
                             Squadra B
                           </p>
-                          {goalsB.length === 0 ? (
+                          {scorersB.length === 0 ? (
                             <p className="text-sm text-gray-400">—</p>
                           ) : (
-                            goalsB.map((g, i) => (
-                              <div key={i} className="mb-1 flex items-start justify-end gap-1 text-sm text-gray-700">
-                                {g.is_own_goal && <span className="shrink-0 text-xs text-red-500">(ag)</span>}
-                                <PlayerName name={g.name} surname={g.surname} nickname={g.nickname} />
-                                <span>⚽</span>
+                            scorersB.map((e) => (
+                              <div key={e.player_id} className="mb-1 flex items-start justify-end gap-1.5 text-sm text-gray-700">
+                                <PlayerName name={e.name} surname={e.surname} nickname={e.nickname} />
+                                <ScorerBadges entry={e} reverse />
                               </div>
                             ))
                           )}

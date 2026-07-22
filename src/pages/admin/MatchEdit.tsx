@@ -58,6 +58,9 @@ export default function MatchEdit() {
   const [knownFields, setKnownFields] = useState<string[]>([])
   const [savingInfo, setSavingInfo] = useState(false)
   const [infoError, setInfoError] = useState<string | null>(null)
+  // Il box data/ora/luogo parte in sola lettura: si entra in modifica con
+  // l'apposito tasto. Una volta censito il risultato non è più modificabile.
+  const [editingInfo, setEditingInfo] = useState(false)
 
   const [newGoalPlayer, setNewGoalPlayer] = useState<Record<Team, string>>({ A: '', B: '' })
   const [ownGoal, setOwnGoal] = useState<Record<Team, boolean>>({ A: false, B: false })
@@ -333,7 +336,8 @@ export default function MatchEdit() {
   }
 
   async function handleSaveInfo() {
-    if (!id || locked) return
+    // Una volta salvato il risultato la partita non cambia più data/ora/luogo.
+    if (!id || locked || data?.result) return
     setInfoError(null)
     setSavingInfo(true)
 
@@ -359,6 +363,7 @@ export default function MatchEdit() {
       .update({ match_date: matchDate, match_time: matchTime || null, field: field || null, season_id: seasonId })
       .eq('id', id)
     setSavingInfo(false)
+    setEditingInfo(false)
     logActivity('partita_modificata', { matchId: id, data: matchDate, ora: matchTime || null, campo: field || null })
     refetch()
   }
@@ -878,56 +883,102 @@ export default function MatchEdit() {
         </p>
       )}
 
-      {/* ===== STEP 1 — Info partita ===== */}
-      <div className="mt-2 space-y-2 rounded-xl bg-white p-3 shadow">
-        <div className="grid grid-cols-2 gap-2">
-          <div className="min-w-0">
-            <label className="mb-1 block text-xs font-medium text-gray-700">Data</label>
-            <input
-              type="date"
-              value={matchDate}
-              disabled={locked}
-              onChange={(e) => setMatchDate(e.target.value)}
-              className="w-full min-w-0 rounded-lg border border-gray-300 px-2 py-1.5 text-sm disabled:bg-gray-100 disabled:text-gray-400"
-            />
+      {/* ===== STEP 1 — Info partita =====
+          Il box è in sola lettura di default. Si entra in modifica con il tasto
+          dedicato; una volta salvato il risultato (o pubblicate le pagelle) i
+          dati diventano definitivi e il tasto Modifica sparisce. */}
+      {(() => {
+        // "bloccato" = non più modificabile in alcun modo: partita chiusa
+        // oppure risultato già censito.
+        const infoLocked = locked || !!result
+        const inputsDisabled = infoLocked || !editingInfo
+        return (
+          <div className="mt-2 space-y-2 rounded-xl bg-white p-3 shadow">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-field-green-dark">Data / ora / luogo</h2>
+              {!infoLocked && !editingInfo && (
+                <button
+                  onClick={() => {
+                    setInfoError(null)
+                    setEditingInfo(true)
+                  }}
+                  className="rounded-lg border border-field-green px-3 py-1 text-xs font-medium text-field-green-dark hover:bg-field-green/10"
+                >
+                  ✏️ Modifica data/ora/luogo
+                </button>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="min-w-0">
+                <label className="mb-1 block text-xs font-medium text-gray-700">Data</label>
+                <input
+                  type="date"
+                  value={matchDate}
+                  disabled={inputsDisabled}
+                  onChange={(e) => setMatchDate(e.target.value)}
+                  className="w-full min-w-0 rounded-lg border border-gray-300 px-2 py-1.5 text-sm disabled:bg-gray-100 disabled:text-gray-400"
+                />
+              </div>
+              <div className="min-w-0">
+                <label className="mb-1 block text-xs font-medium text-gray-700">Ora</label>
+                <input
+                  type="time"
+                  value={matchTime}
+                  disabled={inputsDisabled}
+                  onChange={(e) => setMatchTime(e.target.value)}
+                  className="w-full min-w-0 rounded-lg border border-gray-300 px-2 py-1.5 text-sm disabled:bg-gray-100 disabled:text-gray-400"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-700">Campo</label>
+              <input
+                value={field}
+                disabled={inputsDisabled}
+                onChange={(e) => setField(e.target.value)}
+                list="campi-noti"
+                className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm disabled:bg-gray-100 disabled:text-gray-400"
+              />
+              <datalist id="campi-noti">
+                {knownFields.map((f) => (
+                  <option key={f} value={f} />
+                ))}
+              </datalist>
+            </div>
+            {result && !locked && (
+              <p className="text-xs text-gray-400">
+                🔒 Risultato censito: data, ora e luogo non sono più modificabili.
+              </p>
+            )}
+            {infoError && <p className="text-sm text-red-600">{infoError}</p>}
+            {editingInfo && !infoLocked && (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    // Annulla: ripristina i valori attuali della partita.
+                    setInfoError(null)
+                    setMatchDate(match.match_date)
+                    setMatchTime(match.match_time ?? '')
+                    setField(match.field ?? '')
+                    setEditingInfo(false)
+                  }}
+                  disabled={savingInfo}
+                  className="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Annulla
+                </button>
+                <button
+                  onClick={handleSaveInfo}
+                  disabled={savingInfo || !matchDate}
+                  className="flex-1 rounded-lg bg-field-green px-3 py-1.5 text-sm font-medium text-white hover:bg-field-green-dark disabled:opacity-50"
+                >
+                  {savingInfo ? 'Salvataggio...' : 'Salva data/ora/campo'}
+                </button>
+              </div>
+            )}
           </div>
-          <div className="min-w-0">
-            <label className="mb-1 block text-xs font-medium text-gray-700">Ora</label>
-            <input
-              type="time"
-              value={matchTime}
-              disabled={locked}
-              onChange={(e) => setMatchTime(e.target.value)}
-              className="w-full min-w-0 rounded-lg border border-gray-300 px-2 py-1.5 text-sm disabled:bg-gray-100 disabled:text-gray-400"
-            />
-          </div>
-        </div>
-        <div>
-          <label className="mb-1 block text-xs font-medium text-gray-700">Campo</label>
-          <input
-            value={field}
-            disabled={locked}
-            onChange={(e) => setField(e.target.value)}
-            list="campi-noti"
-            className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm disabled:bg-gray-100 disabled:text-gray-400"
-          />
-          <datalist id="campi-noti">
-            {knownFields.map((f) => (
-              <option key={f} value={f} />
-            ))}
-          </datalist>
-        </div>
-        {infoError && <p className="text-sm text-red-600">{infoError}</p>}
-        {!locked && (
-          <button
-            onClick={handleSaveInfo}
-            disabled={savingInfo || !matchDate}
-            className="w-full rounded-lg bg-field-green px-3 py-1.5 text-sm font-medium text-white hover:bg-field-green-dark disabled:opacity-50"
-          >
-            {savingInfo ? 'Salvataggio...' : 'Salva data/ora/campo'}
-          </button>
-        )}
-      </div>
+        )
+      })()}
 
       {/* ===== SONDAGGIO ===== */}
       {!locked &&

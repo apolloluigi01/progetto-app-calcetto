@@ -80,8 +80,8 @@ Deno.serve(async (req: Request) => {
   const [matchRes, resultRes, goalsRes, assistsRes, pagelleRes, matchPlayersRes] = await Promise.all([
     adminClient.from("matches").select("match_date, field").eq("id", matchId).single(),
     adminClient.from("match_results").select("score_a, score_b").eq("match_id", matchId).maybeSingle(),
-    adminClient.from("goals").select("team, is_own_goal, players(name, surname, nickname)").eq("match_id", matchId),
-    adminClient.from("assists").select("team, players(name, surname, nickname)").eq("match_id", matchId),
+    adminClient.from("goals").select("player_id, team, is_own_goal, players(name, surname, nickname)").eq("match_id", matchId),
+    adminClient.from("assists").select("player_id, team, players(name, surname, nickname)").eq("match_id", matchId),
     adminClient
       .from("pagelle")
       .select("player_id, voto, titolo, descrizione, is_mvp, players(name, surname, nickname)")
@@ -101,8 +101,8 @@ Deno.serve(async (req: Request) => {
     p.players?.nickname
       ? `<p style="margin:0;font-size:11px;color:#9ca3af;${extraStyle}">${p.players.nickname}</p>`
       : "";
-  const goals = (goalsRes.data ?? []) as unknown as (Named & { team: string; is_own_goal: boolean })[];
-  const assists = (assistsRes.data ?? []) as unknown as (Named & { team: string })[];
+  const goals = (goalsRes.data ?? []) as unknown as (Named & { player_id: string; team: string; is_own_goal: boolean })[];
+  const assists = (assistsRes.data ?? []) as unknown as (Named & { player_id: string; team: string })[];
   const pagelle = (pagelleRes.data ?? []) as unknown as (Named & {
     player_id: string;
     voto: string;
@@ -122,29 +122,49 @@ Deno.serve(async (req: Request) => {
     ? `<p style="text-align:center;color:#666;margin:0 0 16px;">📍 ${matchRes.data.field}</p>`
     : "";
 
-  function goalRow(g: Named & { is_own_goal: boolean }, align: "left" | "right") {
-    return `
-      <div style="margin:2px 0 6px;text-align:${align};">
-        <p style="margin:0;font-size:13px;color:#374151;">⚽ ${displayName(g)}${g.is_own_goal ? ' <span style="color:#dc2626;font-size:11px;">(ag)</span>' : ""}</p>
-        ${nicknameLine(g)}
-      </div>`;
+  // Tabellino per giocatore: gol e assist non più come righe ripetute, ma
+  // raggruppati per giocatore con i simboli affianco al nome (⚽ per gol,
+  // 🅰️ per assist). Gli autogol restano marcati "(ag)".
+  type ScorerAgg = Named & { player_id: string; goals: number; ownGoals: number; assists: number };
+  function aggregateTeam(team: "A" | "B"): ScorerAgg[] {
+    const map = new Map<string, ScorerAgg>();
+    const ensure = (p: Named & { player_id: string }) => {
+      let e = map.get(p.player_id);
+      if (!e) {
+        e = { player_id: p.player_id, players: p.players, goals: 0, ownGoals: 0, assists: 0 };
+        map.set(p.player_id, e);
+      }
+      return e;
+    };
+    for (const g of goals.filter((g) => g.team === team)) {
+      const e = ensure(g);
+      if (g.is_own_goal) e.ownGoals += 1;
+      else e.goals += 1;
+    }
+    for (const a of assists.filter((a) => a.team === team)) ensure(a).assists += 1;
+    return [...map.values()].sort(
+      (x, y) => y.goals + y.ownGoals + y.assists - (x.goals + x.ownGoals + x.assists) || y.goals - x.goals,
+    );
   }
 
-  function assistRow(a: Named, align: "left" | "right") {
+  function scorerRow(e: ScorerAgg, align: "left" | "right") {
+    const badges =
+      "⚽".repeat(e.goals) +
+      (e.ownGoals > 0 ? `<span style="color:#dc2626;">${"⚽".repeat(e.ownGoals)}<span style="font-size:11px;"> (ag)</span></span>` : "") +
+      "🅰️".repeat(e.assists);
     return `
       <div style="margin:2px 0 6px;text-align:${align};">
-        <p style="margin:0;font-size:13px;color:#6b7280;">🅰️ ${displayName(a)} <span style="color:#9ca3af;font-size:11px;">(assist)</span></p>
-        ${nicknameLine(a)}
+        <p style="margin:0;font-size:13px;color:#374151;">${displayName(e)} <span style="white-space:nowrap;">${badges}</span></p>
+        ${nicknameLine(e)}
       </div>`;
   }
 
   function teamScorersHtml(team: "A" | "B", align: "left" | "right") {
-    const teamGoals = goals.filter((g) => g.team === team);
-    const teamAssists = assists.filter((a) => a.team === team);
-    if (teamGoals.length === 0 && teamAssists.length === 0) {
+    const entries = aggregateTeam(team);
+    if (entries.length === 0) {
       return '<p style="margin:0;font-size:13px;color:#9ca3af;">—</p>';
     }
-    return `${teamGoals.map((g) => goalRow(g, align)).join("")}${teamAssists.map((a) => assistRow(a, align)).join("")}`;
+    return entries.map((e) => scorerRow(e, align)).join("");
   }
 
   const scoreboardHtml = `

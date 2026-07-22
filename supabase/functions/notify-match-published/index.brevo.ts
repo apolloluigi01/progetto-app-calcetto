@@ -108,12 +108,29 @@ Deno.serve(async (req: Request) => {
     ? `<p style="text-align:center;color:#666;margin:0 0 16px;">📍 ${matchRes.data.field}</p>`
     : "";
 
-  const goalsA = goals.filter((g) => g.team === "A");
-  const goalsB = goals.filter((g) => g.team === "B");
+  // Tabellino per giocatore: i gol non sono più righe ripetute, ma raggruppati
+  // per giocatore con un ⚽ per gol affianco al nome. Gli autogol restano "(ag)".
+  type GoalAgg = { name: string; goals: number; ownGoals: number };
+  function aggregateGoals(team: "A" | "B"): GoalAgg[] {
+    const map = new Map<string, GoalAgg>();
+    for (const g of goals.filter((g) => g.team === team)) {
+      const name = g.players?.name ?? "?";
+      let e = map.get(name);
+      if (!e) { e = { name, goals: 0, ownGoals: 0 }; map.set(name, e); }
+      if (g.is_own_goal) e.ownGoals += 1;
+      else e.goals += 1;
+    }
+    return [...map.values()].sort((x, y) => y.goals + y.ownGoals - (x.goals + x.ownGoals));
+  }
 
-  function goalRow(g: Named & { team: string; is_own_goal: boolean }) {
-    const name = g.players?.name ?? "?";
-    return `<p style="margin:3px 0;font-size:14px;color:#374151;">⚽ ${name}${g.is_own_goal ? ' <span style="color:#dc2626;font-size:12px;">(autogol)</span>' : ""}</p>`;
+  const goalsA = aggregateGoals("A");
+  const goalsB = aggregateGoals("B");
+
+  function goalRow(e: GoalAgg) {
+    const badges =
+      "⚽".repeat(e.goals) +
+      (e.ownGoals > 0 ? `<span style="color:#dc2626;">${"⚽".repeat(e.ownGoals)}<span style="font-size:12px;"> (ag)</span></span>` : "");
+    return `<p style="margin:3px 0;font-size:14px;color:#374151;">${e.name} <span style="white-space:nowrap;">${badges}</span></p>`;
   }
 
   const goalsHtml = goals.length
