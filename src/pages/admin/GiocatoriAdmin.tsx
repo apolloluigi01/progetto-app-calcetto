@@ -178,6 +178,11 @@ export default function GiocatoriAdmin() {
                 {p.nickname && <p className="text-xs text-gray-500">{p.nickname}</p>}
               </div>
               <div className="flex items-center gap-2">
+                {p.is_guest && (
+                  <span className="rounded-full bg-field-orange/10 px-2 py-0.5 text-xs font-semibold text-field-orange">
+                    Ospite
+                  </span>
+                )}
                 {p.role !== 'player' && (
                   <span className="rounded-full bg-field-green/10 px-2 py-0.5 text-xs text-field-green-dark">
                     {roleLabels[p.role]}
