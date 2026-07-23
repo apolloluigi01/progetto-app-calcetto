@@ -250,29 +250,6 @@ export default function MatchDetail() {
           </div>
         </div>
       )}
-
-      <div className="mt-4">
-        <h3 className="mb-2 font-medium text-field-green-dark">Pagelle</h3>
-        {pagelle.length === 0 ? (
-          <p className="text-sm text-gray-500">Pagelle non ancora pubblicate.</p>
-        ) : (
-          <div className="space-y-2">
-            {pagelle.map((p) => (
-              <div key={p.id} className="rounded-xl bg-white p-3 shadow">
-                <div className="flex items-center justify-between">
-                  <span className="flex min-w-0 items-start gap-2 font-medium">
-                    <PlayerName name={p.name} surname={p.surname} nickname={p.nickname} />
-                    {p.is_mvp && <span className="shrink-0 text-field-orange">★ MVP</span>}
-                  </span>
-                  <span className="font-semibold text-field-green-dark">{p.voto}</span>
-                </div>
-                {p.titolo && <p className="text-sm font-medium text-gray-700">{p.titolo}</p>}
-                {p.descrizione && <p className="mt-1 text-sm text-gray-500">{p.descrizione}</p>}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
     </div>
   )
 }
