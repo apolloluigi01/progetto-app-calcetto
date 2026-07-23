@@ -5,25 +5,18 @@ import { supabase } from '../../lib/supabase'
 // import { useAuth } from '../../contexts/AuthContext'
 import { useMatchDetail } from '../../hooks/useMatchDetail'
 import { useMatchBookings } from '../../hooks/useMatchBookings'
-import { useMatchVoting } from '../../hooks/useMatchVoting'
 import { getKnownFields } from '../../lib/fields'
 import { findSeasonForDate } from '../../lib/seasons'
 import { logActivity } from '../../lib/activityLog'
 import { computeOverallsForPlayers, generateBalancedTeams } from '../../lib/teamGeneration'
-import { formatVote, formatExact } from '../../lib/voting'
 import PlayerName, { fullName } from '../../components/PlayerName'
+import ScorerBadges from '../../components/ScorerBadges'
+import { aggregateScorers } from '../../lib/scorers'
 import GuestPlayerForm from '../../components/GuestPlayerForm'
 import type { Player, Team } from '../../types/database'
 import type { PlayerOverall, GeneratedTeams } from '../../lib/teamGeneration'
 
 const MAX_PLAYERS = 10
-
-interface PagellaDraft {
-  voto: string
-  titolo: string
-  descrizione: string
-  is_mvp: boolean
-}
 
 // Riga della bozza squadre (match_players_draft): è l'area di lavoro degli
 // admin. match_players (official) viene scritto solo all'ufficializzazione.
@@ -51,6 +44,9 @@ export default function MatchEdit() {
   const [scoreB, setScoreB] = useState('')
   const [savingResult, setSavingResult] = useState(false)
   const [savingStats, setSavingStats] = useState(false)
+  // Il box risultato, come data/ora/luogo, dopo il salvataggio diventa in sola
+  // lettura: si rientra in modifica con l'apposito tasto matita.
+  const [editingResult, setEditingResult] = useState(false)
 
   const [matchDate, setMatchDate] = useState('')
   const [matchTime, setMatchTime] = useState('')
@@ -67,25 +63,7 @@ export default function MatchEdit() {
   // Assist censiti in modo indipendente dai gol.
   const [newAssistPlayer, setNewAssistPlayer] = useState<Record<Team, string>>({ A: '', B: '' })
 
-  const [drafts, setDrafts] = useState<Record<string, PagellaDraft>>({})
-  const [savingPagelle, setSavingPagelle] = useState(false)
-  const [publishing, setPublishing] = useState(false)
   const [deleting, setDeleting] = useState(false)
-  const [openingVoting, setOpeningVoting] = useState(false)
-  const [closingVoting, setClosingVoting] = useState(false)
-
-  const {
-    votes,
-    voterInfo,
-    averages,
-    provisionalMvpId,
-    voterIds,
-    adminVoterIds,
-    allAdminVotersVoted,
-    participants,
-    refetch: refetchVoting,
-  } = useMatchVoting(id)
-  const [showVoteDetail, setShowVoteDetail] = useState(false)
 
   // Sondaggio: aggiunta manuale giocatore
   const [allPlayers, setAllPlayers] = useState<Player[]>([])
@@ -239,18 +217,6 @@ export default function MatchEdit() {
     setMatchDate(data.match.match_date)
     setMatchTime(data.match.match_time ?? '')
     setField(data.match.field ?? '')
-
-    const initial: Record<string, PagellaDraft> = {}
-    for (const mp of data.matchPlayers) {
-      const existing = data.pagelle.find((p) => p.player_id === mp.player_id)
-      initial[mp.player_id] = {
-        voto: existing?.voto ?? '',
-        titolo: existing?.titolo ?? '',
-        descrizione: existing?.descrizione ?? '',
-        is_mvp: existing?.is_mvp ?? false,
-      }
-    }
-    setDrafts(initial)
   }, [data])
 
   if (loading) return <div className="p-4 text-sm text-gray-500">Caricamento...</div>
@@ -265,7 +231,6 @@ export default function MatchEdit() {
   const dTeamB = draftPlayers.filter((p) => p.team === 'B')
 
   const goalsByTeam = (team: Team) => goals.filter((g) => g.team === team)
-  const assistsByTeam = (team: Team) => assists.filter((a) => a.team === team)
 
   const isPublished = pagelle.length > 0 && pagelle.every((p) => p.published_at)
   // Partita "chiusa": pagelle pubblicate. Non più modificabile da nessuno,
@@ -315,6 +280,7 @@ export default function MatchEdit() {
     // Cambiare il risultato invalida le statistiche eventualmente già confermate.
     await resetStatsConfirmation()
     setSavingResult(false)
+    setEditingResult(false)
     logActivity('risultato_salvato', { matchId: id, data: match.match_date, scoreA: Number(scoreA) || 0, scoreB: Number(scoreB) || 0 })
     refetch()
   }
@@ -416,80 +382,17 @@ export default function MatchEdit() {
     refetch()
   }
 
-  function updateDraft(playerId: string, patch: Partial<PagellaDraft>) {
-    setDrafts((prev) => ({ ...prev, [playerId]: { ...prev[playerId], ...patch } }))
+  // Nel tabellino compatto si rimuove "un gol"/"un assist" del giocatore: si
+  // cancella una delle righe corrispondenti (per un dato giocatore/squadra i gol
+  // regolari e gli autogol non coesistono nella stessa colonna).
+  async function handleRemoveOneGoal(playerId: string, team: Team) {
+    const g = goals.find((x) => x.player_id === playerId && x.team === team)
+    if (g) await handleRemoveGoal(g.id)
   }
 
-  function setMvp(playerId: string) {
-    setDrafts((prev) => {
-      const next = { ...prev }
-      for (const pid of Object.keys(next)) {
-        next[pid] = { ...next[pid], is_mvp: pid === playerId }
-      }
-      return next
-    })
-  }
-
-  function buildPagelleRows(publish: boolean) {
-    return matchPlayers.map((mp) => ({
-      match_id: id,
-      player_id: mp.player_id,
-      voto: drafts[mp.player_id]?.voto || '',
-      titolo: drafts[mp.player_id]?.titolo || null,
-      descrizione: drafts[mp.player_id]?.descrizione || null,
-      is_mvp: drafts[mp.player_id]?.is_mvp ?? false,
-      ...(publish ? { published_at: new Date().toISOString() } : {}),
-    }))
-  }
-
-  async function handleSaveDraft() {
-    if (locked) return
-    setSavingPagelle(true)
-    await supabase.from('pagelle').upsert(buildPagelleRows(false), { onConflict: 'match_id,player_id' })
-    setSavingPagelle(false)
-    logActivity('pagelle_bozza', { matchId: id, data: match.match_date })
-    refetch()
-  }
-
-  async function handlePublish() {
-    if (locked) return
-    if (!result) {
-      alert('Salva prima il risultato della partita: le pagelle non possono essere pubblicate senza un risultato.')
-      return
-    }
-    if (!goalsCoherent) {
-      alert('I gol registrati non coincidono con il risultato: correggi i marcatori o il risultato prima di pubblicare.')
-      return
-    }
-    const incomplete = matchPlayers.filter((mp) => {
-      const d = drafts[mp.player_id]
-      return !d || !d.voto.trim() || !d.titolo.trim() || !d.descrizione.trim()
-    })
-    if (incomplete.length > 0) {
-      alert(
-        `Completa voto, titolo e descrizione per tutti i giocatori prima di pubblicare. Mancano per: ${incomplete
-          .map((mp) => fullName(mp))
-          .join(', ')}.`
-      )
-      return
-    }
-    const mvpCount = matchPlayers.filter((mp) => drafts[mp.player_id]?.is_mvp).length
-    if (mvpCount !== 1) {
-      alert('Seleziona un MVP prima di pubblicare le pagelle.')
-      return
-    }
-    if (
-      !confirm(
-        'Pubblicare le pagelle? Diventeranno visibili a tutti i giocatori e verrà inviata una mail a tutti i partecipanti con risultato, marcatori e pagelle. Dopo la pubblicazione la partita non sarà più modificabile.'
-      )
-    )
-      return
-    setPublishing(true)
-    await supabase.from('pagelle').upsert(buildPagelleRows(true), { onConflict: 'match_id,player_id' })
-    await supabase.functions.invoke('notify-match-published', { body: { matchId: id } })
-    logActivity('pagelle_pubblicate', { matchId: id, data: match.match_date })
-    setPublishing(false)
-    refetch()
+  async function handleRemoveOneAssist(playerId: string, team: Team) {
+    const a = assists.find((x) => x.player_id === playerId && x.team === team)
+    if (a) await handleRemoveAssist(a.id)
   }
 
   async function handleDeleteMatch() {
@@ -504,47 +407,6 @@ export default function MatchEdit() {
     }
     await logActivity('partita_eliminata', { matchId: id, data: match.match_date })
     navigate('/admin/partite')
-  }
-
-  // --- Votazioni ---
-  async function handleOpenVoting() {
-    if (!id || locked) return
-    setOpeningVoting(true)
-    await supabase.from('matches').update({ voting_open: true }).eq('id', id)
-    logActivity('votazioni_aperte', { matchId: id, data: match.match_date })
-    supabase.functions
-      .invoke('notify-voting-opened', { body: { matchId: id } })
-      .catch((e) => console.error('notify-voting-opened:', e))
-    setOpeningVoting(false)
-    refetch()
-    refetchVoting()
-  }
-
-  async function handleCloseVoting() {
-    if (!id || !confirm('Chiudere le votazioni? I giocatori non potranno più modificare i voti.')) return
-    setClosingVoting(true)
-    await supabase.from('matches').update({ voting_open: false }).eq('id', id)
-    logActivity('votazioni_chiuse', { matchId: id, data: match.match_date })
-    setClosingVoting(false)
-    refetch()
-    refetchVoting()
-  }
-
-  function prefillFromVoting() {
-    setDrafts((prev) => {
-      const next = { ...prev }
-      for (const avg of averages) {
-        if (avg.average !== null && next[avg.player_id]) {
-          next[avg.player_id] = { ...next[avg.player_id], voto: formatVote(avg.average) }
-        }
-      }
-      if (provisionalMvpId) {
-        for (const pid of Object.keys(next)) {
-          next[pid] = { ...next[pid], is_mvp: pid === provisionalMvpId }
-        }
-      }
-      return next
-    })
   }
 
   // --- Sondaggio ---
@@ -1510,132 +1372,174 @@ export default function MatchEdit() {
         </div>
       )}
 
-      {/* ===== STEP 2 — RISULTATO (solo dopo ufficializzazione squadre) ===== */}
+      {/* ===== STEP 2 — RISULTATO (solo dopo ufficializzazione squadre) =====
+          Dopo il salvataggio il box va in sola lettura: si rientra in modifica
+          col tasto "✏️ Modifica risultato". */}
       {teamsOfficial ? (
-        <div className="mt-4 rounded-xl bg-white p-4 shadow">
-          <h2 className="font-medium">Risultato</h2>
-          <div className="mt-2 flex flex-wrap items-center gap-3">
-            <input
-              type="number"
-              min={0}
-              value={scoreA}
-              disabled={locked}
-              onChange={(e) => setScoreA(e.target.value)}
-              className="w-20 rounded-lg border border-gray-300 px-3 py-2 text-center disabled:bg-gray-100"
-            />
-            <span className="font-semibold">-</span>
-            <input
-              type="number"
-              min={0}
-              value={scoreB}
-              disabled={locked}
-              onChange={(e) => setScoreB(e.target.value)}
-              className="w-20 rounded-lg border border-gray-300 px-3 py-2 text-center disabled:bg-gray-100"
-            />
-            {!locked && (
-              <button
-                onClick={handleSaveResult}
-                disabled={savingResult || !infoComplete}
-                title={!infoComplete ? 'Completa data, ora e campo prima di salvare il risultato' : undefined}
-                className="w-full rounded-lg bg-field-green px-4 py-2 text-sm font-medium text-white hover:bg-field-green-dark disabled:cursor-not-allowed disabled:opacity-50 sm:ml-auto sm:w-auto"
-              >
-                {savingResult ? 'Salvataggio...' : 'Salva risultato'}
-              </button>
-            )}
-          </div>
-          <p className="mt-2 text-xs text-gray-500">
-            Gol registrati: {goalsByTeam('A').length} - {goalsByTeam('B').length}
-            {result && !goalsCoherent ? ' (non coincide con il risultato inserito)' : ''}
-          </p>
-          {!infoComplete && !locked && (
-            <p className="mt-1 text-xs text-red-500">
-              ⚠️ Completa data, ora e campo prima di poter salvare il risultato.
-            </p>
-          )}
-        </div>
+        (() => {
+          const resultReadOnly = locked || (!!result && !editingResult)
+          return (
+            <div className="mt-4 rounded-xl bg-white p-4 shadow">
+              <div className="flex items-center justify-between">
+                <h2 className="font-medium">Risultato</h2>
+                {result && !locked && !editingResult && (
+                  <button
+                    onClick={() => setEditingResult(true)}
+                    className="rounded-lg border border-field-green px-3 py-1 text-xs font-medium text-field-green-dark hover:bg-field-green/10"
+                  >
+                    ✏️ Modifica risultato
+                  </button>
+                )}
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-3">
+                <input
+                  type="number"
+                  min={0}
+                  value={scoreA}
+                  disabled={resultReadOnly}
+                  onChange={(e) => setScoreA(e.target.value)}
+                  className="w-20 rounded-lg border border-gray-300 px-3 py-2 text-center disabled:bg-gray-100 disabled:text-gray-500"
+                />
+                <span className="font-semibold">-</span>
+                <input
+                  type="number"
+                  min={0}
+                  value={scoreB}
+                  disabled={resultReadOnly}
+                  onChange={(e) => setScoreB(e.target.value)}
+                  className="w-20 rounded-lg border border-gray-300 px-3 py-2 text-center disabled:bg-gray-100 disabled:text-gray-500"
+                />
+                {!locked && (!result || editingResult) && (
+                  <div className="flex w-full gap-2 sm:ml-auto sm:w-auto">
+                    {editingResult && (
+                      <button
+                        onClick={() => {
+                          setScoreA(result ? String(result.score_a) : '')
+                          setScoreB(result ? String(result.score_b) : '')
+                          setEditingResult(false)
+                        }}
+                        disabled={savingResult}
+                        className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50 sm:flex-none"
+                      >
+                        Annulla
+                      </button>
+                    )}
+                    <button
+                      onClick={handleSaveResult}
+                      disabled={savingResult || !infoComplete}
+                      title={!infoComplete ? 'Completa data, ora e campo prima di salvare il risultato' : undefined}
+                      className="flex-1 rounded-lg bg-field-green px-4 py-2 text-sm font-medium text-white hover:bg-field-green-dark disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none"
+                    >
+                      {savingResult ? 'Salvataggio...' : 'Salva risultato'}
+                    </button>
+                  </div>
+                )}
+              </div>
+              {result && editingResult && (
+                <p className="mt-2 text-xs text-field-orange">
+                  ⚠️ Modificare il risultato azzera la conferma delle statistiche: dovrai risalvarle.
+                </p>
+              )}
+              <p className="mt-2 text-xs text-gray-500">
+                Gol registrati: {goalsByTeam('A').length} - {goalsByTeam('B').length}
+                {result && !goalsCoherent ? ' (non coincide con il risultato inserito)' : ''}
+              </p>
+              {!infoComplete && !locked && (
+                <p className="mt-1 text-xs text-red-500">
+                  ⚠️ Completa data, ora e campo prima di poter salvare il risultato.
+                </p>
+              )}
+            </div>
+          )
+        })()
       ) : (
         <p className="mt-4 rounded-xl border border-dashed border-gray-300 bg-white p-4 text-center text-sm text-gray-500">
           📋 Il risultato si potrà inserire dopo aver ufficializzato le squadre.
         </p>
       )}
 
-      {/* ===== STEP 3 — MARCATORI E ASSIST (solo dopo aver salvato il risultato) ===== */}
+      {/* ===== STEP 3 — MARCATORI E ASSIST (solo dopo aver salvato il risultato) =====
+          Tabellino compatto: gol e assist raggruppati per giocatore con i simboli
+          affianco al nome (Nome ⚽⚽🅰️, autogol marcati "(ag)"). */}
       {result && (
         <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-          {(['A', 'B'] as Team[]).map((team) => (
-            <div key={team} className="min-w-0 rounded-xl bg-white p-3 shadow">
-              <h3 className="mb-2 font-medium text-field-green-dark">Marcatori Squadra {team}</h3>
-              <ul className="space-y-1 text-sm">
-                {goalsByTeam(team).map((g) => (
-                  <li key={g.id} className="flex items-center justify-between gap-2">
-                    <span className="flex min-w-0 items-start gap-1">
-                      <span>⚽</span>
-                      <PlayerName name={g.name} surname={g.surname} nickname={g.nickname} />
-                      {g.is_own_goal && <span className="shrink-0 text-red-600">(autogol)</span>}
-                    </span>
-                    {!locked && (
-                      <button onClick={() => handleRemoveGoal(g.id)} className="shrink-0 text-xs text-red-600">
-                        Rimuovi
-                      </button>
-                    )}
-                  </li>
-                ))}
-              </ul>
-              {!locked && (
-                <div className="mt-2 space-y-2">
-                  <select
-                    value={newGoalPlayer[team]}
-                    onChange={(e) => setNewGoalPlayer((prev) => ({ ...prev, [team]: e.target.value }))}
-                    className="w-full min-w-0 rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
-                  >
-                    <option value="">Giocatore...</option>
-                    {(ownGoal[team] ? (team === 'A' ? teamB : teamA) : team === 'A' ? teamA : teamB).map((p) => (
-                      <option key={p.player_id} value={p.player_id}>
-                        {fullName(p)}{p.nickname ? ` (${p.nickname})` : ''}
-                      </option>
+          {(['A', 'B'] as Team[]).map((team) => {
+            const entries = aggregateScorers(goals, assists, team)
+            return (
+              <div key={team} className="min-w-0 rounded-xl bg-white p-3 shadow">
+                <h3 className="mb-2 font-medium text-field-green-dark">Marcatori e assist Squadra {team}</h3>
+                {entries.length === 0 ? (
+                  <p className="text-sm text-gray-400">Nessun gol o assist.</p>
+                ) : (
+                  <ul className="space-y-1 text-sm">
+                    {entries.map((e) => (
+                      <li key={e.player_id} className="flex items-center justify-between gap-2">
+                        <span className="flex min-w-0 items-start gap-1.5">
+                          <PlayerName name={e.name} surname={e.surname} nickname={e.nickname} />
+                          <ScorerBadges entry={e} />
+                        </span>
+                        {!locked && (
+                          <span className="flex shrink-0 items-center gap-1.5">
+                            {e.goals + e.ownGoals > 0 && (
+                              <button
+                                onClick={() => handleRemoveOneGoal(e.player_id, team)}
+                                title="Rimuovi un gol"
+                                className="rounded border border-red-200 px-1.5 text-xs text-red-600 hover:bg-red-50"
+                              >
+                                −⚽
+                              </button>
+                            )}
+                            {e.assists > 0 && (
+                              <button
+                                onClick={() => handleRemoveOneAssist(e.player_id, team)}
+                                title="Rimuovi un assist"
+                                className="rounded border border-red-200 px-1.5 text-xs text-red-600 hover:bg-red-50"
+                              >
+                                −🅰️
+                              </button>
+                            )}
+                          </span>
+                        )}
+                      </li>
                     ))}
-                  </select>
-                  <label className="flex items-center gap-2 text-xs text-red-600">
-                    <input
-                      type="checkbox"
-                      checked={ownGoal[team]}
-                      onChange={(e) => {
-                        setOwnGoal((prev) => ({ ...prev, [team]: e.target.checked }))
-                        setNewGoalPlayer((prev) => ({ ...prev, [team]: '' }))
-                      }}
-                    />
-                    Autogol (giocatore della squadra avversaria)
-                  </label>
-                  <button
-                    onClick={() => handleAddGoal(team)}
-                    disabled={!newGoalPlayer[team]}
-                    className="w-full rounded-lg bg-field-green px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
-                  >
-                    + Aggiungi gol
-                  </button>
-                </div>
-              )}
+                  </ul>
+                )}
 
-              {/* Assist */}
-              <div className="mt-4 border-t border-gray-100 pt-3">
-                <h4 className="mb-2 text-sm font-medium text-field-green-dark">Assist Squadra {team}</h4>
-                <ul className="space-y-1 text-sm">
-                  {assistsByTeam(team).map((a) => (
-                    <li key={a.id} className="flex items-center justify-between gap-2">
-                      <span className="flex min-w-0 items-start gap-1">
-                        <span>🅰️</span>
-                        <PlayerName name={a.name} surname={a.surname} nickname={a.nickname} />
-                      </span>
-                      {!locked && (
-                        <button onClick={() => handleRemoveAssist(a.id)} className="shrink-0 text-xs text-red-600">
-                          Rimuovi
-                        </button>
-                      )}
-                    </li>
-                  ))}
-                </ul>
                 {!locked && (
-                  <div className="mt-2 space-y-2">
+                  <div className="mt-3 space-y-2 border-t border-gray-100 pt-3">
+                    <p className="text-xs font-medium text-gray-500">Aggiungi gol</p>
+                    <select
+                      value={newGoalPlayer[team]}
+                      onChange={(e) => setNewGoalPlayer((prev) => ({ ...prev, [team]: e.target.value }))}
+                      className="w-full min-w-0 rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
+                    >
+                      <option value="">Giocatore...</option>
+                      {(ownGoal[team] ? (team === 'A' ? teamB : teamA) : team === 'A' ? teamA : teamB).map((p) => (
+                        <option key={p.player_id} value={p.player_id}>
+                          {fullName(p)}{p.nickname ? ` (${p.nickname})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                    <label className="flex items-center gap-2 text-xs text-red-600">
+                      <input
+                        type="checkbox"
+                        checked={ownGoal[team]}
+                        onChange={(e) => {
+                          setOwnGoal((prev) => ({ ...prev, [team]: e.target.checked }))
+                          setNewGoalPlayer((prev) => ({ ...prev, [team]: '' }))
+                        }}
+                      />
+                      Autogol (giocatore della squadra avversaria)
+                    </label>
+                    <button
+                      onClick={() => handleAddGoal(team)}
+                      disabled={!newGoalPlayer[team]}
+                      className="w-full rounded-lg bg-field-green px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+                    >
+                      + Aggiungi gol
+                    </button>
+
+                    <p className="mt-2 text-xs font-medium text-gray-500">Aggiungi assist</p>
                     <select
                       value={newAssistPlayer[team]}
                       onChange={(e) => setNewAssistPlayer((prev) => ({ ...prev, [team]: e.target.value }))}
@@ -1658,8 +1562,8 @@ export default function MatchEdit() {
                   </div>
                 )}
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
@@ -1695,231 +1599,14 @@ export default function MatchEdit() {
         </div>
       )}
 
-      {/* ===== STEP 4 — VOTAZIONI (admin) — dopo il salvataggio delle statistiche ===== */}
+      {/* ===== VOTAZIONI E PAGELLE (pagina dedicata) ===== */}
       {result && goalsCoherent && statsConfirmed && (
-        <div className="mt-4 rounded-xl border border-purple-200 bg-purple-50 p-4">
-          <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-purple-800">🗳️ Votazioni</h2>
-            <span className="text-sm font-medium text-purple-600">
-              {[...voterIds].filter((v) => adminVoterIds.includes(v)).length}/{adminVoterIds.length} hanno votato
-            </span>
-          </div>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {!locked &&
-              (!match.voting_open ? (
-                <button
-                  onClick={handleOpenVoting}
-                  disabled={openingVoting}
-                  className="flex-1 rounded-lg bg-purple-600 px-3 py-2 text-sm font-medium text-white hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {openingVoting ? 'Apertura...' : '🔓 Apri votazioni'}
-                </button>
-              ) : (
-                <button
-                  onClick={handleCloseVoting}
-                  disabled={closingVoting}
-                  className="flex-1 rounded-lg border border-purple-400 bg-white px-3 py-2 text-sm font-medium text-purple-700 hover:bg-purple-100 disabled:opacity-50"
-                >
-                  {closingVoting ? 'Chiusura...' : '🔒 Chiudi votazioni'}
-                </button>
-              ))}
-            {!locked && allAdminVotersVoted && averages.some((a) => a.exact !== null) && (
-              <button
-                onClick={prefillFromVoting}
-                className="rounded-lg border border-purple-300 bg-white px-3 py-2 text-sm text-purple-700 hover:bg-purple-50"
-                title="Copia le medie nelle pagelle"
-              >
-                ↓ Pre-compila pagelle
-              </button>
-            )}
-            <button
-              onClick={() => setShowVoteDetail((v) => !v)}
-              className="rounded-lg border border-purple-300 bg-white px-3 py-2 text-sm text-purple-700 hover:bg-purple-50"
-            >
-              {showVoteDetail ? '✕ Nascondi dettaglio voti' : '📋 Dettaglio voti'}
-            </button>
-          </div>
-
-          {showVoteDetail && (
-            <div className="mt-3 space-y-3 rounded-lg border border-purple-200 bg-white p-3">
-              <h3 className="text-sm font-semibold text-purple-800">Dettaglio voti per giocatore</h3>
-              {matchPlayers.map((mp) => {
-                const playerVotes = votes.filter((v) => v.voted_id === mp.player_id)
-                return (
-                  <div key={mp.id}>
-                    <PlayerName name={mp.name} surname={mp.surname} nickname={mp.nickname} nameClassName="text-sm font-medium text-gray-800" />
-                    {playerVotes.length === 0 ? (
-                      <p className="text-xs text-gray-400">Nessun voto ancora.</p>
-                    ) : (
-                      <ul className="mt-1 space-y-0.5 text-xs text-gray-600">
-                        {playerVotes.map((v) => (
-                          <li key={v.voter_id} className="flex items-center justify-between">
-                            <span>
-                              {(() => {
-                                const info = voterInfo.get(v.voter_id)
-                                return info ? fullName(info) : 'Sconosciuto'
-                              })()}
-                            </span>
-                            <span className="font-semibold text-purple-700">{formatVote(v.vote)}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          )}
-
-          {/* Media (NON arrotondata) + MVP: visibili solo quando tutti gli admin
-              che hanno partecipato alla partita hanno votato. */}
-          {allAdminVotersVoted && averages.some((a) => a.exact !== null) ? (
-            <div className="mt-3 space-y-1.5">
-              <p className="text-xs text-purple-500">
-                Media voto (non arrotondata) — l'MVP è il giocatore con la media più alta; a parità, con più bonus.
-              </p>
-              {[...averages]
-                .sort((a, b) => (b.exact ?? 0) - (a.exact ?? 0))
-                .map((avg) => {
-                  const p = participants.find((x) => x.player_id === avg.player_id)
-                  if (!p) return null
-                  const isMvp = avg.player_id === provisionalMvpId
-                  return (
-                    <div
-                      key={avg.player_id}
-                      className={`flex items-center justify-between rounded-lg px-3 py-2 ${
-                        isMvp ? 'border border-yellow-200 bg-yellow-50' : 'bg-white'
-                      }`}
-                    >
-                      <span className="flex min-w-0 items-start gap-1 text-sm font-medium text-gray-800">
-                        {isMvp && <span>🏆</span>}
-                        <PlayerName name={p.name} surname={p.surname} nickname={p.nickname} />
-                      </span>
-                      <div className="flex shrink-0 items-center gap-2">
-                        <span className="text-xs text-gray-400">
-                          {avg.raw_count} {avg.raw_count === 1 ? 'voto' : 'voti'}
-                        </span>
-                        <span className="rounded-full bg-purple-100 px-2.5 py-0.5 text-sm font-bold text-purple-700">
-                          {avg.exact !== null ? formatExact(avg.exact) : '—'}
-                        </span>
-                      </div>
-                    </div>
-                  )
-                })}
-              {provisionalMvpId === null && averages.filter((a) => a.exact !== null).length > 1 && (
-                <p className="mt-1 text-xs text-yellow-600">
-                  ⚠️ MVP in parimerito su media e bonus: scegli tu l'MVP nelle pagelle prima di pubblicare.
-                </p>
-              )}
-            </div>
-          ) : (
-            <p className="mt-3 text-center text-xs text-purple-500">
-              La media voto e l'MVP saranno visibili quando tutti gli admin che hanno partecipato avranno votato.
-            </p>
-          )}
-
-          {match.voting_open && (
-            <p className="mt-2 animate-pulse text-center text-xs text-purple-500">Votazioni in corso...</p>
-          )}
-        </div>
-      )}
-
-      {/* ===== PAGELLE ===== */}
-      {result && goalsCoherent && statsConfirmed && (
-        <div className="mt-4">
-          <h2 className="font-medium text-field-green-dark">Pagelle</h2>
-          <div className="mt-2 space-y-3">
-            {matchPlayers.map((mp) => {
-              const draft = drafts[mp.player_id]
-              if (!draft) return null
-              return (
-                <div key={mp.id} className="rounded-xl bg-white p-3 shadow">
-                  <div className="flex items-center justify-between">
-                    <PlayerName name={mp.name} surname={mp.surname} nickname={mp.nickname} nameClassName="font-medium" />
-                    <label className="flex items-center gap-1 text-xs text-field-orange">
-                      <input
-                        type="radio"
-                        name="mvp"
-                        checked={draft.is_mvp}
-                        disabled={locked}
-                        onChange={() => setMvp(mp.player_id)}
-                      />
-                      MVP
-                    </label>
-                  </div>
-                  <div className="mt-2 flex gap-2">
-                    <div className="flex flex-col gap-0.5">
-                      <input
-                        placeholder="Voto"
-                        value={draft.voto}
-                        disabled={locked}
-                        onChange={(e) => updateDraft(mp.player_id, { voto: e.target.value })}
-                        className="w-20 rounded-lg border border-gray-300 px-2 py-1 text-sm disabled:bg-gray-100"
-                      />
-                      {!locked &&
-                        (() => {
-                          const avg = averages.find((a) => a.player_id === mp.player_id)
-                          return avg?.average !== null && avg?.average !== undefined ? (
-                            <button
-                              type="button"
-                              onClick={() => updateDraft(mp.player_id, { voto: formatVote(avg.average!) })}
-                              className="text-left text-[10px] text-purple-600 hover:underline"
-                            >
-                              Media: {formatVote(avg.average!)} →
-                            </button>
-                          ) : null
-                        })()}
-                    </div>
-                    <input
-                      placeholder="Titolo"
-                      value={draft.titolo}
-                      disabled={locked}
-                      onChange={(e) => updateDraft(mp.player_id, { titolo: e.target.value })}
-                      className="flex-1 rounded-lg border border-gray-300 px-2 py-1 text-sm disabled:bg-gray-100"
-                    />
-                  </div>
-                  <textarea
-                    placeholder="Descrizione"
-                    value={draft.descrizione}
-                    disabled={locked}
-                    onChange={(e) => updateDraft(mp.player_id, { descrizione: e.target.value })}
-                    className="mt-2 w-full rounded-lg border border-gray-300 px-2 py-1 text-sm disabled:bg-gray-100"
-                    rows={2}
-                  />
-                </div>
-              )
-            })}
-          </div>
-
-          {!locked ? (
-            <>
-              <div className="mt-3 flex gap-2">
-                <button
-                  onClick={handleSaveDraft}
-                  disabled={savingPagelle}
-                  className="flex-1 rounded-lg border border-field-green px-4 py-2 text-sm font-medium text-field-green-dark hover:bg-field-green/5 disabled:opacity-50"
-                >
-                  {savingPagelle ? 'Salvataggio...' : 'Salva bozza'}
-                </button>
-                <button
-                  onClick={handlePublish}
-                  disabled={publishing || match.voting_open}
-                  title={match.voting_open ? 'Chiudi prima le votazioni prima di pubblicare' : undefined}
-                  className="flex-1 rounded-lg bg-field-orange px-4 py-2 text-sm font-medium text-white hover:bg-field-orange/90 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {publishing ? 'Pubblicazione...' : 'Pubblica pagelle'}
-                </button>
-              </div>
-              {match.voting_open && (
-                <p className="mt-2 text-xs text-red-500">⚠️ Chiudi le votazioni prima di pubblicare le pagelle.</p>
-              )}
-            </>
-          ) : (
-            <p className="mt-3 rounded-lg bg-field-green/10 px-3 py-2 text-center text-xs font-medium text-field-green-dark">
-              ✅ Pagelle pubblicate e visibili a tutti.
-            </p>
-          )}
-        </div>
+        <Link
+          to={`/partite/${id}/votazioni`}
+          className="mt-4 block w-full rounded-lg border border-purple-300 bg-purple-50 px-3 py-2.5 text-center text-sm font-medium text-purple-700 hover:bg-purple-100"
+        >
+          🗳️ Gestisci votazioni e pagelle →
+        </Link>
       )}
 
       <button

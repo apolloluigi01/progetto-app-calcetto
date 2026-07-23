@@ -1,11 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useMatchDetail } from '../hooks/useMatchDetail'
 import { useMatchBookings } from '../hooks/useMatchBookings'
-import { useMatchVoting } from '../hooks/useMatchVoting'
-import { formatVote } from '../lib/voting'
 import PlayerName from '../components/PlayerName'
 import ScorerBadges from '../components/ScorerBadges'
 import { aggregateScorers } from '../lib/scorers'
@@ -15,7 +13,7 @@ const MAX_PLAYERS = 10
 
 export default function MatchDetail() {
   const { id } = useParams<{ id: string }>()
-  const { player, isAdmin, isSuperAdmin } = useAuth()
+  const { player, isAdmin } = useAuth()
   const { data, loading, error } = useMatchDetail(id)
   const {
     bookings,
@@ -26,12 +24,6 @@ export default function MatchDetail() {
 
   const [bookingBusy, setBookingBusy] = useState(false)
   const [bookingError, setBookingError] = useState<string | null>(null)
-  const [localVotes, setLocalVotes] = useState<Record<string, number>>({})
-  const [votingBusy, setVotingBusy] = useState(false)
-  const [votingSuccess, setVotingSuccess] = useState(false)
-
-  const { participants, voterIds, getMyVotes, hasVotedAll, submitVotes } =
-    useMatchVoting(id)
 
   async function handleBook() {
     // Il numero di giocatori è fisso a 10: oltre non si prenota. Il limite è
@@ -62,26 +54,6 @@ export default function MatchDetail() {
     refetchBookings()
   }
 
-  useEffect(() => {
-    if (!player?.id || participants.length === 0) return
-    const existing = getMyVotes(player.id)
-    const defaults: Record<string, number> = {}
-    for (const p of participants) {
-      defaults[p.player_id] = existing[p.player_id] ?? 6
-    }
-    setLocalVotes(defaults)
-  }, [player?.id, participants.length]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  async function handleSubmitVotes() {
-    if (!player?.id) return
-    setVotingBusy(true)
-    setVotingSuccess(false)
-    await submitVotes(player.id, localVotes)
-    setVotingBusy(false)
-    setVotingSuccess(true)
-    setTimeout(() => setVotingSuccess(false), 3000)
-  }
-
   if (loading) return <div className="p-4 text-sm text-gray-500">Caricamento...</div>
   if (error || !data) return <div className="p-4 text-sm text-red-600">{error ?? 'Partita non trovata'}</div>
 
@@ -91,15 +63,6 @@ export default function MatchDetail() {
   const isPublished = pagelle.length > 0 && pagelle.every((p) => p.published_at)
   const bookingCount = bookings.length
   const bookingFull = bookingCount >= MAX_PLAYERS
-
-  const alreadyVotedAll = player ? hasVotedAll(player.id) : false
-  // Possono votare solo gli admin/superadmin che hanno partecipato alla partita.
-  // Caso limite: se nessun admin fa parte della partita, vota il superadmin
-  // anche se non ha partecipato (le stesse regole sono imposte dalle policy DB).
-  const adminVoters = participants.filter((p) => p.role === 'admin' || p.role === 'superadmin')
-  const isParticipant = !!player && participants.some((p) => p.player_id === player.id)
-  const canVote =
-    (isAdmin && isParticipant) || (isSuperAdmin && adminVoters.length === 0)
 
   return (
     <div className="p-4 pb-12">
@@ -214,83 +177,6 @@ export default function MatchDetail() {
         </div>
       )}
 
-      {/* ===== SEZIONE VOTAZIONI (solo admin/superadmin) ===== */}
-      {match.voting_open && canVote && participants.length > 0 && (
-        <div className="mt-4 rounded-xl border border-purple-200 bg-purple-50 p-4">
-          <div className="flex items-center justify-between">
-            <h3 className="font-semibold text-purple-800">🗳️ Vota i giocatori</h3>
-            <span className="text-xs text-purple-500">
-              {voterIds.size}/{adminVoters.length} hanno votato
-            </span>
-          </div>
-          <p className="mt-1 text-xs text-purple-500">
-            Dai un voto da 1 a 10 (con mezzi voti) per ogni giocatore della partita, te compreso.
-          </p>
-
-          <div className="mt-3 space-y-3">
-            {participants.map((p) => {
-              const v = localVotes[p.player_id] ?? 6
-              return (
-                <div key={p.player_id} className="flex items-center gap-3">
-                  <span className="w-28 shrink-0 text-sm font-medium text-gray-800">
-                    <PlayerName name={p.name} surname={p.surname} nickname={p.nickname} />
-                  </span>
-                  <input
-                    type="range"
-                    min={1}
-                    max={10}
-                    step={0.5}
-                    value={v}
-                    onChange={(e) =>
-                      setLocalVotes((prev) => ({
-                        ...prev,
-                        [p.player_id]: Number(e.target.value),
-                      }))
-                    }
-                    className="flex-1 accent-purple-600"
-                  />
-                  <span className="w-8 text-right text-sm font-bold text-purple-700">
-                    {formatVote(v)}
-                  </span>
-                </div>
-              )
-            })}
-          </div>
-
-          <p className="mt-3 text-xs text-purple-400">
-            🏆 L'MVP viene calcolato automaticamente dal sistema in base alla media voto più alta.
-          </p>
-
-          {votingSuccess && (
-            <p className="mt-3 text-center text-sm font-medium text-purple-700">
-              ✓ Voti inviati correttamente!
-            </p>
-          )}
-
-          <button
-            onClick={handleSubmitVotes}
-            disabled={votingBusy || Object.keys(localVotes).length === 0}
-            className="mt-4 w-full rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50"
-          >
-            {votingBusy
-              ? 'Invio...'
-              : alreadyVotedAll
-              ? '✓ Aggiorna i tuoi voti'
-              : 'Invia i tuoi voti'}
-          </button>
-        </div>
-      )}
-
-      {match.voting_open && !canVote && (
-        <div className="mt-4 rounded-xl border border-purple-100 bg-purple-50 p-3 text-center">
-          <p className="text-sm text-purple-600">
-            {isAdmin
-              ? '🗳️ Le votazioni sono aperte, ma riservate agli admin che hanno partecipato alla partita.'
-              : '🗳️ Le votazioni sono aperte, ma riservate ad admin e superadmin.'}
-          </p>
-        </div>
-      )}
-
       {result && (
         <p className="mt-3 text-center text-3xl font-bold text-field-green-dark">
           {result.score_a} - {result.score_b}
@@ -335,6 +221,15 @@ export default function MatchDetail() {
           className="mt-4 block w-full rounded-lg border border-field-green/40 bg-field-green/5 px-3 py-1.5 text-center text-sm font-medium text-field-green-dark hover:bg-field-green/10"
         >
           ⚽ Visualizzazione campetto
+        </Link>
+      )}
+
+      {matchPlayers.length > 0 && (
+        <Link
+          to={`/partite/${id}/votazioni`}
+          className="mt-2 block w-full rounded-lg border border-purple-300 bg-purple-50 px-3 py-1.5 text-center text-sm font-medium text-purple-700 hover:bg-purple-100"
+        >
+          🗳️ Votazioni e pagelle
         </Link>
       )}
 

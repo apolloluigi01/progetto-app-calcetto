@@ -12,6 +12,7 @@ import GiocatoreDetail from './pages/GiocatoreDetail'
 import Partite from './pages/Partite'
 import PartitaForm from './pages/PartitaForm'
 import MatchDetail from './pages/MatchDetail'
+import MatchVoting from './pages/MatchVoting'
 import MatchPitch from './pages/MatchPitch'
 import Statistiche from './pages/Statistiche'
 import StatisticheStagione from './pages/StatisticheStagione'
@@ -57,6 +58,7 @@ function App() {
               <Route path="/partite" element={<Partite />} />
               <Route path="/partite/stagione/:id" element={<StagionePartite />} />
               <Route path="/partite/:id" element={<MatchDetail />} />
+              <Route path="/partite/:id/votazioni" element={<MatchVoting />} />
               <Route path="/partite/:id/campetto" element={<MatchPitch />} />
               <Route path="/statistiche" element={<Statistiche />} />
               <Route path="/statistiche/stagione/:id" element={<StatisticheStagione />} />

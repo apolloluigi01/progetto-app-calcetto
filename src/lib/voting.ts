@@ -63,30 +63,65 @@ export function getPlayerAverages(votes: VoteWithRole[], playerIds: string[]): P
   })
 }
 
+/** Dati di spareggio per il calcolo automatico dell'MVP. */
+export interface MvpTiebreakData {
+  /** player_id -> numero di bonus (gol + assist) nella partita. */
+  bonusByPlayer?: Map<string, number>
+  /** player_id -> numero di gol regolari (esclusi gli autogol). */
+  goalsByPlayer?: Map<string, number>
+  /** player_id -> squadra ('A' | 'B') del giocatore in questa partita. */
+  teamByPlayer?: Map<string, 'A' | 'B'>
+  /** Squadra vincitrice ('A' | 'B'); null se pareggio o risultato assente. */
+  winningTeam?: 'A' | 'B' | null
+}
+
 /**
- * MVP calcolato automaticamente dal sistema, in ordine di priorità:
+ * MVP calcolato automaticamente dal sistema, con questa catena di priorità
+ * (a parità di un criterio scatta automaticamente il successivo):
  *  1. media voto ESATTA più alta (NON arrotondata a 0,5);
- *  2. a parità di media, il giocatore con più bonus in partita (gol + assist).
- * Se anche i bonus sono pari resta il parimerito: si restituisce null e la
+ *  2. squadra vincitrice (a parità di media si premia chi ha vinto la partita);
+ *  3. numero di bonus, cioè gol + assist;
+ *  4. peso dei bonus: a parità di numero, chi ha fatto più gol.
+ * Se resta ancora il parimerito (caso molto raro) si restituisce null e la
  * scelta spetta all'admin alla pubblicazione delle pagelle.
- *
- * @param bonusByPlayer mappa player_id -> numero di bonus (gol + assist) nella partita.
  */
 export function getProvisionalMvpId(
   averages: PlayerAverage[],
-  bonusByPlayer: Map<string, number> = new Map()
+  data: MvpTiebreakData = {}
 ): string | null {
-  const withVotes = averages.filter((a) => a.exact !== null)
-  if (withVotes.length === 0) return null
+  const { bonusByPlayer, goalsByPlayer, teamByPlayer, winningTeam } = data
 
-  const maxAvg = Math.max(...withVotes.map((a) => a.exact!))
-  const topByAvg = withVotes.filter((a) => a.exact === maxAvg)
-  if (topByAvg.length === 1) return topByAvg[0].player_id
+  let tied = averages.filter((a) => a.exact !== null)
+  if (tied.length === 0) return null
 
-  // Parità di media: spareggio sul numero di bonus (gol + assist).
-  const maxBonus = Math.max(...topByAvg.map((a) => bonusByPlayer.get(a.player_id) ?? 0))
-  const topByBonus = topByAvg.filter((a) => (bonusByPlayer.get(a.player_id) ?? 0) === maxBonus)
-  return topByBonus.length === 1 ? topByBonus[0].player_id : null
+  // 1) Media voto esatta più alta.
+  const maxAvg = Math.max(...tied.map((a) => a.exact!))
+  tied = tied.filter((a) => a.exact === maxAvg)
+  if (tied.length === 1) return tied[0].player_id
+
+  // 2) Squadra vincitrice: se qualcuno dei pari-media ha vinto, si resta a loro.
+  if (winningTeam && teamByPlayer) {
+    const onWinner = tied.filter((a) => teamByPlayer.get(a.player_id) === winningTeam)
+    if (onWinner.length > 0) tied = onWinner
+    if (tied.length === 1) return tied[0].player_id
+  }
+
+  // 3) Numero di bonus (gol + assist).
+  if (bonusByPlayer) {
+    const maxBonus = Math.max(...tied.map((a) => bonusByPlayer.get(a.player_id) ?? 0))
+    tied = tied.filter((a) => (bonusByPlayer.get(a.player_id) ?? 0) === maxBonus)
+    if (tied.length === 1) return tied[0].player_id
+  }
+
+  // 4) Peso dei bonus: più gol.
+  if (goalsByPlayer) {
+    const maxGoals = Math.max(...tied.map((a) => goalsByPlayer.get(a.player_id) ?? 0))
+    tied = tied.filter((a) => (goalsByPlayer.get(a.player_id) ?? 0) === maxGoals)
+    if (tied.length === 1) return tied[0].player_id
+  }
+
+  // Parimerito totale: decide l'admin.
+  return null
 }
 
 export function formatVote(v: number): string {
