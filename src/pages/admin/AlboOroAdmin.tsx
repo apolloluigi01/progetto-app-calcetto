@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { supabase } from '../../lib/supabase'
 import { logActivity } from '../../lib/activityLog'
+import EditButton from '../../components/EditButton'
 import { playerFullName } from '../../lib/statistiche'
 import type { HonorEntry, HonorKind, Player } from '../../types/database'
 
@@ -33,6 +34,7 @@ export default function AlboOroAdmin() {
   const [error, setError] = useState<string | null>(null)
   const [form, setForm] = useState<FormState>(emptyForm)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
 
   async function load() {
@@ -65,6 +67,12 @@ export default function AlboOroAdmin() {
     return p ? playerFullName(p) : '—'
   }
 
+  function startAdd() {
+    setEditingId(null)
+    setForm(emptyForm)
+    setShowForm(true)
+  }
+
   function startEdit(entry: HonorEntry) {
     setEditingId(entry.id)
     setForm({
@@ -75,12 +83,14 @@ export default function AlboOroAdmin() {
       second_player_id: entry.second_player_id ?? '',
       third_player_id: entry.third_player_id ?? '',
     })
+    setShowForm(true)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   function cancelEdit() {
     setEditingId(null)
     setForm(emptyForm)
+    setShowForm(false)
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -164,6 +174,16 @@ export default function AlboOroAdmin() {
 
       {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
 
+      {!showForm && (
+        <button
+          onClick={startAdd}
+          className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-field-green px-4 py-2 text-sm font-medium text-white transition hover:bg-field-green-dark"
+        >
+          + Aggiungi voce
+        </button>
+      )}
+
+      {showForm && (
       <form onSubmit={handleSubmit} className="mt-4 space-y-4 rounded-xl bg-white p-4 shadow">
         <h2 className="font-medium text-field-green-dark">
           {editingId ? 'Modifica voce' : 'Nuova voce'}
@@ -228,17 +248,16 @@ export default function AlboOroAdmin() {
           >
             {saving ? 'Salvataggio...' : editingId ? 'Salva modifiche' : 'Aggiungi voce'}
           </button>
-          {editingId && (
-            <button
-              type="button"
-              onClick={cancelEdit}
-              className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
-            >
-              Annulla
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={cancelEdit}
+            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
+          >
+            Annulla
+          </button>
         </div>
       </form>
+      )}
 
       <h2 className="mt-6 font-medium text-field-green-dark">Voci censite a mano</h2>
       {loading && <p className="mt-2 text-sm text-gray-500">Caricamento...</p>}
@@ -268,16 +287,11 @@ export default function AlboOroAdmin() {
                   </p>
                 )}
               </div>
-              <div className="flex shrink-0 gap-2">
-                <button
-                  onClick={() => startEdit(entry)}
-                  className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
-                >
-                  Modifica
-                </button>
+              <div className="flex shrink-0 items-center gap-2">
+                <EditButton onClick={() => startEdit(entry)} />
                 <button
                   onClick={() => handleDelete(entry)}
-                  className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
+                  className="rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50"
                 >
                   Elimina
                 </button>

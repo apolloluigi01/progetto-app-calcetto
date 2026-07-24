@@ -6,6 +6,7 @@ import { useMatchDetail } from '../hooks/useMatchDetail'
 import { useMatchBookings } from '../hooks/useMatchBookings'
 import PlayerName from '../components/PlayerName'
 import ScorerBadges from '../components/ScorerBadges'
+import EditButton from '../components/EditButton'
 import { aggregateScorers } from '../lib/scorers'
 import type { Team } from '../types/database'
 
@@ -77,12 +78,7 @@ export default function MatchDetail() {
         </h1>
         <div className="flex flex-wrap items-center gap-2">
           {isAdmin && (
-            <Link
-              to={`/admin/partite/${id}`}
-              className="rounded-lg border border-field-green px-3 py-1 text-sm font-medium text-field-green-dark hover:bg-field-green/10"
-            >
-              ✏️ Modifica Partita
-            </Link>
+            <EditButton to={`/admin/partite/${id}`}>Modifica Partita</EditButton>
           )}
           {match.booking_open && (
             <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700">

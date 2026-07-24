@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import ErrorNotice from '../components/ErrorNotice'
+import EditButton from '../components/EditButton'
 import { getSeasonStatus } from '../lib/seasons'
 import type { Match, MatchResult, Season } from '../types/database'
 
@@ -117,12 +118,9 @@ export default function StagionePartite() {
           </p>
         </div>
         {isAdmin && (
-          <Link
-            to={`/partite/stagione/${id}/modifica`}
-            className="shrink-0 rounded-lg border border-field-green px-3 py-1 text-sm font-medium text-field-green-dark hover:bg-field-green/10"
-          >
-            ✏️ Modifica Stagione
-          </Link>
+          <EditButton to={`/partite/stagione/${id}/modifica`} className="shrink-0">
+            Modifica Stagione
+          </EditButton>
         )}
       </div>
 

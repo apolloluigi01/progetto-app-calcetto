@@ -13,6 +13,7 @@ import PlayerName, { fullName } from '../../components/PlayerName'
 import ScorerBadges from '../../components/ScorerBadges'
 import { aggregateScorers } from '../../lib/scorers'
 import GuestPlayerForm from '../../components/GuestPlayerForm'
+import EditButton from '../../components/EditButton'
 import type { Player, Team } from '../../types/database'
 import type { PlayerOverall, GeneratedTeams } from '../../lib/teamGeneration'
 
@@ -759,15 +760,14 @@ export default function MatchEdit() {
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold text-field-green-dark">Data / ora / luogo</h2>
               {!infoLocked && !editingInfo && (
-                <button
+                <EditButton
                   onClick={() => {
                     setInfoError(null)
                     setEditingInfo(true)
                   }}
-                  className="rounded-lg border border-field-green px-3 py-1 text-xs font-medium text-field-green-dark hover:bg-field-green/10"
                 >
-                  ✏️ Modifica data/ora/luogo
-                </button>
+                  Modifica data/ora/luogo
+                </EditButton>
               )}
             </div>
             <div className="grid grid-cols-2 gap-2">
@@ -1202,12 +1202,9 @@ export default function MatchEdit() {
 
           {canEditTeams && (
             <div className="mt-2 flex gap-2">
-              <button
-                onClick={startEditingTeams}
-                className="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
-              >
-                ✏️ Modifica squadre
-              </button>
+              <EditButton onClick={startEditingTeams} className="flex-1">
+                Modifica squadre
+              </EditButton>
               <button
                 onClick={handleRecalculateTeams}
                 disabled={recalculating}
@@ -1383,12 +1380,7 @@ export default function MatchEdit() {
               <div className="flex items-center justify-between">
                 <h2 className="font-medium">Risultato</h2>
                 {result && !locked && !editingResult && (
-                  <button
-                    onClick={() => setEditingResult(true)}
-                    className="rounded-lg border border-field-green px-3 py-1 text-xs font-medium text-field-green-dark hover:bg-field-green/10"
-                  >
-                    ✏️ Modifica risultato
-                  </button>
+                  <EditButton onClick={() => setEditingResult(true)}>Modifica risultato</EditButton>
                 )}
               </div>
               <div className="mt-2 flex flex-wrap items-center gap-3">

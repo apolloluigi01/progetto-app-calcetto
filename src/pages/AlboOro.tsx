@@ -47,7 +47,6 @@ export default function AlboOro() {
             supabase
               .from('seasons')
               .select('*')
-              .eq('season_type', 'format')
               .not('end_date', 'is', null)
               .lt('end_date', today)
               .order('end_date', { ascending: false }),
@@ -65,7 +64,9 @@ export default function AlboOro() {
         for (const season of concluded) {
           const stats = await computeStatistiche(season.id)
           if (stats.length === 0) continue
-          const top3 = getRanking(stats, 'format').slice(0, 3)
+          // Amichevole: podio per gol fatti; format: Classifica Format.
+          const rankKey = season.season_type === 'amichevole' ? 'marcatori' : 'format'
+          const top3 = getRanking(stats, rankKey).slice(0, 3)
           const overalls = await computeOverallsForPlayers(
             top3.map((e) => ({ id: e.stats.player.id, name: e.stats.player.name }))
           )
@@ -206,8 +207,8 @@ export default function AlboOro() {
     <div className="p-4 pb-12">
       <h1 className="text-xl font-semibold text-field-green-dark">🏆 Albo d'oro</h1>
       <p className="mt-1 text-sm text-gray-500">
-        Il podio della Classifica Format di ogni stagione conclusa. Tocca una carta per aprire la
-        scheda del giocatore.
+        Il podio di ogni stagione conclusa: Classifica Format per le stagioni format, classifica dei
+        gol per le amichevoli. Tocca una carta per aprire la scheda del giocatore.
       </p>
 
       {loading && <p className="mt-4 text-sm text-gray-500">Caricamento...</p>}
@@ -215,7 +216,7 @@ export default function AlboOro() {
 
       {!loading && !error && formatPodiums.length === 0 && (
         <p className="mt-6 rounded-xl bg-white p-4 text-sm text-gray-500 shadow">
-          Nessuna stagione format conclusa: l'albo d'oro si riempirà alla fine della prima stagione.
+          Nessuna stagione conclusa: l'albo d'oro si riempirà alla fine della prima stagione.
         </p>
       )}
 

@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useHomeDashboard } from '../hooks/useHomeDashboard'
 import { useCurrentSeason } from '../hooks/useCurrentSeason'
 import { useStatistiche } from '../hooks/useStatistiche'
-import { getRanking, playerFullName } from '../lib/statistiche'
+import { getRanking, playerFullName, type StatKey } from '../lib/statistiche'
 import { describeWeatherCode, getMatchWeather, type WeatherForecast } from '../lib/weather'
 import ErrorNotice from '../components/ErrorNotice'
 import PlayerName from '../components/PlayerName'
@@ -143,7 +143,10 @@ export default function Home() {
   const { lastMatch, nextMatch, loading, error, reload } = useHomeDashboard()
   const { season } = useCurrentSeason()
   const { stats, loading: statsLoading, error: statsError } = useStatistiche()
-  const marcatori = getRanking(stats, 'marcatori').slice(0, 5)
+  // Stagione amichevole -> classifica gol; stagione format -> classifica format.
+  const isFormatSeason = season?.season_type === 'format'
+  const rankKey: StatKey = isFormatSeason ? 'format' : 'marcatori'
+  const ranking = getRanking(stats, rankKey).slice(0, 5)
 
   return (
     <div className="p-4 pb-8">
@@ -264,10 +267,12 @@ export default function Home() {
 
           <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
             <Link
-              to={season ? `/statistiche/stagione/${season.id}/marcatori` : '/statistiche'}
+              to={season ? `/statistiche/stagione/${season.id}/${rankKey}` : '/statistiche'}
               className="flex items-center justify-between border-b border-gray-200 px-4 py-3 hover:bg-gray-50"
             >
-              <h2 className="font-medium text-field-green-dark">Gol</h2>
+              <h2 className="font-medium text-field-green-dark">
+                {isFormatSeason ? 'Classifica Format' : 'Gol'}
+              </h2>
               <span className="text-xs text-gray-400">Vedi tutte →</span>
             </Link>
             {statsLoading && <p className="p-4 text-sm text-gray-500">Caricamento...</p>}
@@ -276,10 +281,10 @@ export default function Home() {
                 <ErrorNotice message={statsError} />
               </div>
             )}
-            {!statsLoading && !statsError && marcatori.length === 0 && (
+            {!statsLoading && !statsError && ranking.length === 0 && (
               <p className="p-4 text-sm text-gray-500">Nessun dato disponibile per la stagione corrente.</p>
             )}
-            {!statsLoading && !statsError && marcatori.length > 0 && (
+            {!statsLoading && !statsError && ranking.length > 0 && (
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50">
@@ -290,14 +295,14 @@ export default function Home() {
                       Giocatore
                     </th>
                     <th className="px-4 py-2 text-right text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                      Gol
+                      {isFormatSeason ? 'Media' : 'Gol'}
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {marcatori.map((entry, i) => (
+                  {ranking.map((entry, i) => (
                     <tr key={entry.stats.player.id} className="border-t border-gray-100 hover:bg-gray-50">
-                      <td className="px-4 py-2 text-gray-400">{i + 1}</td>
+                      <td className="px-4 py-2 text-gray-400">{i === 0 && isFormatSeason ? '🏆' : i + 1}</td>
                       <td className="px-2 py-2 font-medium text-gray-700">
                         <Link to={`/giocatori/${entry.stats.player.id}`} className="hover:underline">
                           <p>{playerFullName(entry.stats.player)}</p>
@@ -308,7 +313,9 @@ export default function Home() {
                       </td>
                       <td className="px-4 py-2 text-right">
                         <span className="inline-flex items-center rounded-full bg-field-green/10 px-2.5 py-1 text-xs font-semibold text-field-green-dark">
-                          {entry.value} gol
+                          {isFormatSeason
+                            ? entry.value.toFixed(2)
+                            : `${entry.value} gol`}
                         </span>
                       </td>
                     </tr>

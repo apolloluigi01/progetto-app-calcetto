@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { validatePassword } from '../lib/passwordPolicy'
 import { COUNTRIES } from '../lib/countries'
+import EditButton from '../components/EditButton'
 import type { PlayingPosition } from '../types/database'
 
 const roleLabels: Record<string, string> = {
@@ -257,15 +258,12 @@ export default function Impostazioni() {
           ) : (
             <div className="mt-1 flex items-center gap-2">
               <p className="text-sm text-gray-500">{player.nickname || 'Nessun nickname impostato'}</p>
-              <button
+              <EditButton
                 onClick={() => {
                   setNickname(player.nickname ?? '')
                   setEditingNickname(true)
                 }}
-                className="text-xs font-medium text-field-green hover:underline"
-              >
-                Modifica
-              </button>
+              />
             </div>
           )}
 
@@ -278,14 +276,7 @@ export default function Impostazioni() {
         <div className="mt-4 rounded-xl bg-white p-4 shadow">
           <div className="flex items-center justify-between">
             <h2 className="font-medium text-gray-800">Carta giocatore</h2>
-            {!editingCard && (
-              <button
-                onClick={startEditingCard}
-                className="text-xs font-medium text-field-green hover:underline"
-              >
-                Modifica
-              </button>
-            )}
+            {!editingCard && <EditButton onClick={startEditingCard} />}
           </div>
           <p className="mt-1 text-xs text-gray-500">
             Nazionalità, ruolo di gioco e numero di maglia mostrati sulla tua carta.

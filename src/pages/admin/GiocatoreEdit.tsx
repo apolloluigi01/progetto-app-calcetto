@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { getFunctionErrorMessage } from '../../lib/functionErrors'
 import { logActivity, type FieldChange } from '../../lib/activityLog'
 import { COUNTRIES } from '../../lib/countries'
+import EditButton from '../../components/EditButton'
 import { useFasce } from '../../hooks/useFasce'
 import { fasciaForOverall, fasciaLabel, rangeForOverall } from '../../lib/fasce'
 import type { Player, PlayerRole, PlayingPosition } from '../../types/database'
@@ -444,12 +445,7 @@ export default function GiocatoreEdit() {
             </dl>
 
             {canEditDetails ? (
-              <button
-                onClick={() => setEditing(true)}
-                className="w-full rounded-lg bg-field-green px-4 py-2 font-medium text-white hover:bg-field-green-dark"
-              >
-                Modifica
-              </button>
+              <EditButton onClick={() => setEditing(true)} className="w-full" />
             ) : (
               <p className="text-xs text-gray-400">
                 Solo un superadmin può modificare nome, cognome, nickname, ruolo o password di un altro admin.

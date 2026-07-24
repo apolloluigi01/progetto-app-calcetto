@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { logActivity, type FieldChange } from '../../lib/activityLog'
+import EditButton from '../../components/EditButton'
 import { DEFAULT_FASCE, fasciaLabel, getFasce, invalidateFasceCache, type FasciaRange } from '../../lib/fasce'
 
 // Anteprima colore della carta nella leggenda, coerente con i template di PlayerCard.
@@ -26,6 +27,7 @@ export default function FasceAdmin() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [editing, setEditing] = useState(false)
 
   useEffect(() => {
     getFasce(true).then((f) => {
@@ -100,6 +102,7 @@ export default function FasceAdmin() {
     invalidateFasceCache()
     setInitial(rows)
     setSaved(true)
+    setEditing(false)
   }
 
   if (loading) return <div className="p-4 text-sm text-gray-500">Caricamento...</div>
@@ -113,8 +116,13 @@ export default function FasceAdmin() {
         di ricalcolare le squadre delle partite non ancora giocate.
       </p>
 
-      {/* Modifica range */}
+      {/* Range: sola lettura finché non si clicca Modifica */}
       <div className="mt-4 space-y-3 rounded-xl bg-white p-4 shadow">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-field-green-dark">Range overall → carta</h2>
+          {!editing && <EditButton onClick={() => { setSaved(false); setEditing(true) }} />}
+        </div>
+
         {rows.map((r) => (
           <div key={r.id} className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
             <div className="flex items-center gap-2 sm:flex-1">
@@ -124,39 +132,61 @@ export default function FasceAdmin() {
                 <p className="text-xs text-gray-400">Fascia {fasciaLabel(r)}</p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <input
-                type="number"
-                min={0}
-                max={100}
-                value={isNaN(r.min) ? '' : r.min}
-                onChange={(e) => updateRow(r.id, { min: Number(e.target.value) })}
-                className="w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-center font-semibold"
-              />
-              <span className="text-gray-400">→</span>
-              <input
-                type="number"
-                min={0}
-                max={100}
-                value={isNaN(r.max) ? '' : r.max}
-                onChange={(e) => updateRow(r.id, { max: Number(e.target.value) })}
-                className="w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-center font-semibold"
-              />
-            </div>
+            {editing ? (
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={isNaN(r.min) ? '' : r.min}
+                  onChange={(e) => updateRow(r.id, { min: Number(e.target.value) })}
+                  className="w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-center font-semibold"
+                />
+                <span className="text-gray-400">→</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={isNaN(r.max) ? '' : r.max}
+                  onChange={(e) => updateRow(r.id, { max: Number(e.target.value) })}
+                  className="w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-center font-semibold"
+                />
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 font-semibold text-gray-700">
+                <span className="w-20 text-center">{r.min}</span>
+                <span className="text-gray-400">→</span>
+                <span className="w-20 text-center">{r.max}</span>
+              </div>
+            )}
           </div>
         ))}
 
-        {validationError && <p className="text-xs text-red-500">{validationError}</p>}
+        {editing && validationError && <p className="text-xs text-red-500">{validationError}</p>}
         {error && <p className="text-sm text-red-600">{error}</p>}
-        {saved && <p className="text-sm text-green-700">✓ Fasce salvate.</p>}
+        {saved && !editing && <p className="text-sm text-green-700">✓ Fasce salvate.</p>}
 
-        <button
-          onClick={handleSave}
-          disabled={saving || !!validationError}
-          className="w-full rounded-lg bg-field-green px-4 py-2 font-medium text-white hover:bg-field-green-dark disabled:opacity-50"
-        >
-          {saving ? 'Salvataggio...' : 'Salva fasce'}
-        </button>
+        {editing && (
+          <div className="flex gap-2">
+            <button
+              onClick={handleSave}
+              disabled={saving || !!validationError}
+              className="flex-1 rounded-lg bg-field-green px-4 py-2 font-medium text-white hover:bg-field-green-dark disabled:opacity-50"
+            >
+              {saving ? 'Salvataggio...' : 'Salva fasce'}
+            </button>
+            <button
+              onClick={() => {
+                setRows(initial)
+                setError(null)
+                setEditing(false)
+              }}
+              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
+            >
+              Annulla
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Leggenda */}

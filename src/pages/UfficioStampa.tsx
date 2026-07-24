@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import ErrorNotice from '../components/ErrorNotice'
+import EditButton from '../components/EditButton'
 
 interface PressLink {
   id: string
@@ -196,17 +197,12 @@ export default function UfficioStampa() {
                 </span>
               </a>
               {isAdmin && (
-                <div className="mt-2 flex gap-3 border-t border-gray-100 pt-2">
-                  <button
-                    onClick={() => openEditForm(link)}
-                    className="text-xs font-medium text-field-green hover:underline"
-                  >
-                    Modifica
-                  </button>
+                <div className="mt-2 flex items-center gap-2 border-t border-gray-100 pt-2">
+                  <EditButton onClick={() => openEditForm(link)} />
                   <button
                     onClick={() => handleDelete(link)}
                     disabled={deletingId === link.id}
-                    className="text-xs font-medium text-red-500 hover:underline disabled:opacity-50"
+                    className="rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
                   >
                     {deletingId === link.id ? 'Rimozione...' : 'Rimuovi'}
                   </button>

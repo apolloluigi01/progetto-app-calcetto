@@ -18,6 +18,7 @@ export default function FantaLega() {
   const [joining, setJoining] = useState(false)
   const [calcBusy, setCalcBusy] = useState<string | null>(null)
   const [calcError, setCalcError] = useState<string | null>(null)
+  const [tab, setTab] = useState<'classifica' | 'giornate'>('classifica')
 
   if (loading) return <div className="p-4 text-sm text-gray-500">Caricamento...</div>
   if (error || !data) return <div className="p-4 text-sm text-red-600">{error ?? 'Lega non trovata'}</div>
@@ -150,9 +151,29 @@ export default function FantaLega() {
         </div>
       )}
 
+      {/* Voci della lega: Classifica / Giornate */}
+      <div className="mt-4 flex gap-2 rounded-lg bg-gray-100 p-1">
+        <button
+          onClick={() => setTab('classifica')}
+          className={`flex-1 rounded-md py-1.5 text-sm font-medium transition ${
+            tab === 'classifica' ? 'bg-white text-field-green-dark shadow-sm' : 'text-gray-500'
+          }`}
+        >
+          Classifica
+        </button>
+        <button
+          onClick={() => setTab('giornate')}
+          className={`flex-1 rounded-md py-1.5 text-sm font-medium transition ${
+            tab === 'giornate' ? 'bg-white text-field-green-dark shadow-sm' : 'text-gray-500'
+          }`}
+        >
+          Giornate
+        </button>
+      </div>
+
       {/* ===== CLASSIFICA ===== */}
-      <h2 className="mt-6 text-sm font-semibold uppercase tracking-wide text-gray-500">Classifica</h2>
-      <div className="mt-2 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+      {tab === 'classifica' && (
+      <div className="mt-4 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
         {standings.length === 0 ? (
           <p className="p-4 text-sm text-gray-500">Nessun partecipante ancora.</p>
         ) : (
@@ -198,11 +219,15 @@ export default function FantaLega() {
           </table>
         )}
       </div>
+      )}
 
+      {/* ===== GIORNATE (da schierare + concluse) ===== */}
+      {tab === 'giornate' && (
+      <>
       {/* ===== PROSSIME PARTITE (formazioni da schierare) ===== */}
       {isMember && (
         <>
-          <h2 className="mt-6 text-sm font-semibold uppercase tracking-wide text-gray-500">Da schierare</h2>
+          <h2 className="mt-4 text-sm font-semibold uppercase tracking-wide text-gray-500">Da schierare</h2>
           <div className="mt-2 space-y-2">
             {upcoming.length === 0 && (
               <p className="text-sm text-gray-500">
@@ -258,7 +283,7 @@ export default function FantaLega() {
       )}
 
       {/* ===== PARTITE GIOCATE ===== */}
-      <h2 className="mt-6 text-sm font-semibold uppercase tracking-wide text-gray-500">Giornate concluse</h2>
+      <h2 className="mt-4 text-sm font-semibold uppercase tracking-wide text-gray-500">Giornate concluse</h2>
       {calcError && <p className="mt-2 text-sm text-red-600">{calcError}</p>}
       <div className="mt-2 space-y-2">
         {played.length === 0 && <p className="text-sm text-gray-500">Nessuna giornata conclusa.</p>}
@@ -314,6 +339,8 @@ export default function FantaLega() {
           </div>
         ))}
       </div>
+      </>
+      )}
     </div>
   )
 }
