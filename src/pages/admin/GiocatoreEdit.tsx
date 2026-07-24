@@ -43,6 +43,12 @@ export default function GiocatoreEdit() {
   const [resetSuccess, setResetSuccess] = useState(false)
   const [resetting, setResetting] = useState(false)
 
+  const [showRegister, setShowRegister] = useState(false)
+  const [registerEmail, setRegisterEmail] = useState('')
+  const [registerPassword, setRegisterPassword] = useState('')
+  const [registerError, setRegisterError] = useState<string | null>(null)
+  const [registering, setRegistering] = useState(false)
+
   const isSelf = session?.user.id === id
 
   async function load() {
@@ -207,6 +213,38 @@ export default function GiocatoreEdit() {
     logActivity('password_reimpostata', { nome: player?.name, playerId: id })
   }
 
+  async function handleRegisterGuest(e: FormEvent) {
+    e.preventDefault()
+    if (!id || !player) return
+    setRegisterError(null)
+    const email = registerEmail.trim()
+    if (!email) {
+      setRegisterError("Inserisci l'email dell'ospite")
+      return
+    }
+
+    setRegistering(true)
+    const { data, error } = await supabase.functions.invoke<{ id: string }>('register-guest', {
+      body: {
+        guestId: id,
+        email,
+        password: registerPassword || undefined,
+        name,
+        surname: surname || undefined,
+        nickname: nickname || undefined,
+      },
+    })
+    setRegistering(false)
+    if (error) {
+      setRegisterError(await getFunctionErrorMessage(error, "Errore nella registrazione dell'ospite"))
+      return
+    }
+
+    await logActivity('ospite_registrato', { giocatore: targetLabel(), email, playerId: data?.id })
+    // L'id del giocatore cambia (ora e' l'id auth): vai alla nuova pagina.
+    navigate(data?.id ? `/admin/giocatori/${data.id}` : '/admin/giocatori')
+  }
+
   async function handleDelete() {
     if (!id || !confirm(`Eliminare ${player?.name}? L'account verrà rimosso definitivamente.`)) return
     setDeleting(true)
@@ -353,6 +391,93 @@ export default function GiocatoreEdit() {
         )}
       </div>
 
+      {player.is_guest && canEditDetails && (
+        <div className="mt-4 rounded-xl border border-field-orange/40 bg-field-orange/5 p-4 shadow">
+          <div className="flex items-center gap-2">
+            <h2 className="font-medium text-gray-800">Registra giocatore</h2>
+            <span className="rounded-full bg-field-orange/10 px-2 py-0.5 text-[10px] font-semibold text-field-orange">
+              Ospite
+            </span>
+          </div>
+          <p className="mt-1 text-xs text-gray-500">
+            Trasforma questo ospite in un giocatore registrato sull'app. Inserisci solo l'email:
+            riceverà una mail di benvenuto con una password provvisoria. Mantiene tutte le
+            statistiche accumulate ed entra nelle classifiche come tutti gli altri.
+          </p>
+
+          {showRegister ? (
+            <form onSubmit={handleRegisterGuest} className="mt-3 space-y-3">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700" htmlFor="registerEmail">
+                  Email
+                </label>
+                <input
+                  id="registerEmail"
+                  type="email"
+                  required
+                  value={registerEmail}
+                  onChange={(e) => setRegisterEmail(e.target.value)}
+                  placeholder="email@esempio.it"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-field-green focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700" htmlFor="registerPassword">
+                  Password provvisoria (opzionale)
+                </label>
+                <input
+                  id="registerPassword"
+                  type="text"
+                  value={registerPassword}
+                  onChange={(e) => setRegisterPassword(e.target.value)}
+                  placeholder="Lascia vuoto per generarla automaticamente"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-field-green focus:outline-none"
+                />
+              </div>
+
+              <p className="text-xs text-gray-400">
+                Nome, cognome e nickname vengono ripresi dal profilo ospite (modificabili qui sopra
+                prima di registrare).
+              </p>
+
+              {registerError && <p className="text-sm text-red-600">{registerError}</p>}
+
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  disabled={registering}
+                  className="flex-1 rounded-lg bg-field-green px-4 py-2 text-sm font-medium text-white hover:bg-field-green-dark disabled:opacity-60"
+                >
+                  {registering ? 'Registrazione...' : 'Registra e invia invito'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowRegister(false)
+                    setRegisterError(null)
+                  }}
+                  className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                >
+                  Annulla
+                </button>
+              </div>
+            </form>
+          ) : (
+            <button
+              onClick={() => {
+                setShowRegister(true)
+                setRegisterError(null)
+                setRegisterEmail('')
+                setRegisterPassword('')
+              }}
+              className="mt-3 rounded-lg bg-field-green px-4 py-2 text-sm font-medium text-white hover:bg-field-green-dark"
+            >
+              Registra giocatore
+            </button>
+          )}
+        </div>
+      )}
+
       {canEditOverall && (
         <div className="mt-4 rounded-xl bg-white p-4 shadow">
           <h2 className="font-medium text-gray-800">Overall</h2>
@@ -400,7 +525,7 @@ export default function GiocatoreEdit() {
         </div>
       )}
 
-      {canEditDetails && (
+      {canEditDetails && !player.is_guest && (
         <div className="mt-4 rounded-xl bg-white p-4 shadow">
           <h2 className="font-medium text-gray-800">Password</h2>
           <p className="mt-1 text-xs text-gray-500">

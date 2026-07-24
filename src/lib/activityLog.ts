@@ -8,6 +8,7 @@ export interface FieldChange {
 
 export type ActivityAction =
   | 'giocatore_creato'
+  | 'ospite_registrato'
   | 'giocatore_modificato'
   | 'overall_modificato'
   | 'giocatore_eliminato'
@@ -48,6 +49,7 @@ export type ActivityAction =
 
 export const actionLabels: Record<ActivityAction, string> = {
   giocatore_creato:      'Giocatore creato',
+  ospite_registrato:     'Ospite registrato come giocatore',
   giocatore_modificato:  'Giocatore modificato',
   overall_modificato:    'Overall modificato',
   giocatore_eliminato:   'Giocatore eliminato',
