@@ -179,52 +179,64 @@ export default function Home() {
             {lastMatch && (
               <Link to={`/partite/${lastMatch.match.id}`} className="block px-4 py-4">
                 <p className="text-center text-xs text-gray-500">{formatDate(lastMatch.match.match_date)}</p>
-                {lastMatch.result && (
-                  <p className="mt-1 text-center text-5xl font-extrabold text-field-green-dark">
-                    {lastMatch.result.score_a} - {lastMatch.result.score_b}
-                  </p>
-                )}
-                {(lastMatch.goals.length > 0 || lastMatch.assists.length > 0) &&
+                {lastMatch.goals.length > 0 || lastMatch.assists.length > 0 ? (
                   (() => {
                     const scorersA = aggregateScorers(lastMatch.goals, lastMatch.assists, 'A')
                     const scorersB = aggregateScorers(lastMatch.goals, lastMatch.assists, 'B')
                     return (
-                      <div className="mt-4 grid grid-cols-2 items-start gap-3">
+                      // Mobile: punteggio in alto + 2 colonne sotto. Desktop (sm+):
+                      // 3 colonne con il punteggio al centro e le due squadre che lo
+                      // affiancano dall'alto (sm:contents scioglie il wrapper mobile).
+                      <div className="sm:grid sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:items-start sm:gap-4">
+                        {lastMatch.result && (
+                          <p className="mt-1 text-center text-5xl font-extrabold text-field-green-dark sm:order-2 sm:mt-0 sm:self-start sm:px-2">
+                            {lastMatch.result.score_a} - {lastMatch.result.score_b}
+                          </p>
+                        )}
                         {/* min-w-0: senza, i nomi con "truncate" impediscono alle
                             colonne di restringersi e la pagina sfora lo schermo. */}
-                        <div className="min-w-0">
-                          <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-field-green-dark">
-                            Squadra A
-                          </p>
-                          {scorersA.length === 0 ? (
-                            <p className="text-sm text-gray-400">—</p>
-                          ) : (
-                            scorersA.map((e) => (
-                              <div key={e.player_id} className="mb-1 flex items-start gap-1.5 text-sm text-gray-700">
-                                <PlayerName name={e.name} surname={e.surname} nickname={e.nickname} />
-                                <ScorerBadges entry={e} />
-                              </div>
-                            ))
-                          )}
-                        </div>
-                        <div className="min-w-0 text-right">
-                          <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-field-orange">
-                            Squadra B
-                          </p>
-                          {scorersB.length === 0 ? (
-                            <p className="text-sm text-gray-400">—</p>
-                          ) : (
-                            scorersB.map((e) => (
-                              <div key={e.player_id} className="mb-1 flex items-start justify-end gap-1.5 text-sm text-gray-700">
-                                <PlayerName name={e.name} surname={e.surname} nickname={e.nickname} />
-                                <ScorerBadges entry={e} reverse />
-                              </div>
-                            ))
-                          )}
+                        <div className="mt-4 grid grid-cols-2 gap-3 sm:contents sm:mt-0">
+                          <div className="min-w-0 sm:order-1">
+                            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-field-green-dark">
+                              Squadra A
+                            </p>
+                            {scorersA.length === 0 ? (
+                              <p className="text-sm text-gray-400">—</p>
+                            ) : (
+                              scorersA.map((e) => (
+                                <div key={e.player_id} className="mb-1 flex items-start gap-1.5 text-sm text-gray-700">
+                                  <PlayerName name={e.name} surname={e.surname} nickname={e.nickname} />
+                                  <ScorerBadges entry={e} />
+                                </div>
+                              ))
+                            )}
+                          </div>
+                          <div className="min-w-0 text-right sm:order-3">
+                            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-field-orange">
+                              Squadra B
+                            </p>
+                            {scorersB.length === 0 ? (
+                              <p className="text-sm text-gray-400">—</p>
+                            ) : (
+                              scorersB.map((e) => (
+                                <div key={e.player_id} className="mb-1 flex items-start justify-end gap-1.5 text-sm text-gray-700">
+                                  <PlayerName name={e.name} surname={e.surname} nickname={e.nickname} />
+                                  <ScorerBadges entry={e} reverse />
+                                </div>
+                              ))
+                            )}
+                          </div>
                         </div>
                       </div>
                     )
-                  })()}
+                  })()
+                ) : (
+                  lastMatch.result && (
+                    <p className="mt-1 text-center text-5xl font-extrabold text-field-green-dark">
+                      {lastMatch.result.score_a} - {lastMatch.result.score_b}
+                    </p>
+                  )
+                )}
               </Link>
             )}
           </div>
