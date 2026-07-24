@@ -3,7 +3,8 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 
 const supabaseUrl    = Deno.env.get("SUPABASE_URL")!;
-const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+// Nuova secret key (sb_secret_...) con fallback alla legacy service_role.
+const serviceRoleKey = Deno.env.get("SERVICE_SECRET_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const gmailUser      = Deno.env.get("GMAIL_USER")!;
 const gmailPassword  = Deno.env.get("GMAIL_APP_PASSWORD")!;
 
