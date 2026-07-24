@@ -30,6 +30,7 @@ export default function GiocatoreEdit() {
   const [jerseyNumber, setJerseyNumber] = useState('')
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [editing, setEditing] = useState(false)
 
   const [overallValue, setOverallValue] = useState<number>(50)
   const [initialOverall, setInitialOverall] = useState<number>(50)
@@ -72,15 +73,18 @@ export default function GiocatoreEdit() {
     load()
   }, [id])
 
+  function resetFields(p: PlayerWithStatus) {
+    setName(p.name)
+    setSurname(p.surname ?? '')
+    setNickname(p.nickname ?? '')
+    setRole(p.role)
+    setNationality(p.nationality ?? '')
+    setPosition(p.position ?? '')
+    setJerseyNumber(p.jersey_number ? String(p.jersey_number) : '')
+  }
+
   useEffect(() => {
-    if (!player) return
-    setName(player.name)
-    setSurname(player.surname ?? '')
-    setNickname(player.nickname ?? '')
-    setRole(player.role)
-    setNationality(player.nationality ?? '')
-    setPosition(player.position ?? '')
-    setJerseyNumber(player.jersey_number ? String(player.jersey_number) : '')
+    if (player) resetFields(player)
   }, [player])
 
   if (loading) return <div className="p-4 text-sm text-gray-500">Caricamento...</div>
@@ -155,6 +159,7 @@ export default function GiocatoreEdit() {
     if (modifiche.length > 0) {
       logActivity('giocatore_modificato', { playerId: id, giocatore: targetLabel(), modifiche })
     }
+    setEditing(false)
     load()
   }
 
@@ -258,6 +263,17 @@ export default function GiocatoreEdit() {
     navigate('/admin/giocatori')
   }
 
+  const positionLabels: Record<PlayingPosition, string> = {
+    POR: 'Portiere (POR)',
+    DIF: 'Difensore (DIF)',
+    CEN: 'Centrocampista (CEN)',
+    ATT: 'Attaccante (ATT)',
+  }
+  const roleLabels: Record<PlayerRole, string> = { superadmin: 'Superadmin', admin: 'Admin', player: 'Player' }
+  const nationalityName = player.nationality
+    ? COUNTRIES.find((c) => c.code === player.nationality)?.name ?? player.nationality
+    : null
+
   return (
     <div className="p-4">
       <h1 className="text-xl font-semibold text-field-green-dark">
@@ -266,7 +282,7 @@ export default function GiocatoreEdit() {
       </h1>
 
       <div className="mt-4 space-y-3 rounded-xl bg-white p-4 shadow">
-        {canEditDetails ? (
+        {canEditDetails && editing ? (
           <>
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">Nome</label>
@@ -363,31 +379,84 @@ export default function GiocatoreEdit() {
                 dall'overall del giocatore.
               </p>
             </div>
-            {player.email && (
-              <p className="text-xs text-gray-500">
-                {player.email} — {player.email_confirmed ? 'email confermata' : 'in attesa di conferma'}
-              </p>
-            )}
-
             {error && <p className="text-sm text-red-600">{error}</p>}
 
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="w-full rounded-lg bg-field-green px-4 py-2 font-medium text-white hover:bg-field-green-dark disabled:opacity-60"
-            >
-              {saving ? 'Salvataggio...' : 'Salva'}
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="flex-1 rounded-lg bg-field-green px-4 py-2 font-medium text-white hover:bg-field-green-dark disabled:opacity-60"
+              >
+                {saving ? 'Salvataggio...' : 'Salva'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditing(false)
+                  resetFields(player)
+                  setError(null)
+                }}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+              >
+                Annulla
+              </button>
+            </div>
           </>
         ) : (
-          <div>
-            {player.nickname && <p className="text-sm text-gray-500">{player.nickname}</p>}
-            <p className="mt-1 text-xs uppercase text-field-green">{player.role}</p>
-            <p className="mt-2 text-xs text-gray-400">
-              Solo un superadmin può modificare nome, cognome, nickname, ruolo o password di un altro admin.
-              L'overall resta modificabile qui sotto.
-            </p>
-          </div>
+          <>
+            <dl className="space-y-2 text-sm">
+              <div className="flex justify-between gap-3">
+                <dt className="text-gray-500">Nome</dt>
+                <dd className="text-right font-medium text-gray-800">{player.name}</dd>
+              </div>
+              <div className="flex justify-between gap-3">
+                <dt className="text-gray-500">Cognome</dt>
+                <dd className="text-right font-medium text-gray-800">{player.surname || '—'}</dd>
+              </div>
+              <div className="flex justify-between gap-3">
+                <dt className="text-gray-500">Nickname</dt>
+                <dd className="text-right font-medium text-gray-800">{player.nickname || '—'}</dd>
+              </div>
+              <div className="flex justify-between gap-3">
+                <dt className="text-gray-500">Ruolo</dt>
+                <dd className="text-right font-medium text-gray-800">{roleLabels[player.role]}</dd>
+              </div>
+              <div className="flex justify-between gap-3">
+                <dt className="text-gray-500">Nazionalità</dt>
+                <dd className="text-right font-medium text-gray-800">{nationalityName || '—'}</dd>
+              </div>
+              <div className="flex justify-between gap-3">
+                <dt className="text-gray-500">Ruolo di gioco</dt>
+                <dd className="text-right font-medium text-gray-800">
+                  {player.position ? positionLabels[player.position] : '—'}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-3">
+                <dt className="text-gray-500">Numero maglia</dt>
+                <dd className="text-right font-medium text-gray-800">{player.jersey_number ?? '—'}</dd>
+              </div>
+              {player.email && (
+                <div className="flex justify-between gap-3">
+                  <dt className="text-gray-500">Email</dt>
+                  <dd className="break-all text-right font-medium text-gray-800">{player.email}</dd>
+                </div>
+              )}
+            </dl>
+
+            {canEditDetails ? (
+              <button
+                onClick={() => setEditing(true)}
+                className="w-full rounded-lg bg-field-green px-4 py-2 font-medium text-white hover:bg-field-green-dark"
+              >
+                Modifica
+              </button>
+            ) : (
+              <p className="text-xs text-gray-400">
+                Solo un superadmin può modificare nome, cognome, nickname, ruolo o password di un altro admin.
+                L'overall resta modificabile qui sotto.
+              </p>
+            )}
+          </>
         )}
       </div>
 

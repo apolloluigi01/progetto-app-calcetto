@@ -188,11 +188,6 @@ export default function GiocatoriAdmin() {
                     {roleLabels[p.role]}
                   </span>
                 )}
-                {p.email_confirmed === false && (
-                  <span className="rounded-full bg-field-yellow/20 px-2 py-0.5 text-xs text-field-orange">
-                    In attesa
-                  </span>
-                )}
               </div>
             </div>
           </Link>
