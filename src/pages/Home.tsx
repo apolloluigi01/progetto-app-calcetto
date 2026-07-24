@@ -173,7 +173,7 @@ export default function Home() {
         <div className="mt-4 space-y-4">
           <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
             <div className="border-b border-gray-200 px-4 py-3">
-              <h2 className="font-medium text-field-green-dark">Ultima partita</h2>
+              <h2 className="text-center font-medium text-field-green-dark">Ultima partita</h2>
             </div>
             {!lastMatch && <p className="p-4 text-sm text-gray-500">Nessuna partita completata.</p>}
             {lastMatch && (
