@@ -176,12 +176,17 @@ export default function Home() {
             {lastMatch && (
               <Link to={`/partite/${lastMatch.match.id}`} className="block px-4 py-4">
                 <p className="text-center text-xs text-gray-500">{formatDate(lastMatch.match.match_date)}</p>
-                {lastMatch.goals.length > 0 || lastMatch.assists.length > 0 ? (
+                {lastMatch.result && (
+                  <p className="mt-1 text-center text-5xl font-extrabold text-field-green-dark">
+                    {lastMatch.result.score_a} - {lastMatch.result.score_b}
+                  </p>
+                )}
+                {(lastMatch.goals.length > 0 || lastMatch.assists.length > 0) &&
                   (() => {
                     const scorersA = aggregateScorers(lastMatch.goals, lastMatch.assists, 'A')
                     const scorersB = aggregateScorers(lastMatch.goals, lastMatch.assists, 'B')
                     return (
-                      <div className="mt-2 grid grid-cols-[1fr_auto_1fr] items-start gap-3">
+                      <div className="mt-4 grid grid-cols-2 items-start gap-3">
                         {/* min-w-0: senza, i nomi con "truncate" impediscono alle
                             colonne di restringersi e la pagina sfora lo schermo. */}
                         <div className="min-w-0">
@@ -199,11 +204,6 @@ export default function Home() {
                             ))
                           )}
                         </div>
-                        {lastMatch.result && (
-                          <p className="self-center whitespace-nowrap text-4xl font-extrabold text-field-green-dark">
-                            {lastMatch.result.score_a} - {lastMatch.result.score_b}
-                          </p>
-                        )}
                         <div className="min-w-0 text-right">
                           <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-field-orange">
                             Squadra B
@@ -221,14 +221,7 @@ export default function Home() {
                         </div>
                       </div>
                     )
-                  })()
-                ) : (
-                  lastMatch.result && (
-                    <p className="mt-1 text-center text-5xl font-extrabold text-field-green-dark">
-                      {lastMatch.result.score_a} - {lastMatch.result.score_b}
-                    </p>
-                  )
-                )}
+                  })()}
               </Link>
             )}
           </div>
