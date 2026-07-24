@@ -13,6 +13,7 @@ interface LogEntry {
 
 const actionColors: Record<ActivityAction, string> = {
   giocatore_creato:      'bg-field-green/10 text-field-green-dark',
+  ospite_registrato:     'bg-field-green/10 text-field-green-dark',
   giocatore_modificato:  'bg-blue-50 text-blue-700',
   overall_modificato:    'bg-blue-50 text-blue-700',
   giocatore_eliminato:   'bg-red-50 text-red-700',
