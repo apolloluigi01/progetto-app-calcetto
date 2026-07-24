@@ -33,24 +33,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.subscription.unsubscribe()
   }, [])
 
+  // Dipende dall'id utente, NON dall'oggetto session: al ritorno del focus
+  // (alt-tab, cambio app) Supabase emette TOKEN_REFRESHED con una nuova
+  // session (stesso utente). Se dipendessimo da `session` l'effect si
+  // ri-eseguirebbe rimettendo loading=true, ProtectedRoute smonterebbe la
+  // pagina e le form aperte (pagelle, nuova partita, ...) si azzererebbero.
+  const userId = session?.user.id ?? null
   useEffect(() => {
-    if (!session) {
+    if (!userId) {
       setPlayer(null)
       setLoading(false)
       return
     }
 
-    setLoading(true)
+    let cancelled = false
     supabase
       .from('players')
       .select('*')
-      .eq('id', session.user.id)
+      .eq('id', userId)
       .single()
       .then(({ data }) => {
+        if (cancelled) return
         setPlayer(data as Player | null)
         setLoading(false)
       })
-  }, [session])
+    return () => {
+      cancelled = true
+    }
+  }, [userId])
 
   async function signIn(email: string, password: string) {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
