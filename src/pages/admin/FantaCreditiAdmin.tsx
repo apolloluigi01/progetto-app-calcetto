@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { logActivity, type FieldChange } from '../../lib/activityLog'
 import { DEFAULT_FASCE, fasciaLabel, getFasce, invalidateFasceCache, type FasciaRange } from '../../lib/fasce'
 import { FANTA_TEAM_SIZE } from '../../lib/fantacalcetto'
+import EditButton from '../../components/EditButton'
 
 // Anteprima colore della carta, coerente con FasceAdmin e i template di PlayerCard.
 const TIER_SWATCH: Record<string, string> = {
@@ -30,6 +31,8 @@ export default function FantaCreditiAdmin() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // I costi partono in sola lettura: si entra in modifica col tasto dedicato.
+  const [editing, setEditing] = useState(false)
 
   useEffect(() => {
     getFasce(true).then((f) => {
@@ -101,6 +104,14 @@ export default function FantaCreditiAdmin() {
     invalidateFasceCache()
     setInitial(rows)
     setSaved(true)
+    setEditing(false)
+  }
+
+  function handleCancel() {
+    setRows(initial)
+    setError(null)
+    setSaved(false)
+    setEditing(false)
   }
 
   if (loading) return <div className="p-4 text-sm text-gray-500">Caricamento...</div>
@@ -131,6 +142,12 @@ export default function FantaCreditiAdmin() {
 
       {/* Modifica costi */}
       <div className="mt-4 space-y-3 rounded-xl bg-white p-4 shadow">
+        {!editing && (
+          <div className="flex justify-end">
+            <EditButton onClick={() => { setSaved(false); setEditing(true) }}>Modifica crediti</EditButton>
+          </div>
+        )}
+
         {rows.map((r) => (
           <div key={r.id} className="flex items-center gap-3">
             <span className={`h-6 w-6 shrink-0 rounded ${TIER_SWATCH[r.tier] ?? 'bg-gray-200'}`} />
@@ -145,25 +162,37 @@ export default function FantaCreditiAdmin() {
                 type="number"
                 min={1}
                 value={isNaN(r.creditCost) ? '' : r.creditCost}
+                disabled={!editing}
                 onChange={(e) => updateCost(r.id, Number(e.target.value))}
-                className="w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-center font-semibold"
+                className="w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-center font-semibold disabled:bg-gray-100 disabled:text-gray-500"
               />
               <span className="text-sm text-gray-400">crediti</span>
             </div>
           </div>
         ))}
 
-        {validationError && <p className="text-xs text-red-500">{validationError}</p>}
+        {editing && validationError && <p className="text-xs text-red-500">{validationError}</p>}
         {error && <p className="text-sm text-red-600">{error}</p>}
         {saved && <p className="text-sm text-green-700">✓ Crediti salvati.</p>}
 
-        <button
-          onClick={handleSave}
-          disabled={saving || !!validationError}
-          className="w-full rounded-lg bg-field-green px-4 py-2 font-medium text-white hover:bg-field-green-dark disabled:opacity-50"
-        >
-          {saving ? 'Salvataggio...' : 'Salva crediti'}
-        </button>
+        {editing && (
+          <div className="flex gap-2">
+            <button
+              onClick={handleCancel}
+              disabled={saving}
+              className="flex-1 rounded-lg border border-gray-300 px-4 py-2 font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            >
+              Annulla
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving || !!validationError}
+              className="flex-1 rounded-lg bg-field-green px-4 py-2 font-medium text-white hover:bg-field-green-dark disabled:opacity-50"
+            >
+              {saving ? 'Salvataggio...' : 'Salva crediti'}
+            </button>
+          </div>
+        )}
       </div>
 
       <p className="mt-3 text-xs text-gray-400">

@@ -220,15 +220,6 @@ export default function MatchDetail() {
         </Link>
       )}
 
-      {matchPlayers.length > 0 && (
-        <Link
-          to={`/partite/${id}/votazioni`}
-          className="mt-2 block w-full rounded-lg border border-purple-300 bg-purple-50 px-3 py-1.5 text-center text-sm font-medium text-purple-700 hover:bg-purple-100"
-        >
-          🗳️ Votazioni e pagelle
-        </Link>
-      )}
-
       {(goals.length > 0 || assists.length > 0) && (
         <div className="mt-4 rounded-xl bg-white p-3 shadow">
           <h3 className="mb-2 font-medium text-field-green-dark">Marcatori e assist</h3>
@@ -245,6 +236,15 @@ export default function MatchDetail() {
             ))}
           </div>
         </div>
+      )}
+
+      {matchPlayers.length > 0 && (
+        <Link
+          to={`/partite/${id}/votazioni`}
+          className="mt-4 block w-full rounded-lg border border-purple-300 bg-purple-50 px-3 py-1.5 text-center text-sm font-medium text-purple-700 hover:bg-purple-100"
+        >
+          🗳️ Votazioni e pagelle
+        </Link>
       )}
     </div>
   )

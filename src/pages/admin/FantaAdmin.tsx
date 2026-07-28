@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { logActivity, type FieldChange } from '../../lib/activityLog'
 import { DEFAULT_FANTA_SETTINGS, type FantaSettings } from '../../lib/fantacalcetto'
+import EditButton from '../../components/EditButton'
 
 // Questa pagina gestisce solo bonus/malus: i costi in crediti delle fasce si
 // manutengono dalla Gestione crediti Fantacalcetto, mentre il budget è
@@ -25,6 +26,17 @@ const PARAMS: ParamDef[] = [
   { key: 'captainMultiplier', label: 'Moltiplicatore capitano', hint: 'I soli bonus del capitano vengono moltiplicati per questo valore (voto base e malus restano invariati)', step: '0.1' },
 ]
 
+function toValues(s: FantaSettings): Record<BonusKey, string> {
+  return {
+    bonusMvp: String(s.bonusMvp),
+    bonusGol: String(s.bonusGol),
+    bonusAssist: String(s.bonusAssist),
+    malusAutogol: String(s.malusAutogol),
+    malusPeggiore: String(s.malusPeggiore),
+    captainMultiplier: String(s.captainMultiplier),
+  }
+}
+
 export default function FantaAdmin() {
   const { player } = useAuth()
   const [values, setValues] = useState<Record<BonusKey, string>>({
@@ -35,6 +47,8 @@ export default function FantaAdmin() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // I campi partono in sola lettura: si entra in modifica col tasto dedicato.
+  const [editing, setEditing] = useState(false)
 
   useEffect(() => {
     supabase
@@ -55,14 +69,7 @@ export default function FantaAdmin() {
             }
           : DEFAULT_FANTA_SETTINGS
         setInitial(s)
-        setValues({
-          bonusMvp: String(s.bonusMvp),
-          bonusGol: String(s.bonusGol),
-          bonusAssist: String(s.bonusAssist),
-          malusAutogol: String(s.malusAutogol),
-          malusPeggiore: String(s.malusPeggiore),
-          captainMultiplier: String(s.captainMultiplier),
-        })
+        setValues(toValues(s))
         setLoading(false)
       })
   }, [])
@@ -116,6 +123,14 @@ export default function FantaAdmin() {
     }
     setInitial((prev) => ({ ...prev, ...next }))
     setSaved(true)
+    setEditing(false)
+  }
+
+  function handleCancel() {
+    setValues(toValues(initial))
+    setError(null)
+    setSaved(false)
+    setEditing(false)
   }
 
   if (loading) return <div className="p-4 text-sm text-gray-500">Caricamento...</div>
@@ -129,6 +144,12 @@ export default function FantaAdmin() {
       </p>
 
       <div className="mt-4 space-y-3 rounded-xl bg-white p-4 shadow">
+        {!editing && (
+          <div className="flex justify-end">
+            <EditButton onClick={() => { setSaved(false); setEditing(true) }}>Modifica parametri</EditButton>
+          </div>
+        )}
+
         {PARAMS.map((p) => (
           <div key={p.key} className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
             <div className="sm:flex-1">
@@ -139,16 +160,17 @@ export default function FantaAdmin() {
               type="number"
               step={p.step}
               value={values[p.key]}
+              disabled={!editing}
               onChange={(e) => {
                 setSaved(false)
                 setValues((prev) => ({ ...prev, [p.key]: e.target.value }))
               }}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-center font-semibold sm:w-28"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-center font-semibold disabled:bg-gray-100 disabled:text-gray-500 sm:w-28"
             />
           </div>
         ))}
 
-        {!allValid && (
+        {editing && !allValid && (
           <p className="text-xs text-red-500">
             Inserisci un valore numerico per ogni parametro (il moltiplicatore capitano deve essere maggiore di 0).
           </p>
@@ -156,13 +178,24 @@ export default function FantaAdmin() {
         {error && <p className="text-sm text-red-600">{error}</p>}
         {saved && <p className="text-sm text-green-700">✓ Parametri salvati.</p>}
 
-        <button
-          onClick={handleSave}
-          disabled={saving || !allValid}
-          className="w-full rounded-lg bg-field-green px-4 py-2 font-medium text-white hover:bg-field-green-dark disabled:opacity-50"
-        >
-          {saving ? 'Salvataggio...' : 'Salva parametri'}
-        </button>
+        {editing && (
+          <div className="flex gap-2">
+            <button
+              onClick={handleCancel}
+              disabled={saving}
+              className="flex-1 rounded-lg border border-gray-300 px-4 py-2 font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            >
+              Annulla
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving || !allValid}
+              className="flex-1 rounded-lg bg-field-green px-4 py-2 font-medium text-white hover:bg-field-green-dark disabled:opacity-50"
+            >
+              {saving ? 'Salvataggio...' : 'Salva parametri'}
+            </button>
+          </div>
+        )}
       </div>
 
       <p className="mt-3 text-xs text-gray-400">
