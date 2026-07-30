@@ -56,6 +56,9 @@ export default function MatchVoting() {
   const [drafts, setDrafts] = useState<Record<string, PagellaDraft>>({})
   const [savingPagelle, setSavingPagelle] = useState(false)
   const [publishing, setPublishing] = useState(false)
+  const [pagelleError, setPagelleError] = useState<string | null>(null)
+  const [resendingMail, setResendingMail] = useState(false)
+  const [mailInfo, setMailInfo] = useState<string | null>(null)
 
   const isManager = isAdmin || isSuperAdmin
 
@@ -159,10 +162,42 @@ export default function MatchVoting() {
 
   async function handleSaveDraft() {
     setSavingPagelle(true)
-    await supabase.from('pagelle').upsert(buildPagelleRows(false), { onConflict: 'match_id,player_id' })
+    setPagelleError(null)
+    const { error: saveError } = await supabase
+      .from('pagelle')
+      .upsert(buildPagelleRows(false), { onConflict: 'match_id,player_id' })
     setSavingPagelle(false)
+    if (saveError) {
+      setPagelleError(`Bozza NON salvata: ${saveError.message}. Ricarica la pagina e riprova.`)
+      return
+    }
     logActivity('pagelle_bozza', { matchId: id })
     refetch()
+  }
+
+  /**
+   * Rimanda la mail con risultato, tabellino e pagelle a tutti i partecipanti.
+   * Serve dopo una pubblicazione andata a metà (mail partita senza pagelle) o
+   * quando un giocatore non l'ha ricevuta: la mail e' sempre ricostruita dai
+   * dati correnti, quindi si puo' reinviare senza ripubblicare.
+   */
+  async function handleResendMail() {
+    if (!id || resendingMail) return
+    if (!confirm('Reinviare la mail con risultato, tabellino e pagelle a tutti i partecipanti?')) return
+    setResendingMail(true)
+    setPagelleError(null)
+    setMailInfo(null)
+    const { data: mailData, error: mailError } = await supabase.functions.invoke('notify-match-published', {
+      body: { matchId: id },
+    })
+    setResendingMail(false)
+    if (mailError) {
+      setPagelleError(`Invio mail fallito: ${mailError.message}`)
+      return
+    }
+    const sent = (mailData as { sent?: number; total?: number } | null)?.sent ?? 0
+    const total = (mailData as { sent?: number; total?: number } | null)?.total ?? 0
+    setMailInfo(`Mail inviata a ${sent}/${total} partecipanti.`)
   }
 
   async function handlePublish() {
@@ -203,10 +238,52 @@ export default function MatchVoting() {
     )
       return
     setPublishing(true)
-    await supabase.from('pagelle').upsert(buildPagelleRows(true), { onConflict: 'match_id,player_id' })
-    await supabase.functions.invoke('notify-match-published', { body: { matchId: id } })
+    setPagelleError(null)
+    setMailInfo(null)
+
+    // La mail parte SOLO se la pubblicazione e' davvero andata a buon fine.
+    // In passato l'errore della upsert veniva ignorato: la mail usciva senza
+    // pagelle (la edge function le filtra su published_at) e il registro
+    // segnava "pubblicate" pur avendo published_at ancora null.
+    const { error: publishError } = await supabase
+      .from('pagelle')
+      .upsert(buildPagelleRows(true), { onConflict: 'match_id,player_id' })
+    if (publishError) {
+      setPublishing(false)
+      setPagelleError(`Pubblicazione NON riuscita: ${publishError.message}. Ricarica la pagina e riprova.`)
+      return
+    }
+
+    // Verifica esplicita: se la scrittura non ha avuto effetto (richiesta
+    // respinta a monte, sessione scaduta, riga non agganciata) le pagelle
+    // resterebbero invisibili ai giocatori e la mail uscirebbe vuota.
+    const { data: check, error: checkError } = await supabase
+      .from('pagelle')
+      .select('published_at')
+      .eq('match_id', id)
+    const published = (check ?? []).filter((p) => p.published_at).length
+    if (checkError || published === 0 || published < data.matchPlayers.length) {
+      setPublishing(false)
+      setPagelleError(
+        `Pubblicazione non confermata: risultano pubblicate ${published}/${data.matchPlayers.length} pagelle. ` +
+          'La mail NON e\' stata inviata. Ricarica la pagina e riprova.'
+      )
+      return
+    }
+
+    const { error: mailError } = await supabase.functions.invoke('notify-match-published', {
+      body: { matchId: id },
+    })
     logActivity('pagelle_pubblicate', { matchId: id })
     setPublishing(false)
+    if (mailError) {
+      setPagelleError(
+        `Pagelle pubblicate correttamente, ma l'invio della mail e' fallito: ${mailError.message}. ` +
+          'Usa "Reinvia mail pagelle" per riprovare.'
+      )
+    } else {
+      setMailInfo('Pagelle pubblicate e mail inviata a tutti i partecipanti.')
+    }
     refetch()
   }
 
@@ -456,9 +533,18 @@ export default function MatchVoting() {
             <div className="mt-4">
               <h2 className="font-medium text-field-green-dark">Pagelle</h2>
               {isPublished && (
-                <p className="mt-1 rounded-lg bg-field-green/10 px-3 py-2 text-center text-xs font-medium text-field-green-dark">
-                  ✓ Pagelle pubblicate: la partita non è più modificabile.
-                </p>
+                <>
+                  <p className="mt-1 rounded-lg bg-field-green/10 px-3 py-2 text-center text-xs font-medium text-field-green-dark">
+                    ✓ Pagelle pubblicate: la partita non è più modificabile.
+                  </p>
+                  <button
+                    onClick={handleResendMail}
+                    disabled={resendingMail}
+                    className="mt-2 w-full rounded-lg border border-field-green px-4 py-2 text-sm font-medium text-field-green-dark hover:bg-field-green/5 disabled:opacity-50"
+                  >
+                    {resendingMail ? 'Invio in corso...' : '📧 Reinvia mail pagelle'}
+                  </button>
+                </>
               )}
               <div className="mt-2 space-y-3">
                 {matchPlayers.map((mp) => {
@@ -550,6 +636,14 @@ export default function MatchVoting() {
               )}
               {!isPublished && match.voting_open && (
                 <p className="mt-2 text-xs text-red-500">⚠️ Chiudi le votazioni prima di pubblicare le pagelle.</p>
+              )}
+              {pagelleError && (
+                <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-600">{pagelleError}</p>
+              )}
+              {mailInfo && (
+                <p className="mt-2 rounded-lg bg-field-green/10 px-3 py-2 text-xs font-medium text-field-green-dark">
+                  ✓ {mailInfo}
+                </p>
               )}
             </div>
           )}
