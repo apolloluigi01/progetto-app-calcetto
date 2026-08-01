@@ -33,9 +33,14 @@ export default function Layout() {
   const navigate = useNavigate()
   const isHome = location.pathname === '/'
 
+  const tailItems: NavItem[] = [
+    { to: '/impostazioni', label: 'Impostazioni' },
+    { to: '/calendario', label: 'Calendario' },
+  ]
+
   const items = isAdmin
-    ? [...navItems, { to: '/admin', label: 'CDA' }, { to: '/impostazioni', label: 'Impostazioni' }]
-    : [...navItems, { to: '/impostazioni', label: 'Impostazioni' }]
+    ? [...navItems, { to: '/admin', label: 'CDA' }, ...tailItems]
+    : [...navItems, ...tailItems]
 
   function handleLogout() {
     if (confirm('Vuoi davvero uscire?')) {
@@ -117,7 +122,7 @@ export default function Layout() {
         </Link>
         <button
           onClick={() => setMenuOpen(!menuOpen)}
-          className="flex flex-col justify-center gap-1.5 w-7 h-7 focus:outline-none"
+          className="-mr-2 flex h-11 w-11 flex-col items-center justify-center gap-1.5 focus:outline-none"
           aria-label="Menu"
         >
           <span

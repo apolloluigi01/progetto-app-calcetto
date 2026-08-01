@@ -122,7 +122,7 @@ export default function OverallAdmin() {
 
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
 
-      <div className="mt-4 flex items-center gap-2">
+      <div className="mt-4 flex flex-wrap items-center gap-2">
         <span className="text-xs font-medium text-gray-500">Ordina:</span>
         {sortButton('name', 'Nome')}
         {sortButton('overall_desc', 'Overall ↓')}

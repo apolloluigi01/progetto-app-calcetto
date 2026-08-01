@@ -18,6 +18,7 @@ import Statistiche from './pages/Statistiche'
 import StatisticheStagione from './pages/StatisticheStagione'
 import StatisticheElenco from './pages/StatisticheElenco'
 import Impostazioni from './pages/Impostazioni'
+import Calendario from './pages/Calendario'
 import AdminHome from './pages/admin/AdminHome'
 import GiocatoriAdmin from './pages/admin/GiocatoriAdmin'
 import GiocatoreEdit from './pages/admin/GiocatoreEdit'
@@ -66,6 +67,7 @@ function App() {
               <Route path="/statistiche/stagione/:id/:key" element={<StagioneStatisticaDettaglio />} />
               <Route path="/albo-oro" element={<AlboOro />} />
               <Route path="/impostazioni" element={<Impostazioni />} />
+              <Route path="/calendario" element={<Calendario />} />
               <Route path="/ufficio-stampa" element={<UfficioStampa />} />
               <Route path="/fantacalcetto" element={<Fantacalcetto />} />
               <Route path="/fantacalcetto/:leagueId" element={<FantaLega />} />

@@ -1201,14 +1201,14 @@ export default function MatchEdit() {
           )}
 
           {canEditTeams && (
-            <div className="mt-2 flex gap-2">
-              <EditButton onClick={startEditingTeams} className="flex-1">
+            <div className="mt-2 flex flex-wrap gap-2">
+              <EditButton onClick={startEditingTeams} className="flex-1 basis-full sm:basis-0">
                 Modifica squadre
               </EditButton>
               <button
                 onClick={handleRecalculateTeams}
                 disabled={recalculating}
-                className="flex-1 rounded-lg border border-field-green/50 px-3 py-1.5 text-sm text-field-green-dark hover:bg-field-green/5 disabled:opacity-50"
+                className="flex-1 basis-full rounded-lg border border-field-green/50 px-3 py-1.5 text-sm text-field-green-dark hover:bg-field-green/5 disabled:opacity-50 sm:basis-0"
                 title="Rigenera le squadre con gli overall e le fasce attuali"
               >
                 {recalculating ? 'Ricalcolo...' : '♻️ Ricalcola squadre'}
@@ -1216,7 +1216,7 @@ export default function MatchEdit() {
               <button
                 onClick={startSubstitute}
                 disabled={playersNotInDraft.length === 0}
-                className="flex-1 rounded-lg border border-field-orange/50 px-3 py-1.5 text-sm text-field-orange hover:bg-field-orange/5 disabled:opacity-50"
+                className="flex-1 basis-full rounded-lg border border-field-orange/50 px-3 py-1.5 text-sm text-field-orange hover:bg-field-orange/5 disabled:opacity-50 sm:basis-0"
                 title={playersNotInDraft.length === 0 ? 'Nessun giocatore disponibile per la sostituzione' : undefined}
               >
                 🔄 Sostituisci giocatore

@@ -322,7 +322,7 @@ export default function PartitaForm() {
                 return (
                   <label
                     key={p.id}
-                    className={`flex items-center gap-2 py-1 ${disabled ? 'opacity-40' : ''}`}
+                    className={`flex items-center gap-2 py-2 ${disabled ? 'opacity-40' : ''}`}
                   >
                     <input
                       type="checkbox"

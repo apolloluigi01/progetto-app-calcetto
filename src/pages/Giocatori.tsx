@@ -51,7 +51,7 @@ export default function Giocatori() {
           onChange={(e) => setSearch(e.target.value)}
           placeholder="🔍 Cerca giocatore..."
           aria-label="Cerca giocatore per nome, cognome o nickname"
-          className="w-44 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm focus:border-field-green focus:outline-none sm:w-64"
+          className="w-full min-w-0 max-w-44 flex-1 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm focus:border-field-green focus:outline-none sm:max-w-64"
         />
       </div>
 

@@ -103,7 +103,7 @@ export default function GiocatoreDetail() {
 
       {!statsLoading && playerStats && (
         <>
-          <div className="mt-3 grid grid-cols-3 gap-3">
+          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
             <div className="rounded-xl bg-white p-3 text-center shadow">
               <p className="text-2xl font-bold text-field-green-dark">{playerStats.partiteGiocate}</p>
               <p className="text-xs text-gray-500">Partite giocate</p>

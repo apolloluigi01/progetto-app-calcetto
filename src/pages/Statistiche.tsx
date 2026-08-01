@@ -107,10 +107,10 @@ export default function Statistiche() {
             <Link
               key={s.id}
               to={`/statistiche/stagione/${s.id}`}
-              className="flex items-center justify-between rounded-xl bg-white p-4 shadow-sm hover:bg-gray-50"
+              className="flex items-center justify-between gap-2 rounded-xl bg-white p-4 shadow-sm hover:bg-gray-50"
             >
-              <div>
-                <div className="flex items-center gap-2">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-1.5">
                   <span className="font-semibold text-gray-800">{s.name}</span>
                   <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${badge.className}`}>
                     {badge.label}
