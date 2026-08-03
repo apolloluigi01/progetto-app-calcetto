@@ -329,12 +329,15 @@ export default function FantaFormazione() {
       return
     }
     // Formazione rischierata: l'avviso "squadre ricalcolate" in Home sparisce.
-    await supabase
+    // Se questa cancellazione fallisce la formazione è comunque salvata, quindi
+    // non è un errore da mostrare: resta solo l'avviso di rischierare.
+    const { error: resetError } = await supabase
       .from('fanta_lineup_resets')
       .delete()
       .eq('league_id', leagueId)
       .eq('match_id', matchId)
       .eq('member_id', player.id)
+    if (resetError) console.warn('Avviso "rischiera formazione" non rimosso:', resetError.message)
     setSaved(true)
     setSavedLineup({ playerIds: [...selected], captainId })
   }

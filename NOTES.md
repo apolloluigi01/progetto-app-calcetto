@@ -63,6 +63,27 @@ Revisione completa di codice, schema, RLS ed edge function. Interventi applicati
   La storia autorevole è la tabella `supabase_migrations.schema_migrations`; si recupera con
   `npx supabase migration fetch --linked`.
 
+### Seconda passata (stesso giorno) — i salvataggi silenziosi
+
+La revisione successiva dell'audit ha trovato il problema più serio là dove la prima
+si era fermata: **30 scritture su 66 non controllavano l'esito**. Ora sono 2, entrambe
+innocue (registro attività e rimozione di un avviso).
+
+- Le quattro sequenze critiche del pannello partita erano più chiamate indipendenti:
+  un errore a metà lasciava il database incoerente. Sono diventate tre funzioni
+  Postgres transazionali — `officialize_match_teams`, `save_match_draft_teams`,
+  `save_match_result` — che verificano `is_admin()` al loro interno.
+  Il caso peggiore era "Ufficializza squadre": cancellava `match_players` e, se il
+  reinserimento falliva, la partita restava **senza squadre ma marcata come
+  ufficializzata**, con le formazioni fanta comunque azzerate.
+- `escapeCell` in `exportCsv.ts` non proteggeva il primo carattere: una cella che
+  inizia per `= + - @` viene eseguita come formula da Excel, e il soprannome se lo
+  sceglie ogni giocatore. Ora viene anteposto un apostrofo.
+- `ConfirmDialog`: `Esc` per annullare, focus confinato nel dialogo e — sulle azioni
+  distruttive — focus iniziale su "Annulla" invece che sul pulsante che cancella.
+- Il `Suspense` del code splitting avvolgeva tutte le rotte, quindi cambiando pagina
+  spariva per un istante anche il menu: ora sta attorno all'`Outlet` dentro il Layout.
+
 ### Rimasto fuori, per scelta
 - **Multi-gruppo** (più leghe indipendenti nella stessa app): è un progetto a sé, va fatto
   su un branch Supabase. Oggi l'app assume un solo gruppo e il nome è cablato in 16 file.
