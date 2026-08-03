@@ -9,16 +9,32 @@ const appUrl = Deno.env.get("APP_URL") ?? "https://progetto-app-calcetto.vercel.
 const gmailUser = Deno.env.get("GMAIL_USER")!;
 const gmailAppPassword = Deno.env.get("GMAIL_APP_PASSWORD")!;
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+// CORS ristretto ai domini dell'app: prima era "*", quindi qualsiasi sito
+// poteva far partire richieste verso questa funzione dal browser di un utente.
+const ALLOWED_ORIGINS = new Set([
+  appUrl,
+  "https://progetto-app-calcetto.vercel.app",
+  "http://localhost:5173",
+  "http://localhost:4173",
+]);
+// Le anteprime di Vercel hanno un sottodominio diverso a ogni deploy.
+const PREVIEW_ORIGIN = /^https:\/\/progetto-app-calcetto[a-z0-9-]*\.vercel\.app$/;
 
-function json(body: unknown, status = 200) {
+function corsHeaders(req: Request): Record<string, string> {
+  const origin = req.headers.get("Origin") ?? "";
+  const allowed = ALLOWED_ORIGINS.has(origin) || PREVIEW_ORIGIN.test(origin);
+  return {
+    "Access-Control-Allow-Origin": allowed ? origin : appUrl,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Vary": "Origin",
+  };
+}
+
+function json(req: Request, body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...corsHeaders(req), "Content-Type": "application/json" },
   });
 }
 
@@ -44,6 +60,13 @@ async function sendEmail(to: string, subject: string, html: string) {
   }
 }
 
+/** Massimo di richieste per lo stesso indirizzo, e finestra in minuti. */
+const MAX_PER_EMAIL = 3;
+const EMAIL_WINDOW_MINUTES = 15;
+/** Massimo di richieste dallo stesso IP, e finestra in minuti. */
+const MAX_PER_IP = 10;
+const IP_WINDOW_MINUTES = 60;
+
 // Risposta pubblica intenzionalmente generica: non deve rivelare se un'email esiste o no.
 const GENERIC_RESPONSE = {
   message: "Se l'indirizzo esiste, riceverai una mail con le istruzioni per reimpostare la password.",
@@ -51,18 +74,55 @@ const GENERIC_RESPONSE = {
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response("ok", { headers: corsHeaders(req) });
   }
   if (req.method !== "POST") {
-    return json({ error: "Method not allowed" }, 405);
+    return json(req, { error: "Method not allowed" }, 405);
   }
 
   const { email } = (await req.json()) as { email?: string };
   if (!email) {
-    return json({ error: "email obbligatoria" }, 400);
+    return json(req, { error: "email obbligatoria" }, 400);
   }
 
   const adminClient = createClient(supabaseUrl, serviceRoleKey);
+
+  // Freno anti abuso. La funzione e' pubblica per necessita' (chi ha perso la
+  // password non e' autenticato): senza limiti si satura la quota di invio
+  // giornaliera — condivisa con tutte le altre notifiche dell'app — e si puo'
+  // bombardare di email l'indirizzo di un altro.
+  const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || null;
+  const normalizedEmail = email.trim().toLowerCase();
+
+  const { count: emailCount } = await adminClient
+    .from("password_reset_attempts")
+    .select("id", { count: "exact", head: true })
+    .eq("email", normalizedEmail)
+    .gte("requested_at", new Date(Date.now() - EMAIL_WINDOW_MINUTES * 60_000).toISOString());
+
+  if ((emailCount ?? 0) >= MAX_PER_EMAIL) {
+    return json(req, { error: "Troppe richieste per questo indirizzo. Riprova tra un quarto d'ora." }, 429);
+  }
+
+  if (ip) {
+    const { count: ipCount } = await adminClient
+      .from("password_reset_attempts")
+      .select("id", { count: "exact", head: true })
+      .eq("ip", ip)
+      .gte("requested_at", new Date(Date.now() - IP_WINDOW_MINUTES * 60_000).toISOString());
+
+    if ((ipCount ?? 0) >= MAX_PER_IP) {
+      return json(req, { error: "Troppe richieste. Riprova piu' tardi." }, 429);
+    }
+  }
+
+  // Il tentativo si registra PRIMA dell'invio, cosi' conta anche quando
+  // l'indirizzo non esiste: altrimenti il limite sarebbe aggirabile.
+  await adminClient.from("password_reset_attempts").insert({ email: normalizedEmail, ip });
+  await adminClient
+    .from("password_reset_attempts")
+    .delete()
+    .lt("requested_at", new Date(Date.now() - 24 * 60 * 60_000).toISOString());
 
   // generateLink restituisce anche un codice OTP a 6 cifre (email_otp) abbinato allo
   // stesso token: lo mandiamo via email invece di un link cliccabile, cosi' l'utente
@@ -75,7 +135,7 @@ Deno.serve(async (req: Request) => {
 
   if (linkError || !linkData.user || !linkData.properties?.email_otp) {
     // Utente non trovato o altro errore: non lo comunichiamo al chiamante.
-    return json(GENERIC_RESPONSE);
+    return json(req, GENERIC_RESPONSE);
   }
 
   const code = linkData.properties.email_otp;
@@ -103,5 +163,5 @@ Deno.serve(async (req: Request) => {
     // Non esponiamo errori di invio al chiamante per lo stesso motivo (no enumeration).
   }
 
-  return json(GENERIC_RESPONSE);
+  return json(req, GENERIC_RESPONSE);
 });

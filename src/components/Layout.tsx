@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useConfirm } from './ConfirmDialog'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import './layout-fanta.css'
@@ -30,6 +31,7 @@ function NavLabel({ item, isActive }: { item: NavItem; isActive: boolean }) {
 }
 
 export default function Layout() {
+  const askConfirm = useConfirm()
   const { isAdmin, signOut } = useAuth()
   const [menuOpen, setMenuOpen] = useState(false)
   const location = useLocation()
@@ -42,10 +44,13 @@ export default function Layout() {
     ? [...navItems, { to: '/admin', label: 'CDA' }, ...tailItems]
     : [...navItems, ...tailItems]
 
-  function handleLogout() {
-    if (confirm('Vuoi davvero uscire?')) {
-      signOut()
-    }
+  async function handleLogout() {
+    const conferma = await askConfirm({
+      message: 'Vuoi davvero uscire?',
+      confirmLabel: 'Esci',
+      cancelLabel: 'Resta',
+    })
+    if (conferma) signOut()
   }
 
   return (

@@ -124,13 +124,12 @@ export default function FantaFormazione() {
     if (!leagueId || !matchId || !player) return
     let cancelled = false
     Promise.all([
-      supabase
-        .from('fanta_lineups')
-        // Due foreign key verso players (member e capitano): serve il
-        // riferimento esplicito per disambiguare l'embed.
-        .select('member_id, captain_id, score, hidden, fanta_lineup_players(player_id), member:players!fanta_lineups_member_id_fkey(name, surname, nickname)')
-        .eq('league_id', leagueId)
-        .eq('match_id', matchId),
+      // Le formazioni altrui passano da una RPC e non piu' da una select sulla
+      // tabella: il flag "invisibile" era rispettato solo qui nel frontend,
+      // mentre l'API restituiva comunque i giocatori schierati a chiunque.
+      // Ora il database maschera capitano e giocatori delle formazioni
+      // nascoste finche' non scatta il blocco.
+      supabase.rpc('fanta_match_lineups', { p_league_id: leagueId, p_match_id: matchId }),
       supabase
         .from('fanta_league_members')
         .select('player_id, joined_at, players(name, surname, nickname)')
@@ -139,11 +138,14 @@ export default function FantaFormazione() {
       if (cancelled) return
       type Row = {
         member_id: string
-        captain_id: string
+        member_name: string
+        member_surname: string | null
+        member_nickname: string | null
+        captain_id: string | null
+        player_ids: string[]
         score: number | null
         hidden: boolean
-        fanta_lineup_players: { player_id: string }[]
-        member: { name: string; surname: string | null; nickname: string | null } | null
+        visible: boolean
       }
       type MemberRow = {
         player_id: string
@@ -156,9 +158,9 @@ export default function FantaFormazione() {
           .filter((r) => r.member_id !== player.id)
           .map((r) => ({
             memberId: r.member_id,
-            memberName: r.member ? fullName(r.member) : '?',
-            captainId: r.captain_id,
-            playerIds: r.fanta_lineup_players.map((p) => p.player_id),
+            memberName: fullName({ name: r.member_name, surname: r.member_surname }),
+            captainId: r.captain_id ?? '',
+            playerIds: r.player_ids ?? [],
             score: r.score !== null ? Number(r.score) : null,
             hidden: r.hidden,
           })),

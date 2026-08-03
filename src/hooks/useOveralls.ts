@@ -9,7 +9,7 @@ export function useOveralls() {
   useEffect(() => {
     async function load() {
       setLoading(true)
-      const { data } = await supabase.from('players').select('id, name')
+      const { data } = await supabase.from('players').select('id, name').is('deleted_at', null)
       const result = await computeOverallsForPlayers(data ?? [])
       setOveralls(new Map(result.map((p) => [p.playerId, p.overall])))
       setLoading(false)

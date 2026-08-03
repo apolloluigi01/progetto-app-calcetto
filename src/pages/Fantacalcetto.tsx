@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { SkeletonList } from '../components/Skeleton'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -135,7 +136,7 @@ export default function Fantacalcetto() {
         totalizza più punti.
       </p>
 
-      {loading && <p className="mt-4 text-sm text-gray-500">Caricamento...</p>}
+      {loading && <SkeletonList rows={2} className="mt-4" />}
       {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
 
       {!loading && (

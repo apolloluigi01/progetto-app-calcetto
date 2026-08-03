@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { SkeletonList } from '../components/Skeleton'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -161,7 +162,7 @@ export default function Home() {
 
       <FantaResetNotice />
 
-      {loading && <p className="mt-4 text-sm text-gray-500">Caricamento...</p>}
+      {loading && <SkeletonList rows={3} className="mt-4" />}
 
       {!loading && error && (
         <div className="mt-4">

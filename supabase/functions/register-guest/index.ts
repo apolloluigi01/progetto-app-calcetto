@@ -5,33 +5,77 @@ import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 const supabaseUrl    = Deno.env.get("SUPABASE_URL")!;
 // Nuova secret key (sb_secret_...) con fallback alla legacy service_role.
 const serviceRoleKey = Deno.env.get("SERVICE_SECRET_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+// La verifica di chi chiama si fa con la chiave anonima: la chiave con pieni
+// poteri non deve stare su un client che elabora un header arrivato da fuori.
+const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ?? serviceRoleKey;
 const gmailUser      = Deno.env.get("GMAIL_USER")!;
 const gmailPassword  = Deno.env.get("GMAIL_APP_PASSWORD")!;
 const appUrl         = Deno.env.get("APP_URL") ?? "https://progetto-app-calcetto.vercel.app";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+// CORS ristretto ai domini dell'app: prima era "*", quindi qualsiasi sito
+// poteva far partire richieste verso questa funzione dal browser di un utente.
+const ALLOWED_ORIGINS = new Set([
+  appUrl,
+  "https://progetto-app-calcetto.vercel.app",
+  "http://localhost:5173",
+  "http://localhost:4173",
+]);
+// Le anteprime di Vercel hanno un sottodominio diverso a ogni deploy.
+const PREVIEW_ORIGIN = /^https:\/\/progetto-app-calcetto[a-z0-9-]*\.vercel\.app$/;
 
-function json(body: unknown, status = 200) {
+function corsHeaders(req: Request): Record<string, string> {
+  const origin = req.headers.get("Origin") ?? "";
+  const allowed = ALLOWED_ORIGINS.has(origin) || PREVIEW_ORIGIN.test(origin);
+  return {
+    "Access-Control-Allow-Origin": allowed ? origin : appUrl,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Vary": "Origin",
+  };
+}
+
+function json(req: Request, body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...corsHeaders(req), "Content-Type": "application/json" },
   });
 }
 
-// Password iniziale casuale (l'utente ne sceglie una propria al primo accesso).
+/**
+ * Password iniziale casuale (l'utente ne sceglie una propria al primo accesso).
+ * Usa crypto.getRandomValues e non Math.random: quest'ultimo non e' un
+ * generatore crittografico e le sue uscite sono in linea di principio
+ * prevedibili — non va usato per generare credenziali.
+ */
 function generatePassword(): string {
   const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
   const lower = "abcdefghijkmnpqrstuvwxyz";
   const digits = "23456789";
   const all = upper + lower + digits;
-  const pick = (set: string) => set[Math.floor(Math.random() * set.length)];
-  let pwd = pick(upper) + pick(lower) + pick(digits);
-  for (let i = 0; i < 7; i++) pwd += pick(all);
-  return pwd.split("").sort(() => Math.random() - 0.5).join("");
+
+  // Indice casuale senza bias: si scartano i valori che cadono nella coda
+  // incompleta dell'intervallo (rejection sampling).
+  const randomIndex = (max: number): number => {
+    const limit = Math.floor(256 / max) * max;
+    const buf = new Uint8Array(1);
+    let value: number;
+    do {
+      crypto.getRandomValues(buf);
+      value = buf[0];
+    } while (value >= limit);
+    return value % max;
+  };
+
+  const pick = (set: string) => set[randomIndex(set.length)];
+  const chars = [pick(upper), pick(lower), pick(digits)];
+  for (let i = 0; i < 7; i++) chars.push(pick(all));
+
+  // Mescolamento Fisher-Yates, anch'esso su sorgente crittografica.
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = randomIndex(i + 1);
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+  return chars.join("");
 }
 
 function welcomeHtml(name: string, email: string, password: string): string {
@@ -89,17 +133,17 @@ async function sendWelcomeEmail(to: string, name: string, password: string): Pro
 }
 
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders(req) });
+  if (req.method !== "POST") return json(req, { error: "Method not allowed" }, 405);
 
   const authHeader = req.headers.get("Authorization");
-  if (!authHeader) return json({ error: "Missing Authorization header" }, 401);
+  if (!authHeader) return json(req, { error: "Missing Authorization header" }, 401);
 
-  const callerClient = createClient(supabaseUrl, serviceRoleKey, {
+  const callerClient = createClient(supabaseUrl, anonKey, {
     global: { headers: { Authorization: authHeader } },
   });
   const { data: callerData, error: callerError } = await callerClient.auth.getUser();
-  if (callerError || !callerData.user) return json({ error: "Not authenticated" }, 401);
+  if (callerError || !callerData.user) return json(req, { error: "Not authenticated" }, 401);
 
   const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
@@ -111,7 +155,7 @@ Deno.serve(async (req: Request) => {
 
   const callerRole = callerPlayer?.role;
   if (callerPlayerError || (callerRole !== "admin" && callerRole !== "superadmin")) {
-    return json({ error: "Solo un admin puo' registrare un ospite" }, 403);
+    return json(req, { error: "Solo un admin puo' registrare un ospite" }, 403);
   }
 
   const body = await req.json();
@@ -125,7 +169,7 @@ Deno.serve(async (req: Request) => {
   };
 
   if (!guestId || !email || !name) {
-    return json({ error: "guestId, email e name sono obbligatori" }, 400);
+    return json(req, { error: "guestId, email e name sono obbligatori" }, 400);
   }
 
   // L'id da convertire deve essere un ospite reale.
@@ -134,8 +178,8 @@ Deno.serve(async (req: Request) => {
     .select("id, is_guest")
     .eq("id", guestId)
     .single();
-  if (guestError || !guest) return json({ error: "Ospite non trovato" }, 404);
-  if (!guest.is_guest) return json({ error: "Il giocatore indicato non e' un ospite" }, 400);
+  if (guestError || !guest) return json(req, { error: "Ospite non trovato" }, 404);
+  if (!guest.is_guest) return json(req, { error: "Il giocatore indicato non e' un ospite" }, 400);
 
   const initialPassword = password && password.length >= 6 ? password : generatePassword();
 
@@ -148,7 +192,7 @@ Deno.serve(async (req: Request) => {
   });
 
   if (createError || !createData.user) {
-    return json({ error: createError?.message ?? "Errore creazione utente" }, 400);
+    return json(req, { error: createError?.message ?? "Errore creazione utente" }, 400);
   }
 
   // Sposta l'ospite (con tutte le sue statistiche) sul nuovo id auth.
@@ -163,7 +207,7 @@ Deno.serve(async (req: Request) => {
   if (convertError) {
     // Rollback dell'utente auth: l'ospite resta intatto con le sue statistiche.
     await adminClient.auth.admin.deleteUser(createData.user.id);
-    return json({ error: convertError.message }, 400);
+    return json(req, { error: convertError.message }, 400);
   }
 
   try {
@@ -172,5 +216,5 @@ Deno.serve(async (req: Request) => {
     console.error("Errore invio email:", e);
   }
 
-  return json({ id: createData.user.id });
+  return json(req, { id: createData.user.id });
 });

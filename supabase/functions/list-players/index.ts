@@ -7,7 +7,6 @@ const serviceRoleKey = Deno.env.get("SERVICE_SECRET_KEY") ?? Deno.env.get("SUPAB
 // La verifica di chi chiama si fa con la chiave anonima: la chiave con pieni
 // poteri non deve stare su un client che elabora un header arrivato da fuori.
 const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ?? serviceRoleKey;
-
 const appUrl = Deno.env.get("APP_URL") ?? "https://progetto-app-calcetto.vercel.app";
 
 // CORS ristretto ai domini dell'app: prima era "*", quindi qualsiasi sito
@@ -43,9 +42,6 @@ Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders(req) });
   }
-  if (req.method !== "POST") {
-    return json(req, { error: "Method not allowed" }, 405);
-  }
 
   const authHeader = req.headers.get("Authorization");
   if (!authHeader) {
@@ -55,6 +51,7 @@ Deno.serve(async (req: Request) => {
   const callerClient = createClient(supabaseUrl, anonKey, {
     global: { headers: { Authorization: authHeader } },
   });
+
   const { data: callerData, error: callerError } = await callerClient.auth.getUser();
   if (callerError || !callerData.user) {
     return json(req, { error: "Not authenticated" }, 401);
@@ -70,41 +67,33 @@ Deno.serve(async (req: Request) => {
 
   const callerRole = callerPlayer?.role;
   if (callerPlayerError || (callerRole !== "admin" && callerRole !== "superadmin")) {
-    return json(req, { error: "Solo un admin puo' reimpostare le password" }, 403);
+    return json(req, { error: "Solo un admin puo' vedere questa lista" }, 403);
   }
 
-  const { playerId, newPassword } = (await req.json()) as { playerId?: string; newPassword?: string };
-  if (!playerId || !newPassword) {
-    return json(req, { error: "playerId e newPassword sono obbligatori" }, 400);
-  }
-  if (newPassword.length < 6) {
-    return json(req, { error: "La password deve essere di almeno 6 caratteri" }, 400);
-  }
-
-  const { data: targetPlayer, error: targetError } = await adminClient
+  // I giocatori rimossi (cancellazione logica) restano nel database per non
+  // spezzare lo storico, ma non hanno piu' nulla da mostrare in elenco.
+  const { data: players, error: playersError } = await adminClient
     .from("players")
-    .select("role")
-    .eq("id", playerId)
-    .single();
+    .select("*")
+    .is("deleted_at", null)
+    .order("name");
 
-  if (targetError || !targetPlayer) {
-    return json(req, { error: "Giocatore non trovato" }, 404);
+  if (playersError) {
+    return json(req, { error: playersError.message }, 400);
   }
 
-  // stesso vincolo di delete-player: un admin (non superadmin) puo' agire solo sui 'player'
-  if (callerRole === "admin" && targetPlayer.role !== "player") {
-    return json(req, { error: "Un admin puo' reimpostare solo la password di giocatori con ruolo player" }, 403);
-  }
+  // Gli indirizzi arrivano da una sola query (RPC player_emails) invece di una
+  // chiamata all'admin API per ogni giocatore.
+  const ids = (players ?? []).map((p) => p.id);
+  const { data: emailRows } = await adminClient.rpc("player_emails", { p_ids: ids });
+  type EmailRow = { player_id: string; email: string; email_confirmed: boolean };
+  const byId = new Map(((emailRows ?? []) as EmailRow[]).map((r) => [r.player_id, r]));
 
-  const { error: updateError } = await adminClient.auth.admin.updateUserById(playerId, {
-    password: newPassword,
-  });
-  if (updateError) {
-    return json(req, { error: updateError.message }, 400);
-  }
+  const enriched = (players ?? []).map((p) => ({
+    ...p,
+    email: byId.get(p.id)?.email ?? null,
+    email_confirmed: byId.get(p.id)?.email_confirmed ?? false,
+  }));
 
-  // chi riceve una password impostata da un admin deve sceglierne una propria conforme al primo accesso
-  await adminClient.from("players").update({ must_change_password: true }).eq("id", playerId);
-
-  return json(req, { success: true });
+  return json(req, { players: enriched });
 });

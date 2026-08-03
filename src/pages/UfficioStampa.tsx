@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { useConfirm } from '../components/ConfirmDialog'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import ErrorNotice from '../components/ErrorNotice'
@@ -25,6 +26,7 @@ function isValidUrl(value: string): boolean {
 }
 
 export default function UfficioStampa() {
+  const askConfirm = useConfirm()
   const { player, isAdmin } = useAuth()
   const [links, setLinks] = useState<PressLink[]>([])
   const [loading, setLoading] = useState(true)
@@ -99,7 +101,7 @@ export default function UfficioStampa() {
   }
 
   async function handleDelete(link: PressLink) {
-    if (!confirm(`Rimuovere "${link.title}" dall'ufficio stampa?`)) return
+    if (!await askConfirm({ message: `Rimuovere "${link.title}" dall'ufficio stampa?`, confirmLabel: 'Rimuovi', destructive: true })) return
     setDeletingId(link.id)
     const { error: delError } = await supabase.from('press_links').delete().eq('id', link.id)
     setDeletingId(null)

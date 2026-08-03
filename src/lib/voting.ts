@@ -50,6 +50,42 @@ export function calculateExactAverage(votes: VoteWithRole[]): number | null {
   return Math.round((weightedSum / totalWeight) * 100) / 100
 }
 
+/** Riga aggregata restituita dalla RPC match_vote_summary. */
+export interface VoteSummaryRow {
+  voted_id: string
+  weighted_sum: number
+  weight_total: number
+  raw_count: number
+}
+
+/**
+ * Medie a partire dai dati aggregati del database. I singoli voti non sono
+ * piu' leggibili da chi non li ha espressi (le RLS li riservano all'autore e
+ * agli admin), quindi le medie arrivano dalla RPC match_vote_summary: qui si
+ * applicano gli stessi arrotondamenti di calculateExactAverage /
+ * calculateWeightedAverage, cosi' il risultato e' identico a prima.
+ */
+export function averagesFromSummary(
+  rows: VoteSummaryRow[],
+  playerIds: string[],
+): PlayerAverage[] {
+  const byPlayer = new Map(rows.map((r) => [r.voted_id, r]))
+  return playerIds.map((pid) => {
+    const row = byPlayer.get(pid)
+    if (!row || Number(row.weight_total) === 0) {
+      return { player_id: pid, average: null, exact: null, raw_count: 0, weighted_count: 0 }
+    }
+    const exact = Math.round((Number(row.weighted_sum) / Number(row.weight_total)) * 100) / 100
+    return {
+      player_id: pid,
+      average: Math.round(exact * 2) / 2,
+      exact,
+      raw_count: Number(row.raw_count),
+      weighted_count: Number(row.weight_total),
+    }
+  })
+}
+
 export function getPlayerAverages(votes: VoteWithRole[], playerIds: string[]): PlayerAverage[] {
   return playerIds.map((pid) => {
     const pv = votes.filter((v) => v.voted_id === pid)

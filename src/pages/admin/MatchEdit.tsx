@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useConfirm } from '../../components/ConfirmDialog'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 // [APPROVAZIONE SQUADRE — regressa/disattivata, codice conservato per riuso futuro]
@@ -31,6 +32,7 @@ interface DraftPlayer {
 }
 
 export default function MatchEdit() {
+  const askConfirm = useConfirm()
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   // [APPROVAZIONE SQUADRE — disattivata] const { player: currentAdmin } = useAuth()
@@ -207,6 +209,7 @@ export default function MatchEdit() {
     supabase
       .from('players')
       .select('*')
+      .is('deleted_at', null)
       .order('name')
       .then(({ data: pd }) => setAllPlayers((pd ?? []) as Player[]))
   }, [])
@@ -290,9 +293,7 @@ export default function MatchEdit() {
   async function handleSaveStats() {
     if (!id || locked) return
     if (!goalsCoherent) {
-      alert(
-        'I gol registrati non coincidono con il risultato: correggi i marcatori o il risultato prima di salvare le statistiche.'
-      )
+      await askConfirm({ message: 'I gol registrati non coincidono con il risultato: correggi i marcatori o il risultato prima di salvare le statistiche.', alertOnly: true })
       return
     }
     setSavingStats(true)
@@ -397,13 +398,13 @@ export default function MatchEdit() {
   }
 
   async function handleDeleteMatch() {
-    if (!id || !confirm('Eliminare definitivamente questa partita? Risultato, marcatori e pagelle verranno rimossi.'))
+    if (!id || !await askConfirm({ message: 'Eliminare definitivamente questa partita? Risultato, marcatori e pagelle verranno rimossi.', confirmLabel: 'Elimina', destructive: true }))
       return
     setDeleting(true)
     const { error: delErr } = await supabase.from('matches').delete().eq('id', id)
     setDeleting(false)
     if (delErr) {
-      alert(delErr.message)
+      await askConfirm({ message: delErr.message, alertOnly: true })
       return
     }
     await logActivity('partita_eliminata', { matchId: id, data: match.match_date })
@@ -445,7 +446,7 @@ export default function MatchEdit() {
   }
 
   async function handleCloseSurvey() {
-    if (!id || !confirm('Chiudere il sondaggio? I giocatori non potranno più prenotarsi.')) return
+    if (!id || !await askConfirm('Chiudere il sondaggio? I giocatori non potranno più prenotarsi.')) return
     setClosingSurvey(true)
     await supabase.from('matches').update({ booking_open: false }).eq('id', id)
     logActivity('sondaggio_chiuso', { matchId: id, prenotazioni: bookings.length })
@@ -561,7 +562,7 @@ export default function MatchEdit() {
     if (
       !id ||
       // [APPROVAZIONE SQUADRE — disattivata] !allApproved ||
-      !confirm(
+      !await askConfirm(
         teamsOfficial
           ? 'Ufficializzare la nuova versione delle squadre? Diventerà quella visibile a tutti al posto della precedente, e le formazioni del fantacalcetto verranno azzerate perché le squadre sono cambiate.'
           : 'Ufficializzare le squadre? Diventeranno visibili a tutti i giocatori e si aprirà lo schieramento delle formazioni del fantacalcetto.'

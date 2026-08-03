@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import {
-  getPlayerAverages,
+  averagesFromSummary,
   getProvisionalMvpId,
   type PlayerAverage,
+  type VoteSummaryRow,
   type VoteWithRole,
 } from '../lib/voting'
 import type { PlayerRole, Team } from '../types/database'
@@ -25,7 +26,12 @@ export interface VoterInfo {
 }
 
 export function useMatchVoting(matchId: string | undefined) {
+  // Voti "grezzi": per un giocatore normale sono solo i propri, per un admin
+  // sono tutti (serve al dettaglio "chi ha votato cosa").
   const [votes, setVotes] = useState<VoteWithRole[]>([])
+  // Dati aggregati: leggibili da tutti, e' da qui che si ricavano le medie.
+  const [voteSummary, setVoteSummary] = useState<VoteSummaryRow[]>([])
+  const [allVoterIds, setAllVoterIds] = useState<Set<string>>(new Set())
   const [participants, setParticipants] = useState<VotingParticipant[]>([])
   const [voterInfo, setVoterInfo] = useState<Map<string, VoterInfo>>(new Map())
   // Bonus (gol + assist) per giocatore: serve come spareggio nel calcolo dell'MVP.
@@ -40,11 +46,16 @@ export function useMatchVoting(matchId: string | undefined) {
     if (!matchId) { setLoading(false); return }
     setLoading(true)
 
-    const [votesRes, partsRes, goalsRes, assistsRes, resultRes] = await Promise.all([
+    // I singoli voti li restituisce solo a chi li ha espressi (e agli admin):
+    // le medie e l'elenco di chi ha votato arrivano da due RPC aggregate,
+    // perche' "chi ha dato quale voto a chi" non deve uscire dal database.
+    const [votesRes, summaryRes, votersRes, partsRes, goalsRes, assistsRes, resultRes] = await Promise.all([
       supabase
         .from('player_votes')
         .select('voter_id, voted_id, vote')
         .eq('match_id', matchId),
+      supabase.rpc('match_vote_summary', { p_match_id: matchId }),
+      supabase.rpc('match_voter_ids', { p_match_id: matchId }),
       supabase
         .from('match_players')
         .select('player_id, team, players(name, surname, nickname, role)')
@@ -114,13 +125,17 @@ export function useMatchVoting(matchId: string | undefined) {
     }))
     setVotes(withRole)
     setVoterInfo(nameRoleMap)
+    setVoteSummary((summaryRes.data ?? []) as VoteSummaryRow[])
+    setAllVoterIds(
+      new Set(((votersRes.data ?? []) as { voter_id: string }[]).map((r) => r.voter_id)),
+    )
     setLoading(false)
   }, [matchId])
 
   useEffect(() => { load() }, [load])
 
   const playerIds = participants.map((p) => p.player_id)
-  const averages: PlayerAverage[] = getPlayerAverages(votes, playerIds)
+  const averages: PlayerAverage[] = averagesFromSummary(voteSummary, playerIds)
   const teamByPlayer = new Map<string, Team>(participants.map((p) => [p.player_id, p.team]))
   // MVP automatico con catena di spareggi: media esatta → squadra vincitrice →
   // numero di bonus (gol+assist) → più gol. Null se resta il parimerito totale
@@ -132,7 +147,9 @@ export function useMatchVoting(matchId: string | undefined) {
     winningTeam,
   })
 
-  const voterIds = new Set(votes.map((v) => v.voter_id))
+  // Chi ha votato (non cosa): arriva dalla RPC, perche' un giocatore normale
+  // non vede piu' i voti altrui e non potrebbe dedurlo da `votes`.
+  const voterIds = allVoterIds
 
   // Votanti attesi: gli admin/superadmin che hanno partecipato alla partita.
   // Caso limite: se nessun admin ha partecipato, vota il superadmin (che però

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { SkeletonList } from '../components/Skeleton'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import ErrorNotice from '../components/ErrorNotice'
@@ -157,7 +158,7 @@ export default function Calendario() {
         Tutte le partite divise per stagione: quelle giocate e quelle in programma.
       </p>
 
-      {loading && <p className="mt-4 text-sm text-gray-500">Caricamento...</p>}
+      {loading && <SkeletonList rows={3} className="mt-4" />}
 
       {!loading && error && (
         <div className="mt-4">

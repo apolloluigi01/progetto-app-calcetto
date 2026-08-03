@@ -1,4 +1,5 @@
 import { Link, useParams } from 'react-router-dom'
+import { useConfirm } from '../components/ConfirmDialog'
 import { useAuth } from '../contexts/AuthContext'
 import { useFantaLeague } from '../hooks/useFantaLeague'
 import { computeLineupScore, formatFantaPoints, getFantaSettings } from '../lib/fantacalcetto'
@@ -12,6 +13,7 @@ function formatDate(d: string) {
 }
 
 export default function FantaLega() {
+  const askConfirm = useConfirm()
   const { leagueId } = useParams<{ leagueId: string }>()
   const { player, isAdmin } = useAuth()
   const { data, loading, error, refetch } = useFantaLeague(leagueId, player?.id)
@@ -102,7 +104,7 @@ export default function FantaLega() {
   // Annulla il calcolo: la giornata torna "non calcolata" e i punteggi
   // vengono azzerati (si può poi ricalcolare in qualsiasi momento).
   async function annullaCalcolo(matchId: string) {
-    if (!leagueId || !confirm('Annullare il calcolo di questa giornata? I punti verranno rimossi dalla classifica finché non la ricalcoli.')) return
+    if (!leagueId || !await askConfirm('Annullare il calcolo di questa giornata? I punti verranno rimossi dalla classifica finché non la ricalcoli.')) return
     setCalcBusy(matchId)
     setCalcError(null)
     await supabase.from('fanta_calculations').delete().eq('league_id', leagueId).eq('match_id', matchId)

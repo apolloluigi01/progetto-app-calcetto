@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
+import { useConfirm } from '../../components/ConfirmDialog'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import type { Season, SeasonType } from '../../types/database'
 
 export default function StagioneEdit() {
+  const askConfirm = useConfirm()
   const { id } = useParams<{ id: string }>()
   const isNew = !id || id === 'nuova'
   const navigate = useNavigate()
@@ -101,7 +103,7 @@ export default function StagioneEdit() {
 
   async function handleDelete() {
     if (!id || isNew) return
-    if (!confirm(`Eliminare la stagione "${name}"? Tutte le partite collegate saranno preservate ma orfane.`)) return
+    if (!await askConfirm({ message: `Eliminare la stagione "${name}"? Tutte le partite collegate saranno preservate ma orfane.`, confirmLabel: 'Elimina', destructive: true })) return
     setDeleting(true)
     const { error: err } = await supabase.from('seasons').delete().eq('id', id)
     setDeleting(false)

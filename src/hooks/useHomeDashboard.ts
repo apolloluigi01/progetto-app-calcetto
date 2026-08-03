@@ -61,10 +61,15 @@ export function useHomeDashboard() {
             .order('match_date', { ascending: false })
             .limit(1)
             .maybeSingle(),
+          // "Prossima partita": va esclusa quella già giocata. Senza il filtro
+          // sullo stato, la sera stessa della partita — conclusa e completata,
+          // ma con data uguale a oggi — la dashboard continuava a mostrarla
+          // come prossima, nascondendo quella vera fino a mezzanotte.
           supabase
             .from('matches')
             .select('*')
             .gte('match_date', today)
+            .neq('status', 'completed')
             .order('match_date', { ascending: true })
             .limit(1)
             .maybeSingle(),

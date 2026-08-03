@@ -20,6 +20,19 @@ const positionLabels: Record<string, string> = {
   ATT: 'Attaccante (ATT)',
 }
 
+/**
+ * Dall'URL pubblico di un file nel bucket "avatars" ricava il percorso interno
+ * (`<user-id>/<timestamp>.<ext>`), che è quello che serve per cancellarlo.
+ * Restituisce null se l'URL non è del bucket (es. foto impostata a mano).
+ */
+function storagePathFromPublicUrl(url: string): string | null {
+  const marker = '/storage/v1/object/public/avatars/'
+  const index = url.indexOf(marker)
+  if (index === -1) return null
+  const path = url.slice(index + marker.length).split('?')[0]
+  return path ? decodeURIComponent(path) : null
+}
+
 export default function Impostazioni() {
   const { player, session, refreshPlayer } = useAuth()
 
@@ -62,12 +75,15 @@ export default function Impostazioni() {
       setAvatarError('Seleziona un file immagine (jpg, png, webp...).')
       return
     }
-    if (file.size > 5 * 1024 * 1024) {
-      setAvatarError("L'immagine non può superare i 5 MB.")
+    // Lo stesso limite è imposto dal bucket lato server (file_size_limit):
+    // qui serve solo a dare un messaggio chiaro prima di iniziare il caricamento.
+    if (file.size > 2 * 1024 * 1024) {
+      setAvatarError("L'immagine non può superare i 2 MB.")
       return
     }
     if (!session) return
 
+    const previousAvatarUrl = player?.avatar_url ?? null
     setAvatarPreview(URL.createObjectURL(file))
     setUploadingAvatar(true)
 
@@ -90,6 +106,18 @@ export default function Impostazioni() {
       setAvatarPreview(null)
       setAvatarError(rpcError.message)
       return
+    }
+
+    // La foto precedente non serve piu': senza questa cancellazione ogni
+    // caricamento lasciava nel bucket un file in piu', per sempre.
+    if (previousAvatarUrl) {
+      const previousPath = storagePathFromPublicUrl(previousAvatarUrl)
+      if (previousPath && previousPath !== path) {
+        const { error: removeError } = await supabase.storage.from('avatars').remove([previousPath])
+        // Se la vecchia foto non si cancella non è un problema per l'utente:
+        // la nuova è già salvata, quindi non mostriamo un errore.
+        if (removeError) console.warn('Foto precedente non rimossa:', removeError.message)
+      }
     }
 
     await refreshPlayer()

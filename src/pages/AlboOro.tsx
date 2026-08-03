@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { SkeletonList } from '../components/Skeleton'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { computeStatistiche, getRanking, type PlayerStats } from '../lib/statistiche'
@@ -211,7 +212,7 @@ export default function AlboOro() {
         gol per le amichevoli. Tocca una carta per aprire la scheda del giocatore.
       </p>
 
-      {loading && <p className="mt-4 text-sm text-gray-500">Caricamento...</p>}
+      {loading && <SkeletonList rows={3} className="mt-4" />}
       {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
 
       {!loading && !error && formatPodiums.length === 0 && (

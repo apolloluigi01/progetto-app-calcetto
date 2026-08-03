@@ -44,6 +44,7 @@ export default function PartitaForm() {
     supabase
       .from('players')
       .select('*')
+      .is('deleted_at', null)
       .order('name')
       .then(({ data, error }) => {
         if (error) setError(error.message)

@@ -6,6 +6,7 @@ import { registerSW } from 'virtual:pwa-register'
 import './index.css'
 import App from './App.tsx'
 import { ErrorBoundary } from './components/ErrorBoundary.tsx'
+import { ConfirmProvider } from './components/ConfirmDialog.tsx'
 
 // La PWA installata su mobile può restare aperta a lungo (o "in pausa" in
 // background) senza mai ricaricare: senza questo, un nuovo deploy resta
@@ -42,7 +43,9 @@ navigator.serviceWorker?.addEventListener('controllerchange', () => {
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary>
-      <App />
+      <ConfirmProvider>
+        <App />
+      </ConfirmProvider>
       <Analytics />
       <SpeedInsights />
     </ErrorBoundary>

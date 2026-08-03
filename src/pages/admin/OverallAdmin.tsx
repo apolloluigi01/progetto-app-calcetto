@@ -32,7 +32,7 @@ export default function OverallAdmin() {
   useEffect(() => {
     async function load() {
       const [playersRes, ratingsRes] = await Promise.all([
-        supabase.from('players').select('id, name, surname, nickname').order('name'),
+        supabase.from('players').select('id, name, surname, nickname').is('deleted_at', null).order('name'),
         supabase.from('ratings').select('player_id, rating_value'),
       ])
       if (playersRes.error) {

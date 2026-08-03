@@ -1,6 +1,75 @@
 # Note di progetto — App Calcetto
 
-Ultimo aggiornamento: 2026-07-03
+Ultimo aggiornamento: 2026-08-03
+
+## Audit tecnico del 2026-08-03 — cosa è cambiato
+
+Revisione completa di codice, schema, RLS ed edge function. Interventi applicati
+(database di produzione e funzioni già aggiornati):
+
+**Sicurezza**
+- La **formazione "invisibile"** del fantacalcetto era rispettata solo dal frontend: le
+  policy di SELECT erano `using(true)` e chiunque poteva leggere via API la formazione
+  altrui prima del blocco. Ora decide il database: RLS su `fanta_lineup_players` e RPC
+  `fanta_match_lineups`, che maschera anche il capitano (vive sulla riga `fanta_lineups`,
+  che resta leggibile per punteggio e "ha schierato").
+- I **voti individuali** erano leggibili da chiunque. Ora la riga grezza la vedono solo
+  l'autore e gli admin; le medie arrivano dalle RPC `match_vote_summary` e
+  `match_voter_ids`. L'interfaccia non cambia.
+- Il **bucket avatars** non aveva limiti (il tetto di 5 MB e il "solo immagini" stavano
+  solo in `Impostazioni.tsx`): ora `file_size_limit` 2 MB e mime type consentiti sul
+  bucket, più la policy di DELETE che mancava — ogni caricamento lasciava lì il file
+  precedente per sempre.
+- **`request-password-reset`** ha un rate limit (3 richieste per indirizzo ogni 15', 10
+  per IP ogni ora, tabella `password_reset_attempts`): era pubblica e senza freni, quindi
+  si poteva saturare la quota Gmail e bombardare l'indirizzo di un altro.
+- **`bootstrap-admin` disattivata** (risponde 410). Era pubblica (`verify_jwt = false`) e
+  creava un account admin se non esisteva nessun giocatore con ruolo `admin` — condizione
+  che poteva tornare vera per un incidente. Si può eliminare del tutto dalla dashboard.
+- CORS ristretto ai domini dell'app su tutte le funzioni (era `*`); la verifica del
+  chiamante usa la chiave anonima e non più quella con pieni poteri; password provvisorie
+  con `crypto.getRandomValues` al posto di `Math.random`.
+- `search_path` fissato sulle funzioni che ne erano prive e `EXECUTE` revocato sulle
+  funzioni-trigger, che erano invocabili come RPC perfino da `anon`.
+
+**Correttezza**
+- **Cancellazione logica dei giocatori** (`players.deleted_at` + RPC `soft_delete_player`).
+  Prima `delete-player` cancellava l'utente auth contando su un cascade da `auth.users` che
+  **non esiste più** dalla migration sugli ospiti: la riga restava orfana. E quando il
+  cascade funzionava portava via gol, presenze e pagelle, cambiando le statistiche storiche.
+  Ora i dati personali spariscono, i dati sportivi restano attribuiti a "Giocatore rimosso".
+- La **prossima partita** in Home escludeva solo per data: la sera stessa mostrava ancora
+  come "prossima" quella appena giocata.
+- Le **statistiche** passavano tutti gli id partita in `.in()`: oltre qualche centinaio di
+  partite l'URL sfondava il limite. Ora il filtro è un join su `matches`.
+- Le **notifiche email** aprivano una connessione SMTP per destinatario, tutte in parallelo
+  (Gmail limita le connessioni contemporanee): ora una sola connessione riusata, e gli
+  indirizzi arrivano da una query sola (RPC `player_emails`) invece di una chiamata per
+  destinatario.
+- `AuthContext` non gestiva l'errore sul caricamento del profilo: si finiva autenticati ma
+  senza profilo, in silenzio. Ora riprova e mostra uno stato esplicito.
+
+**Prestazioni e manutenzione**
+- **33 chiavi esterne senza indice** (nelle migration non c'era un solo `create index`),
+  `auth.uid()` racchiuso in `(select ...)` in 13 policy, policy permissive sovrapposte
+  separate per operazione. Gli advisor Supabase su questi tre fronti sono puliti.
+- **`strict: true`** su TypeScript: il codice era già conforme, la build resta pulita.
+- **Code splitting** per rotta: il bundle iniziale passa da 747 kB (194 kB gzip) a
+  277 kB (87 kB gzip), il pannello CDA non viene più scaricato da chi non è admin.
+- `confirm()`/`alert()` del browser sostituiti da un dialogo dell'app (`ConfirmDialog`),
+  sagome di caricamento al posto di "Caricamento..." nelle pagine più visitate.
+- **Drift repo/DB risolto**: le migration applicate a mano non erano nel repository (tra
+  cui il trigger `prevent_unauthorized_role_change`, che impedisce le promozioni di ruolo).
+  La storia autorevole è la tabella `supabase_migrations.schema_migrations`; si recupera con
+  `npx supabase migration fetch --linked`.
+
+### Rimasto fuori, per scelta
+- **Multi-gruppo** (più leghe indipendenti nella stessa app): è un progetto a sé, va fatto
+  su un branch Supabase. Oggi l'app assume un solo gruppo e il nome è cablato in 16 file.
+- Provider email transazionale, dominio proprio, piano Pro (backup PITR e protezione
+  password compromesse), Sentry, CI: richiedono account e spese, non solo codice.
+- Aggregazione delle statistiche interamente nel database (vista materializzata): il tetto
+  è stato tolto, il resto è ottimizzazione che oggi non serve.
 
 ## Stato attuale
 

@@ -5,6 +5,9 @@ import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 const supabaseUrl    = Deno.env.get("SUPABASE_URL")!;
 // Nuova secret key (sb_secret_...) con fallback alla legacy service_role.
 const serviceRoleKey = Deno.env.get("SERVICE_SECRET_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+// La verifica di chi chiama si fa con la chiave anonima: la chiave con pieni
+// poteri non deve stare su un client che elabora un header arrivato da fuori.
+const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ?? serviceRoleKey;
 const gmailUser      = Deno.env.get("GMAIL_USER")!;
 const gmailPassword  = Deno.env.get("GMAIL_APP_PASSWORD")!;
 
@@ -13,16 +16,34 @@ const MAX_REMINDERS = 3;
 /** Stesso blocco delle formazioni: 15 minuti prima del calcio d'inizio. */
 const LINEUP_LOCK_MINUTES = 15;
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+const appUrl = Deno.env.get("APP_URL") ?? "https://progetto-app-calcetto.vercel.app";
 
-function json(body: unknown, status = 200) {
+// CORS ristretto ai domini dell'app: prima era "*", quindi qualsiasi sito
+// poteva far partire richieste verso questa funzione dal browser di un utente.
+const ALLOWED_ORIGINS = new Set([
+  appUrl,
+  "https://progetto-app-calcetto.vercel.app",
+  "http://localhost:5173",
+  "http://localhost:4173",
+]);
+// Le anteprime di Vercel hanno un sottodominio diverso a ogni deploy.
+const PREVIEW_ORIGIN = /^https:\/\/progetto-app-calcetto[a-z0-9-]*\.vercel\.app$/;
+
+function corsHeaders(req: Request): Record<string, string> {
+  const origin = req.headers.get("Origin") ?? "";
+  const allowed = ALLOWED_ORIGINS.has(origin) || PREVIEW_ORIGIN.test(origin);
+  return {
+    "Access-Control-Allow-Origin": allowed ? origin : appUrl,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Vary": "Origin",
+  };
+}
+
+function json(req: Request, body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...corsHeaders(req), "Content-Type": "application/json" },
   });
 }
 
@@ -43,7 +64,20 @@ function escapeHtml(s: string): string {
     .replace(/'/g, "&#39;");
 }
 
-async function sendEmail(to: string, subject: string, html: string): Promise<void> {
+/**
+ * Invia lo stesso messaggio a piu' destinatari riusando UNA sola connessione
+ * SMTP. Prima si apriva una connessione per destinatario, tutte in parallelo:
+ * Gmail limita le connessioni contemporanee, quindi oltre una manciata di
+ * destinatari una parte degli invii falliva. Qui un errore su un indirizzo non
+ * ferma gli altri.
+ */
+async function sendBulk(
+  recipients: string[],
+  subject: string,
+  html: string,
+): Promise<{ sent: number; failed: string[] }> {
+  if (recipients.length === 0) return { sent: 0, failed: [] };
+
   const client = new SMTPClient({
     connection: {
       hostname: "smtp.gmail.com",
@@ -52,30 +86,55 @@ async function sendEmail(to: string, subject: string, html: string): Promise<voi
       auth: { username: gmailUser, password: gmailPassword },
     },
   });
+
+  const body = minifyHtml(html);
+  let sent = 0;
+  const failed: string[] = [];
+
   try {
-    await client.send({
-      from: `Pavone League <${gmailUser}>`,
-      to,
-      subject,
-      html: minifyHtml(html),
-    });
+    for (const to of recipients) {
+      try {
+        await client.send({ from: `Pavone League <${gmailUser}>`, to, subject, html: body });
+        sent++;
+      } catch (e) {
+        failed.push(`${to}: ${e instanceof Error ? e.message : "errore sconosciuto"}`);
+      }
+    }
   } finally {
     try { await client.close(); } catch (e) { console.error("SMTP close error:", e); }
   }
+
+  return { sent, failed };
+}
+
+/** Client Supabase, ridotto alla sola parte che serve qui. */
+interface RpcClient {
+  rpc(fn: string, params: Record<string, unknown>): Promise<{ data: unknown; error: { message: string } | null }>;
+}
+
+/** Indirizzi dei destinatari in una sola query (RPC player_emails). */
+async function recipientEmails(adminClient: RpcClient, ids: string[]): Promise<string[]> {
+  if (ids.length === 0) return [];
+  const { data, error } = await adminClient.rpc("player_emails", { p_ids: ids });
+  if (error) {
+    console.error("player_emails:", error.message);
+    return [];
+  }
+  return ((data ?? []) as { email: string }[]).map((r) => r.email).filter(Boolean);
 }
 
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders(req) });
+  if (req.method !== "POST") return json(req, { error: "Method not allowed" }, 405);
 
   const authHeader = req.headers.get("Authorization");
-  if (!authHeader) return json({ error: "Missing Authorization header" }, 401);
+  if (!authHeader) return json(req, { error: "Missing Authorization header" }, 401);
 
-  const callerClient = createClient(supabaseUrl, serviceRoleKey, {
+  const callerClient = createClient(supabaseUrl, anonKey, {
     global: { headers: { Authorization: authHeader } },
   });
   const { data: callerData, error: callerError } = await callerClient.auth.getUser();
-  if (callerError || !callerData.user) return json({ error: "Not authenticated" }, 401);
+  if (callerError || !callerData.user) return json(req, { error: "Not authenticated" }, 401);
 
   const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
@@ -86,11 +145,11 @@ Deno.serve(async (req: Request) => {
     .single();
 
   if (!callerPlayer || (callerPlayer.role !== "admin" && callerPlayer.role !== "superadmin")) {
-    return json({ error: "Solo un admin puo' inviare il reminder" }, 403);
+    return json(req, { error: "Solo un admin puo' inviare il reminder" }, 403);
   }
 
   const { leagueId, matchId } = (await req.json()) as { leagueId?: string; matchId?: string };
-  if (!leagueId || !matchId) return json({ error: "leagueId e matchId obbligatori" }, 400);
+  if (!leagueId || !matchId) return json(req, { error: "leagueId e matchId obbligatori" }, 400);
 
   const [leagueRes, matchRes] = await Promise.all([
     adminClient.from("fanta_leagues").select("name").eq("id", leagueId).single(),
@@ -100,19 +159,19 @@ Deno.serve(async (req: Request) => {
       .eq("id", matchId)
       .single(),
   ]);
-  if (leagueRes.error || !leagueRes.data) return json({ error: "Lega non trovata" }, 404);
-  if (matchRes.error || !matchRes.data) return json({ error: "Partita non trovata" }, 404);
+  if (leagueRes.error || !leagueRes.data) return json(req, { error: "Lega non trovata" }, 404);
+  if (matchRes.error || !matchRes.data) return json(req, { error: "Partita non trovata" }, 404);
 
   // Il reminder ha senso solo finché le formazioni sono ancora schierabili:
   // stesso blocco delle lineup (partita conclusa o meno di 15' al calcio d'inizio).
   const result = Array.isArray(matchRes.data.result) ? matchRes.data.result[0] : matchRes.data.result;
-  if (result) return json({ error: "Partita già conclusa: le formazioni non sono più schierabili" }, 409);
+  if (result) return json(req, { error: "Partita già conclusa: le formazioni non sono più schierabili" }, 409);
   if (matchRes.data.match_time) {
     const kickoff = new Date(`${matchRes.data.match_date}T${matchRes.data.match_time}`);
     if (!isNaN(kickoff.getTime())) {
       const deadline = kickoff.getTime() - LINEUP_LOCK_MINUTES * 60 * 1000;
       if (Date.now() >= deadline) {
-        return json({ error: "Formazioni bloccate: non è più possibile inviare reminder" }, 409);
+        return json(req, { error: "Formazioni bloccate: non è più possibile inviare reminder" }, 409);
       }
     }
   }
@@ -124,7 +183,7 @@ Deno.serve(async (req: Request) => {
     .eq("match_id", matchId);
   const alreadySent = count ?? 0;
   if (alreadySent >= MAX_REMINDERS) {
-    return json({ error: `Limite raggiunto: massimo ${MAX_REMINDERS} reminder per giornata` }, 409);
+    return json(req, { error: `Limite raggiunto: massimo ${MAX_REMINDERS} reminder per giornata` }, 409);
   }
 
   const { data: membersData } = await adminClient
@@ -132,7 +191,7 @@ Deno.serve(async (req: Request) => {
     .select("player_id")
     .eq("league_id", leagueId);
   const memberIds = ((membersData ?? []) as { player_id: string }[]).map((m) => m.player_id);
-  if (memberIds.length === 0) return json({ error: "Nessun partecipante nella lega" }, 409);
+  if (memberIds.length === 0) return json(req, { error: "Nessun partecipante nella lega" }, 409);
 
   const dateLabel = new Date(matchRes.data.match_date).toLocaleDateString("it-IT", {
     day: "numeric", month: "long", year: "numeric",
@@ -166,22 +225,8 @@ Deno.serve(async (req: Request) => {
       </div>
     </div>`;
 
-  const emails: string[] = [];
-  for (const pid of memberIds) {
-    const { data: userData } = await adminClient.auth.admin.getUserById(pid);
-    if (userData?.user?.email) emails.push(userData.user.email);
-  }
-
-  const results = await Promise.allSettled(
-    emails.map((email) =>
-      sendEmail(email, `Fantacalcetto: schiera la formazione per la partita del ${dateLabel}`, html)
-    )
-  );
-
-  const sent   = results.filter((r) => r.status === "fulfilled").length;
-  const failed = results
-    .filter((r): r is PromiseRejectedResult => r.status === "rejected")
-    .map((r) => r.reason?.message ?? "errore sconosciuto");
+  const emails = await recipientEmails(adminClient, memberIds);
+  const { sent, failed } = await sendBulk(emails, `Fantacalcetto: schiera la formazione per la partita del ${dateLabel}`, html);
 
   // Il reminder conta anche se qualche singolo invio fallisce: la finestra
   // dei 3 tentativi serve a evitare spam, non a garantire la consegna.
@@ -191,5 +236,5 @@ Deno.serve(async (req: Request) => {
     sent_by: callerData.user.id,
   });
 
-  return json({ sent, total: emails.length, remaining: MAX_REMINDERS - alreadySent - 1, failed });
+  return json(req, { sent, total: emails.length, remaining: MAX_REMINDERS - alreadySent - 1, failed });
 });

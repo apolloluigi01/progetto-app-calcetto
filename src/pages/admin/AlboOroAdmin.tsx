@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { useConfirm } from '../../components/ConfirmDialog'
 import { supabase } from '../../lib/supabase'
 import { logActivity } from '../../lib/activityLog'
 import EditButton from '../../components/EditButton'
@@ -28,6 +29,7 @@ const emptyForm: FormState = {
  * dell'esistenza dell'app e dei podi del fantacalcetto.
  */
 export default function AlboOroAdmin() {
+  const askConfirm = useConfirm()
   const [entries, setEntries] = useState<HonorEntry[]>([])
   const [players, setPlayers] = useState<Player[]>([])
   const [loading, setLoading] = useState(true)
@@ -44,7 +46,7 @@ export default function AlboOroAdmin() {
       const [{ data: honors, error: honorsError }, { data: playersData, error: playersError }] =
         await Promise.all([
           supabase.from('honor_entries').select('*').order('end_date', { ascending: false }),
-          supabase.from('players').select('*').order('name'),
+          supabase.from('players').select('*').is('deleted_at', null).order('name'),
         ])
       if (honorsError) throw honorsError
       if (playersError) throw playersError
@@ -125,7 +127,7 @@ export default function AlboOroAdmin() {
   }
 
   async function handleDelete(entry: HonorEntry) {
-    if (!confirm(`Eliminare la voce "${entry.season_name}" dall'albo d'oro?`)) return
+    if (!await askConfirm({ message: `Eliminare la voce "${entry.season_name}" dall'albo d'oro?`, confirmLabel: 'Elimina', destructive: true })) return
     setError(null)
     try {
       const { error } = await supabase.from('honor_entries').delete().eq('id', entry.id)

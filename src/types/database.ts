@@ -18,6 +18,12 @@ export interface Player {
   created_at: string
   is_guest: boolean
   guest_match_id: string | null
+  /**
+   * Cancellazione logica: valorizzata quando un admin rimuove il giocatore.
+   * La riga resta (anonimizzata) perche' gol, presenze, pagelle e albo d'oro
+   * la citano ancora; sparisce solo dagli elenchi.
+   */
+  deleted_at: string | null
 }
 
 export type SeasonType = 'amichevole' | 'format'

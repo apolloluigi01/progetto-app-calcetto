@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { useConfirm } from '../../components/ConfirmDialog'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
@@ -13,6 +14,7 @@ import type { Player, PlayerRole, PlayingPosition } from '../../types/database'
 type PlayerWithStatus = Player & { email?: string | null; email_confirmed?: boolean }
 
 export default function GiocatoreEdit() {
+  const askConfirm = useConfirm()
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { session, isAdmin, isSuperAdmin } = useAuth()
@@ -252,7 +254,11 @@ export default function GiocatoreEdit() {
   }
 
   async function handleDelete() {
-    if (!id || !confirm(`Eliminare ${player?.name}? L'account verrà rimosso definitivamente.`)) return
+    const conferma = player?.is_guest
+      ? `Eliminare l'ospite ${player?.name}?`
+      : `Rimuovere ${player?.name}? L'account di accesso viene eliminato e i dati personali (nome, foto) cancellati. ` +
+        `Gol, presenze e pagelle delle partite già giocate restano, attribuiti a "Giocatore rimosso", per non alterare statistiche e albo d'oro.`
+    if (!id || !await askConfirm({ message: conferma, confirmLabel: 'Rimuovi', destructive: true })) return
     setDeleting(true)
     const { error } = await supabase.functions.invoke('delete-player', { body: { playerId: id } })
     setDeleting(false)

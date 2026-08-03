@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { SkeletonList } from '../components/Skeleton'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useOveralls } from '../hooks/useOveralls'
@@ -33,6 +34,9 @@ export default function Giocatori() {
     supabase
       .from('players')
       .select('*')
+      // I giocatori rimossi restano nel database per non spezzare lo storico
+      // (gol, pagelle, albo d'oro), ma non compaiono piu' negli elenchi.
+      .is('deleted_at', null)
       .order('name')
       .then(({ data, error }) => {
         if (error) setError(error.message)
@@ -56,7 +60,7 @@ export default function Giocatori() {
       </div>
 
       <div className="mt-4 space-y-2">
-        {loading && <p className="text-sm text-gray-500">Caricamento...</p>}
+        {loading && <SkeletonList rows={5} />}
         {!loading && error && <ErrorNotice message={error} onRetry={() => setReloadToken((t) => t + 1)} />}
         {!loading && !error && players.length === 0 && (
           <p className="text-sm text-gray-500">Nessun giocatore registrato.</p>

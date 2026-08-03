@@ -7,7 +7,6 @@ const serviceRoleKey = Deno.env.get("SERVICE_SECRET_KEY") ?? Deno.env.get("SUPAB
 // La verifica di chi chiama si fa con la chiave anonima: la chiave con pieni
 // poteri non deve stare su un client che elabora un header arrivato da fuori.
 const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ?? serviceRoleKey;
-
 const appUrl = Deno.env.get("APP_URL") ?? "https://progetto-app-calcetto.vercel.app";
 
 // CORS ristretto ai domini dell'app: prima era "*", quindi qualsiasi sito
@@ -43,6 +42,7 @@ Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders(req) });
   }
+
   if (req.method !== "POST") {
     return json(req, { error: "Method not allowed" }, 405);
   }
@@ -55,6 +55,7 @@ Deno.serve(async (req: Request) => {
   const callerClient = createClient(supabaseUrl, anonKey, {
     global: { headers: { Authorization: authHeader } },
   });
+
   const { data: callerData, error: callerError } = await callerClient.auth.getUser();
   if (callerError || !callerData.user) {
     return json(req, { error: "Not authenticated" }, 401);
@@ -70,20 +71,21 @@ Deno.serve(async (req: Request) => {
 
   const callerRole = callerPlayer?.role;
   if (callerPlayerError || (callerRole !== "admin" && callerRole !== "superadmin")) {
-    return json(req, { error: "Solo un admin puo' reimpostare le password" }, 403);
+    return json(req, { error: "Solo un admin puo' eliminare giocatori" }, 403);
   }
 
-  const { playerId, newPassword } = (await req.json()) as { playerId?: string; newPassword?: string };
-  if (!playerId || !newPassword) {
-    return json(req, { error: "playerId e newPassword sono obbligatori" }, 400);
+  const { playerId } = (await req.json()) as { playerId?: string };
+  if (!playerId) {
+    return json(req, { error: "playerId obbligatorio" }, 400);
   }
-  if (newPassword.length < 6) {
-    return json(req, { error: "La password deve essere di almeno 6 caratteri" }, 400);
+
+  if (playerId === callerData.user.id) {
+    return json(req, { error: "Non puoi eliminare il tuo stesso account" }, 400);
   }
 
   const { data: targetPlayer, error: targetError } = await adminClient
     .from("players")
-    .select("role")
+    .select("role, is_guest, deleted_at")
     .eq("id", playerId)
     .single();
 
@@ -91,20 +93,43 @@ Deno.serve(async (req: Request) => {
     return json(req, { error: "Giocatore non trovato" }, 404);
   }
 
-  // stesso vincolo di delete-player: un admin (non superadmin) puo' agire solo sui 'player'
   if (callerRole === "admin" && targetPlayer.role !== "player") {
-    return json(req, { error: "Un admin puo' reimpostare solo la password di giocatori con ruolo player" }, 403);
+    return json(req, { error: "Un admin puo' eliminare solo giocatori con ruolo player" }, 403);
   }
 
-  const { error: updateError } = await adminClient.auth.admin.updateUserById(playerId, {
-    password: newPassword,
+  if (targetPlayer.deleted_at) {
+    return json(req, { error: "Questo giocatore risulta gia' rimosso" }, 400);
+  }
+
+  // Gli ospiti non hanno storico da preservare ne' account auth: si cancellano
+  // davvero (la riga sparisce comunque con la partita, per cascade).
+  if (targetPlayer.is_guest) {
+    const { error: hardDeleteError } = await adminClient.from("players").delete().eq("id", playerId);
+    if (hardDeleteError) return json(req, { error: hardDeleteError.message }, 400);
+    return json(req, { success: true, mode: "guest" });
+  }
+
+  // Cancellazione logica: la riga resta (anonimizzata) perche' gol, presenze,
+  // pagelle e voti passati la citano — un delete fisico riscriverebbe lo
+  // storico e le classifiche. La RPC rimuove anche convocazioni, prenotazioni
+  // e formazioni delle partite non ancora giocate.
+  //
+  // Nota: fino a questa versione la funzione cancellava solo l'utente auth,
+  // contando su un cascade da auth.users a players che non esiste piu' (la FK
+  // e' stata rimossa dalla migration sugli ospiti): la riga restava orfana.
+  const { error: softDeleteError } = await adminClient.rpc("soft_delete_player", {
+    p_player_id: playerId,
   });
-  if (updateError) {
-    return json(req, { error: updateError.message }, 400);
+  if (softDeleteError) {
+    return json(req, { error: softDeleteError.message }, 400);
   }
 
-  // chi riceve una password impostata da un admin deve sceglierne una propria conforme al primo accesso
-  await adminClient.from("players").update({ must_change_password: true }).eq("id", playerId);
+  // L'account di accesso invece va eliminato davvero: e' il dato personale
+  // (email, password) e da qui in poi nessuno deve poter entrare con quello.
+  const { error: deleteError } = await adminClient.auth.admin.deleteUser(playerId);
+  if (deleteError) {
+    return json(req, { error: `Giocatore rimosso, ma l'account di accesso non e' stato eliminato: ${deleteError.message}` }, 500);
+  }
 
-  return json(req, { success: true });
+  return json(req, { success: true, mode: "soft" });
 });

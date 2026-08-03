@@ -35,13 +35,52 @@ export function parseVoto(voto: string): number | null {
   return base + modifier
 }
 
+/**
+ * Come restringere le query alle partite che interessano.
+ *
+ * Prima si passava l'elenco degli id partita a ogni query con `.in()`: gli id
+ * finiscono nell'URL (36 caratteri l'uno) e oltre qualche centinaio di partite
+ * la richiesta sfonda il limite di lunghezza e fallisce. Filtrando sulla
+ * tabella `matches` in join il problema sparisce, qualunque sia lo storico.
+ */
+type MatchFilter =
+  | { kind: 'season'; seasonId: string }
+  | { kind: 'all' }
+  | { kind: 'month'; start: string; end: string }
+
+/**
+ * Vista minima del query builder di supabase-js: i tipi veri sono talmente
+ * annidati che usarli qui manda in stallo il compilatore (TS2589), e a noi
+ * servono solo questi tre operatori. Il tipo originale della query si
+ * conserva nel parametro T, cosi' i dati restano tipizzati al `await`.
+ */
+type MatchFilterable = {
+  eq(column: string, value: string): MatchFilterable
+  gte(column: string, value: string): MatchFilterable
+  lt(column: string, value: string): MatchFilterable
+}
+
+function withMatchFilter<T>(query: T, filter: MatchFilter): T {
+  const q = query as unknown as MatchFilterable
+  switch (filter.kind) {
+    case 'season':
+      return q.eq('matches.season_id', filter.seasonId) as unknown as T
+    case 'month':
+      return q
+        .gte('matches.match_date', filter.start)
+        .lt('matches.match_date', filter.end) as unknown as T
+    case 'all':
+      return query
+  }
+}
+
 export async function computeStatistiche(seasonId: string): Promise<PlayerStats[]> {
   const { data: matches } = await supabase
     .from('matches')
     .select('id, match_date, result:match_results(score_a, score_b)')
     .eq('season_id', seasonId)
     .order('match_date', { ascending: true })
-  return aggregateStatistiche((matches ?? []) as MatchStatsRow[])
+  return aggregateStatistiche((matches ?? []) as MatchStatsRow[], { kind: 'season', seasonId })
 }
 
 /** Chiave/sentinella usata al posto dell'id stagione per le statistiche "all time". */
@@ -57,7 +96,7 @@ export async function computeStatisticheAllTime(): Promise<PlayerStats[]> {
     .from('matches')
     .select('id, match_date, result:match_results(score_a, score_b)')
     .order('match_date', { ascending: true })
-  return aggregateStatistiche((matches ?? []) as MatchStatsRow[])
+  return aggregateStatistiche((matches ?? []) as MatchStatsRow[], { kind: 'all' })
 }
 
 /**
@@ -74,7 +113,7 @@ export async function computeStatisticheMensili(monthKey: string): Promise<Playe
     .gte('match_date', start)
     .lt('match_date', end)
     .order('match_date', { ascending: true })
-  return aggregateStatistiche((matches ?? []) as MatchStatsRow[])
+  return aggregateStatistiche((matches ?? []) as MatchStatsRow[], { kind: 'month', start, end })
 }
 
 interface MatchStatsRow {
@@ -83,9 +122,11 @@ interface MatchStatsRow {
   result: { score_a: number; score_b: number } | { score_a: number; score_b: number }[] | null
 }
 
-async function aggregateStatistiche(matches: MatchStatsRow[]): Promise<PlayerStats[]> {
-  const matchIds = matches.map((m) => m.id)
-  if (matchIds.length === 0) return []
+async function aggregateStatistiche(
+  matches: MatchStatsRow[],
+  filter: MatchFilter,
+): Promise<PlayerStats[]> {
+  if (matches.length === 0) return []
 
   const resultByMatch = new Map<string, { score_a: number; score_b: number }>()
   const dateByMatch = new Map<string, string>()
@@ -95,23 +136,38 @@ async function aggregateStatistiche(matches: MatchStatsRow[]): Promise<PlayerSta
     dateByMatch.set(m.id, m.match_date)
   }
 
+  // Il join "matches!inner" serve solo a filtrare: le partite di interesse si
+  // selezionano nel database, senza spedire la lista degli id nell'URL.
   const [matchPlayersRes, goalsRes, assistsRes, pagelleRes, fantaLineupsRes, fantaCalcRes] = await Promise.all([
-    supabase
-      .from('match_players')
-      .select('match_id, player_id, team, players(*)')
-      .in('match_id', matchIds),
-    supabase.from('goals').select('match_id, player_id, is_own_goal').in('match_id', matchIds),
-    supabase.from('assists').select('match_id, player_id').in('match_id', matchIds),
-    supabase
-      .from('pagelle')
-      .select('match_id, player_id, voto, is_mvp')
-      .in('match_id', matchIds)
-      .not('published_at', 'is', null),
-    supabase
-      .from('fanta_lineups')
-      .select('league_id, match_id, captain_id, fanta_lineup_players(player_id)')
-      .in('match_id', matchIds),
-    supabase.from('fanta_calculations').select('league_id, match_id').in('match_id', matchIds),
+    withMatchFilter(
+      supabase.from('match_players').select('match_id, player_id, team, players(*), matches!inner(id)'),
+      filter,
+    ),
+    withMatchFilter(
+      supabase.from('goals').select('match_id, player_id, is_own_goal, matches!inner(id)'),
+      filter,
+    ),
+    withMatchFilter(
+      supabase.from('assists').select('match_id, player_id, matches!inner(id)'),
+      filter,
+    ),
+    withMatchFilter(
+      supabase
+        .from('pagelle')
+        .select('match_id, player_id, voto, is_mvp, matches!inner(id)')
+        .not('published_at', 'is', null),
+      filter,
+    ),
+    withMatchFilter(
+      supabase
+        .from('fanta_lineups')
+        .select('league_id, match_id, captain_id, fanta_lineup_players(player_id), matches!inner(id)'),
+      filter,
+    ),
+    withMatchFilter(
+      supabase.from('fanta_calculations').select('league_id, match_id, matches!inner(id)'),
+      filter,
+    ),
   ])
 
   const statsByPlayer = new Map<string, PlayerStats>()
@@ -179,7 +235,9 @@ async function aggregateStatistiche(matches: MatchStatsRow[]): Promise<PlayerSta
   }
 
   for (const g of goalsRes.data ?? []) {
-    const stats = [...statsByPlayer.values()].find((s) => s.player.id === g.player_id)
+    // Lookup diretto sulla mappa: la versione precedente ricostruiva un array
+    // di tutti i giocatori a ogni gol solo per cercarne uno.
+    const stats = statsByPlayer.get(g.player_id)
     if (!stats) continue
     if (g.is_own_goal) stats.autogol += 1
     else stats.golFatti += 1

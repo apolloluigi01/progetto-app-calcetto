@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useConfirm } from '../components/ConfirmDialog'
 import { Link, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -26,6 +27,7 @@ interface PagellaDraft {
  *   votazioni, vedono il dettaglio voti, la media/MVP e compilano le pagelle.
  */
 export default function MatchVoting() {
+  const askConfirm = useConfirm()
   const { id } = useParams<{ id: string }>()
   const { player, isAdmin, isSuperAdmin } = useAuth()
   const { data, loading, error, refetch } = useMatchDetail(id)
@@ -111,7 +113,7 @@ export default function MatchVoting() {
   }
 
   async function handleCloseVoting() {
-    if (!id || !confirm('Chiudere le votazioni? I giocatori non potranno più modificare i voti.')) return
+    if (!id || !await askConfirm('Chiudere le votazioni? I giocatori non potranno più modificare i voti.')) return
     setClosingVoting(true)
     await supabase.from('matches').update({ voting_open: false }).eq('id', id)
     logActivity('votazioni_chiuse', { matchId: id })
@@ -183,7 +185,7 @@ export default function MatchVoting() {
    */
   async function handleResendMail() {
     if (!id || resendingMail) return
-    if (!confirm('Reinviare la mail con risultato, tabellino e pagelle a tutti i partecipanti?')) return
+    if (!await askConfirm('Reinviare la mail con risultato, tabellino e pagelle a tutti i partecipanti?')) return
     setResendingMail(true)
     setPagelleError(null)
     setMailInfo(null)
@@ -203,11 +205,11 @@ export default function MatchVoting() {
   async function handlePublish() {
     if (!data) return
     if (!data.result) {
-      alert('Salva prima il risultato della partita (in Modifica partita): le pagelle non possono essere pubblicate senza un risultato.')
+      await askConfirm({ message: 'Salva prima il risultato della partita (in Modifica partita): le pagelle non possono essere pubblicate senza un risultato.', alertOnly: true })
       return
     }
     if (!goalsCoherent) {
-      alert('I gol registrati non coincidono con il risultato: correggi i marcatori o il risultato in Modifica partita prima di pubblicare.')
+      await askConfirm({ message: 'I gol registrati non coincidono con il risultato: correggi i marcatori o il risultato in Modifica partita prima di pubblicare.', alertOnly: true })
       return
     }
     const incomplete = data.matchPlayers.filter((mp) => {
@@ -215,24 +217,22 @@ export default function MatchVoting() {
       return !d || !d.voto.trim() || !d.titolo.trim() || !d.descrizione.trim()
     })
     if (incomplete.length > 0) {
-      alert(
-        `Completa voto, titolo e descrizione per tutti i giocatori prima di pubblicare. Mancano per: ${incomplete
+      await askConfirm({ message: `Completa voto, titolo e descrizione per tutti i giocatori prima di pubblicare. Mancano per: ${incomplete
           .map((mp) => fullName(mp))
-          .join(', ')}.`
-      )
+          .join(', ')}.`, alertOnly: true })
       return
     }
     const mvpCount = data.matchPlayers.filter((mp) => drafts[mp.player_id]?.is_mvp).length
     if (mvpCount !== 1) {
-      alert('Seleziona un MVP prima di pubblicare le pagelle.')
+      await askConfirm({ message: 'Seleziona un MVP prima di pubblicare le pagelle.', alertOnly: true })
       return
     }
     if (match.voting_open) {
-      alert('Chiudi prima le votazioni: le pagelle non si pubblicano con le votazioni ancora aperte.')
+      await askConfirm({ message: 'Chiudi prima le votazioni: le pagelle non si pubblicano con le votazioni ancora aperte.', alertOnly: true })
       return
     }
     if (
-      !confirm(
+      !await askConfirm(
         'Pubblicare le pagelle? Diventeranno visibili a tutti i giocatori e verrà inviata una mail a tutti i partecipanti con risultato, marcatori e pagelle. Dopo la pubblicazione la partita non sarà più modificabile.'
       )
     )
