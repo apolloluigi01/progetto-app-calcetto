@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import { useConfirm } from './ConfirmDialog'
+import PageLoader from './PageLoader'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import './layout-fanta.css'
@@ -219,7 +220,12 @@ export default function Layout() {
             </button>
           </div>
         )}
-        <Outlet />
+        {/* Il confine di attesa sta QUI e non attorno a tutte le rotte: mentre
+            arriva il codice della schermata successiva, menu e intestazione
+            restano al loro posto invece di sparire per un istante. */}
+        <Suspense fallback={<PageLoader />}>
+          <Outlet />
+        </Suspense>
       </main>
     </div>
   )

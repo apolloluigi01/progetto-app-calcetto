@@ -67,6 +67,9 @@ export default function MatchEdit() {
   const [newAssistPlayer, setNewAssistPlayer] = useState<Record<Team, string>>({ A: '', B: '' })
 
   const [deleting, setDeleting] = useState(false)
+  // Errore dell'ultima operazione di scrittura: prima gli errori venivano
+  // ignorati e l'interfaccia proseguiva come se tutto fosse andato bene.
+  const [actionError, setActionError] = useState<string | null>(null)
 
   // Sondaggio: aggiunta manuale giocatore
   const [allPlayers, setAllPlayers] = useState<Player[]>([])
@@ -171,7 +174,13 @@ export default function MatchEdit() {
       supabase
         .from('match_players_draft')
         .upsert(rows, { onConflict: 'match_id,player_id' })
-        .then(() => loadDraft())
+        .then(({ error: seedError }) => {
+          if (seedError) {
+            setActionError(`Bozza squadre non ricostruita: ${seedError.message}`)
+            return
+          }
+          loadDraft()
+        })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, data, draftLoaded, draftPlayers.length])
@@ -266,24 +275,52 @@ export default function MatchEdit() {
   // const iApproved = !!currentAdmin && approvals.includes(currentAdmin.id)
   const infoComplete = !!matchDate && !!matchTime && !!field
 
+  /**
+   * Esegue una scrittura e, se fallisce, lo dice invece di tirare dritto.
+   * Restituisce false quando è andata male, così il chiamante si ferma:
+   * prima queste operazioni ignoravano l'errore e l'interfaccia dichiarava
+   * comunque successo.
+   */
+  async function run(
+    label: string,
+    op: PromiseLike<{ error: { message: string } | null }>,
+  ): Promise<boolean> {
+    const { error: opError } = await op
+    if (opError) {
+      setActionError(`${label}: ${opError.message}`)
+      return false
+    }
+    return true
+  }
+
   // Le statistiche (gol/assist) confermate non sono più valide se cambia il
   // risultato o i marcatori: si azzera il flag e vanno risalvate (rilocka i voti).
   async function resetStatsConfirmation() {
-    if (!id || !match.stats_confirmed_at) return
-    await supabase.from('matches').update({ stats_confirmed_at: null }).eq('id', id)
+    if (!id || !match.stats_confirmed_at) return true
+    return run(
+      'Statistiche non invalidate',
+      supabase.from('matches').update({ stats_confirmed_at: null }).eq('id', id),
+    )
   }
 
   // --- Info partita ---
   async function handleSaveResult() {
     if (!id || !infoComplete || locked) return
     setSavingResult(true)
-    await supabase
-      .from('match_results')
-      .upsert({ match_id: id, score_a: Number(scoreA) || 0, score_b: Number(scoreB) || 0 }, { onConflict: 'match_id' })
-    await supabase.from('matches').update({ status: 'completed' }).eq('id', id)
-    // Cambiare il risultato invalida le statistiche eventualmente già confermate.
-    await resetStatsConfirmation()
+    setActionError(null)
+    // Punteggio, stato partita e invalidazione delle statistiche confermate
+    // viaggiano insieme: prima erano tre chiamate separate e nessuna verificata,
+    // quindi un errore poteva lasciare il punteggio senza lo stato "completata".
+    const { error: saveError } = await supabase.rpc('save_match_result', {
+      p_match_id: id,
+      p_score_a: Number(scoreA) || 0,
+      p_score_b: Number(scoreB) || 0,
+    })
     setSavingResult(false)
+    if (saveError) {
+      setActionError(`Risultato non salvato: ${saveError.message}`)
+      return
+    }
     setEditingResult(false)
     logActivity('risultato_salvato', { matchId: id, data: match.match_date, scoreA: Number(scoreA) || 0, scoreB: Number(scoreB) || 0 })
     refetch()
@@ -297,8 +334,10 @@ export default function MatchEdit() {
       return
     }
     setSavingStats(true)
-    await supabase.from('matches').update({ stats_confirmed_at: new Date().toISOString() }).eq('id', id)
+    setActionError(null)
+    const ok = await run('Statistiche non salvate', supabase.from('matches').update({ stats_confirmed_at: new Date().toISOString() }).eq('id', id))
     setSavingStats(false)
+    if (!ok) return
     logActivity('statistiche_salvate', { matchId: id, data: match.match_date })
     refetch()
   }
@@ -326,11 +365,15 @@ export default function MatchEdit() {
     }
     const seasonId = season.id
 
-    await supabase
+    const { error: infoSaveError } = await supabase
       .from('matches')
       .update({ match_date: matchDate, match_time: matchTime || null, field: field || null, season_id: seasonId })
       .eq('id', id)
     setSavingInfo(false)
+    if (infoSaveError) {
+      setInfoError(infoSaveError.message)
+      return
+    }
     setEditingInfo(false)
     logActivity('partita_modificata', { matchId: id, data: matchDate, ora: matchTime || null, campo: field || null })
     refetch()
@@ -338,14 +381,16 @@ export default function MatchEdit() {
 
   async function handleAddGoal(team: Team) {
     if (!id || !newGoalPlayer[team] || locked) return
-    await supabase
+    setActionError(null)
+    const ok = await run('Gol non aggiunto', supabase
       .from('goals')
       .insert({
         match_id: id,
         player_id: newGoalPlayer[team],
         team,
         is_own_goal: ownGoal[team],
-      })
+      }))
+    if (!ok) return
     const playerName = matchPlayers.find((p) => p.player_id === newGoalPlayer[team])?.name
     logActivity('gol_aggiunto', { matchId: id, data: match.match_date, squadra: team, giocatore: playerName, autogol: ownGoal[team] })
     await resetStatsConfirmation()
@@ -357,7 +402,8 @@ export default function MatchEdit() {
   async function handleRemoveGoal(goalId: string) {
     if (locked) return
     const goal = goals.find((g) => g.id === goalId)
-    await supabase.from('goals').delete().eq('id', goalId)
+    setActionError(null)
+    if (!(await run('Gol non rimosso', supabase.from('goals').delete().eq('id', goalId)))) return
     logActivity('gol_rimosso', { matchId: id, data: match.match_date, giocatore: goal?.name })
     await resetStatsConfirmation()
     refetch()
@@ -365,9 +411,8 @@ export default function MatchEdit() {
 
   async function handleAddAssist(team: Team) {
     if (!id || !newAssistPlayer[team] || locked) return
-    await supabase
-      .from('assists')
-      .insert({ match_id: id, player_id: newAssistPlayer[team], team })
+    setActionError(null)
+    if (!(await run('Assist non aggiunto', supabase.from('assists').insert({ match_id: id, player_id: newAssistPlayer[team], team })))) return
     const playerName = matchPlayers.find((p) => p.player_id === newAssistPlayer[team])?.name
     logActivity('assist_aggiunto', { matchId: id, data: match.match_date, squadra: team, giocatore: playerName })
     await resetStatsConfirmation()
@@ -378,7 +423,8 @@ export default function MatchEdit() {
   async function handleRemoveAssist(assistId: string) {
     if (locked) return
     const assist = assists.find((a) => a.id === assistId)
-    await supabase.from('assists').delete().eq('id', assistId)
+    setActionError(null)
+    if (!(await run('Assist non rimosso', supabase.from('assists').delete().eq('id', assistId)))) return
     logActivity('assist_rimosso', { matchId: id, data: match.match_date, giocatore: assist?.name })
     await resetStatsConfirmation()
     refetch()
@@ -440,7 +486,8 @@ export default function MatchEdit() {
 
   async function handleRemoveBooking(playerId: string, playerName: string) {
     if (!id) return
-    await supabase.from('match_bookings').delete().eq('match_id', id).eq('player_id', playerId)
+    setActionError(null)
+    if (!(await run('Prenotazione non rimossa', supabase.from('match_bookings').delete().eq('match_id', id).eq('player_id', playerId)))) return
     logActivity('prenotazione_rimossa', { matchId: id, giocatore: playerName })
     refetchBookings()
   }
@@ -448,9 +495,11 @@ export default function MatchEdit() {
   async function handleCloseSurvey() {
     if (!id || !await askConfirm('Chiudere il sondaggio? I giocatori non potranno più prenotarsi.')) return
     setClosingSurvey(true)
-    await supabase.from('matches').update({ booking_open: false }).eq('id', id)
-    logActivity('sondaggio_chiuso', { matchId: id, prenotazioni: bookings.length })
+    setActionError(null)
+    const ok = await run('Sondaggio non chiuso', supabase.from('matches').update({ booking_open: false }).eq('id', id))
     setClosingSurvey(false)
+    if (!ok) return
+    logActivity('sondaggio_chiuso', { matchId: id, prenotazioni: bookings.length })
     refetch()
   }
 
@@ -502,37 +551,22 @@ export default function MatchEdit() {
   async function handleConfirmTeams() {
     if (!id) return
     setConfirming(true)
-    await supabase.from('match_players_draft').delete().eq('match_id', id)
-    const rows = [
-      ...genTeamA.map((p) => ({ match_id: id, player_id: p.playerId, team: 'A' as Team })),
-      ...genTeamB.map((p) => ({ match_id: id, player_id: p.playerId, team: 'B' as Team })),
-    ]
-    await supabase.from('match_players_draft').insert(rows)
-    // [APPROVAZIONE SQUADRE — disattivata] await clearTeamApprovals()
+    setActionError(null)
+    // Una sola chiamata transazionale: cancellare la bozza e reinserirla erano
+    // due operazioni indipendenti, e un errore sulla seconda lasciava la
+    // partita senza squadre in bozza.
+    const { error: saveError } = await supabase.rpc('save_match_draft_teams', {
+      p_match_id: id,
+      p_team_a: genTeamA.map((p) => p.playerId),
+      p_team_b: genTeamB.map((p) => p.playerId),
+    })
     setConfirming(false)
+    if (saveError) {
+      setActionError(`Squadre non salvate: ${saveError.message}`)
+      return
+    }
     setGeneratedTeams(null)
     loadDraft()
-  }
-
-  // Le squadre ufficiali sono cambiate: le formazioni fantacalcetto schierate su
-  // quelle squadre non sono più valide e vengono azzerate per tutte le leghe.
-  async function resetFantaLineups() {
-    if (!id) return
-    const { data: existing } = await supabase
-      .from('fanta_lineups')
-      .select('league_id, member_id')
-      .eq('match_id', id)
-    const resetRows = ((existing ?? []) as { league_id: string; member_id: string }[]).map((l) => ({
-      league_id: l.league_id,
-      match_id: id,
-      member_id: l.member_id,
-    }))
-    if (resetRows.length > 0) {
-      await supabase
-        .from('fanta_lineup_resets')
-        .upsert(resetRows, { onConflict: 'league_id,match_id,member_id' })
-    }
-    await supabase.from('fanta_lineups').delete().eq('match_id', id)
   }
 
   // [APPROVAZIONE SQUADRE — regressa/disattivata, conservata per riuso futuro]
@@ -570,18 +604,20 @@ export default function MatchEdit() {
     )
       return
     setOfficializing(true)
-    // Copia bozza -> squadre ufficiali.
-    await supabase.from('match_players').delete().eq('match_id', id)
-    const rows = draftPlayers.map((p) => ({ match_id: id, player_id: p.player_id, team: p.team }))
-    if (rows.length > 0) await supabase.from('match_players').insert(rows)
-    await supabase
-      .from('matches')
-      .update({ teams_official_at: new Date().toISOString() })
-      .eq('id', id)
-    // Le squadre (ri)ufficializzate invalidano le formazioni fantacalcetto già schierate.
-    await resetFantaLineups()
-    logActivity('squadre_ufficializzate', { matchId: id, data: match.match_date })
+    setActionError(null)
+    // Copia bozza -> squadre ufficiali, marcatura e azzeramento delle formazioni
+    // fanta avvengono dentro un'unica transazione: prima erano quattro chiamate
+    // separate e senza controllo, quindi un errore a metà poteva lasciare la
+    // partita SENZA squadre ma marcata come ufficializzata.
+    const { error: officializeError } = await supabase.rpc('officialize_match_teams', {
+      p_match_id: id,
+    })
     setOfficializing(false)
+    if (officializeError) {
+      setActionError(`Squadre non ufficializzate: ${officializeError.message}`)
+      return
+    }
+    logActivity('squadre_ufficializzate', { matchId: id, data: match.match_date })
     refetch()
   }
 
@@ -613,15 +649,20 @@ export default function MatchEdit() {
   async function handleSaveTeams() {
     if (!id || localTeamA.length !== 5 || localTeamB.length !== 5) return
     setSavingTeams(true)
-    const changed = [
-      ...localTeamA.filter((p) => p.team !== 'A').map((p) => ({ ...p, team: 'A' as Team })),
-      ...localTeamB.filter((p) => p.team !== 'B').map((p) => ({ ...p, team: 'B' as Team })),
-    ]
-    await Promise.all(
-      changed.map((p) => supabase.from('match_players_draft').update({ team: p.team }).eq('id', p.id))
-    )
-    // [APPROVAZIONE SQUADRE — disattivata] await clearTeamApprovals()
+    setActionError(null)
+    // Spostare giocatori fra le due squadre in bozza: si riscrive l'intera
+    // bozza in una sola transazione invece di una update per ogni giocatore
+    // cambiato, che poteva riuscire a metà lasciando squadre sbilanciate.
+    const { error: saveError } = await supabase.rpc('save_match_draft_teams', {
+      p_match_id: id,
+      p_team_a: localTeamA.map((p) => p.player_id),
+      p_team_b: localTeamB.map((p) => p.player_id),
+    })
     setSavingTeams(false)
+    if (saveError) {
+      setActionError(`Squadre non salvate: ${saveError.message}`)
+      return
+    }
     setEditingTeams(false)
     logActivity('squadre_modificate', { matchId: id, data: match.match_date })
     loadDraft()
@@ -648,15 +689,18 @@ export default function MatchEdit() {
   async function handleSavePendingTeams() {
     if (!id || !pendingTeams) return
     setSavingPendingTeams(true)
-    await supabase.from('match_players_draft').delete().eq('match_id', id)
-    const rows = [
-      ...pendingTeams.teamA.map((p) => ({ match_id: id, player_id: p.playerId, team: 'A' as Team })),
-      ...pendingTeams.teamB.map((p) => ({ match_id: id, player_id: p.playerId, team: 'B' as Team })),
-    ]
-    await supabase.from('match_players_draft').insert(rows)
-    // [APPROVAZIONE SQUADRE — disattivata] await clearTeamApprovals()
-    logActivity(pendingTeams.action, { matchId: id, data: match.match_date, ...pendingTeams.logDetails })
+    setActionError(null)
+    const { error: saveError } = await supabase.rpc('save_match_draft_teams', {
+      p_match_id: id,
+      p_team_a: pendingTeams.teamA.map((p) => p.playerId),
+      p_team_b: pendingTeams.teamB.map((p) => p.playerId),
+    })
     setSavingPendingTeams(false)
+    if (saveError) {
+      setActionError(`Squadre non salvate: ${saveError.message}`)
+      return
+    }
+    logActivity(pendingTeams.action, { matchId: id, data: match.match_date, ...pendingTeams.logDetails })
     setPendingTeams(null)
     loadDraft()
   }
@@ -745,6 +789,24 @@ export default function MatchEdit() {
         <p className="mt-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-center text-sm font-medium text-gray-600">
           🔒 Partita completata e pagelle pubblicate: non è più modificabile. È possibile solo eliminarla.
         </p>
+      )}
+
+      {/* Esito dell'ultima operazione fallita: resta visibile finché non se ne
+          tenta un'altra, così un salvataggio andato male non passa inosservato. */}
+      {actionError && (
+        <div
+          role="alert"
+          className="mt-2 flex items-start justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+        >
+          <span>{actionError}</span>
+          <button
+            onClick={() => setActionError(null)}
+            aria-label="Chiudi avviso"
+            className="shrink-0 font-bold text-red-400 hover:text-red-600"
+          >
+            ✕
+          </button>
+        </div>
       )}
 
       {/* ===== STEP 1 — Info partita =====

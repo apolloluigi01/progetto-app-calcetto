@@ -50,6 +50,7 @@ export default function MatchVoting() {
   const [localVotes, setLocalVotes] = useState<Record<string, number>>({})
   const [votingBusy, setVotingBusy] = useState(false)
   const [votingSuccess, setVotingSuccess] = useState(false)
+  const [voteSaveError, setVoteSaveError] = useState<string | null>(null)
 
   // --- Gestione admin ---
   const [openingVoting, setOpeningVoting] = useState(false)
@@ -61,6 +62,8 @@ export default function MatchVoting() {
   const [pagelleError, setPagelleError] = useState<string | null>(null)
   const [resendingMail, setResendingMail] = useState(false)
   const [mailInfo, setMailInfo] = useState<string | null>(null)
+  // Errore dell'ultima azione su apertura/chiusura votazioni: prima falliva in silenzio.
+  const [votingActionError, setVotingActionError] = useState<string | null>(null)
 
   const isManager = isAdmin || isSuperAdmin
 
@@ -93,7 +96,16 @@ export default function MatchVoting() {
     if (!player?.id) return
     setVotingBusy(true)
     setVotingSuccess(false)
-    await submitVotes(player.id, localVotes)
+    setVoteSaveError(null)
+    try {
+      await submitVotes(player.id, localVotes)
+    } catch (e) {
+      // Prima l'errore veniva ignorato: comparivano i voti "salvati" a schermo
+      // ma sul server non era arrivato niente.
+      setVotingBusy(false)
+      setVoteSaveError(e instanceof Error ? e.message : 'Voti non salvati, riprova.')
+      return
+    }
     setVotingBusy(false)
     setVotingSuccess(true)
     setTimeout(() => setVotingSuccess(false), 3000)
@@ -102,7 +114,13 @@ export default function MatchVoting() {
   async function handleOpenVoting() {
     if (!id) return
     setOpeningVoting(true)
-    await supabase.from('matches').update({ voting_open: true }).eq('id', id)
+    setVotingActionError(null)
+    const { error: openError } = await supabase.from('matches').update({ voting_open: true }).eq('id', id)
+    if (openError) {
+      setOpeningVoting(false)
+      setVotingActionError(`Votazioni non aperte: ${openError.message}`)
+      return
+    }
     logActivity('votazioni_aperte', { matchId: id })
     supabase.functions
       .invoke('notify-voting-opened', { body: { matchId: id } })
@@ -115,9 +133,14 @@ export default function MatchVoting() {
   async function handleCloseVoting() {
     if (!id || !await askConfirm('Chiudere le votazioni? I giocatori non potranno più modificare i voti.')) return
     setClosingVoting(true)
-    await supabase.from('matches').update({ voting_open: false }).eq('id', id)
-    logActivity('votazioni_chiuse', { matchId: id })
+    setVotingActionError(null)
+    const { error: closeError } = await supabase.from('matches').update({ voting_open: false }).eq('id', id)
     setClosingVoting(false)
+    if (closeError) {
+      setVotingActionError(`Votazioni non chiuse: ${closeError.message}`)
+      return
+    }
+    logActivity('votazioni_chiuse', { matchId: id })
     refetch()
     refetchVoting()
   }
@@ -358,6 +381,12 @@ export default function MatchVoting() {
             <p className="mt-3 text-center text-sm font-medium text-purple-700">✓ Voti inviati correttamente!</p>
           )}
 
+          {voteSaveError && (
+            <p role="alert" className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {voteSaveError}
+            </p>
+          )}
+
           <button
             onClick={handleSubmitVotes}
             disabled={votingBusy || Object.keys(localVotes).length === 0}
@@ -433,6 +462,12 @@ export default function MatchVoting() {
                   votato
                 </span>
               </div>
+
+              {votingActionError && (
+                <p role="alert" className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {votingActionError}
+                </p>
+              )}
 
               <div className="mt-3 flex flex-wrap gap-2">
                 {!isPublished &&

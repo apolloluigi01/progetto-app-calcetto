@@ -6,7 +6,14 @@
  */
 
 function escapeCell(value: string): string {
-  const v = value ?? ''
+  let v = value ?? ''
+  // Excel e Google Sheets interpretano come FORMULA ogni cella che inizia per
+  // = + - @ (e i caratteri di tabulazione/ritorno a capo iniziali). Nomi e
+  // soprannomi arrivano dagli utenti — il soprannome se lo modifica ognuno da
+  // solo — quindi un giocatore potrebbe farsi chiamare "=HYPERLINK(...)" e
+  // rendere attivo il file scaricato da un admin. L'apostrofo iniziale forza
+  // l'interpretazione come testo e non viene mostrato dal foglio di calcolo.
+  if (/^[=+\-@\t\r]/.test(v)) v = `'${v}`
   // Le celle che contengono il separatore, virgolette o a-capo vanno racchiuse
   // tra virgolette; le virgolette interne si raddoppiano.
   if (/[";\n\r]/.test(v)) return `"${v.replace(/"/g, '""')}"`

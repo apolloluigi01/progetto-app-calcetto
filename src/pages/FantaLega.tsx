@@ -30,8 +30,15 @@ export default function FantaLega() {
   async function handleJoin() {
     if (!player || !leagueId) return
     setJoining(true)
-    await supabase.from('fanta_league_members').insert({ league_id: leagueId, player_id: player.id })
+    setCalcError(null)
+    const { error: joinError } = await supabase
+      .from('fanta_league_members')
+      .insert({ league_id: leagueId, player_id: player.id })
     setJoining(false)
+    if (joinError) {
+      setCalcError(`Iscrizione non riuscita: ${joinError.message}`)
+      return
+    }
     refetch()
   }
 

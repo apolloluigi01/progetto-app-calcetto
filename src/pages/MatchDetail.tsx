@@ -50,7 +50,16 @@ export default function MatchDetail() {
   async function handleCancel() {
     if (!id || !player) return
     setBookingBusy(true)
-    await supabase.from('match_bookings').delete().eq('match_id', id).eq('player_id', player.id)
+    const { error: unbookError } = await supabase
+      .from('match_bookings')
+      .delete()
+      .eq('match_id', id)
+      .eq('player_id', player.id)
+    if (unbookError) {
+      setBookingBusy(false)
+      setBookingError(unbookError.message)
+      return
+    }
     setBookingBusy(false)
     refetchBookings()
   }

@@ -6,7 +6,7 @@
  */
 export default function PageLoader() {
   return (
-    <div className="flex min-h-svh items-center justify-center" role="status" aria-live="polite">
+    <div className="flex min-h-[60svh] items-center justify-center" role="status" aria-live="polite">
       <span className="sr-only">Caricamento in corso</span>
       <span className="h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-field-green motion-reduce:animate-none" />
     </div>

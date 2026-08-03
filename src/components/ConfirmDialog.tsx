@@ -1,4 +1,12 @@
-import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from 'react'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react'
 
 /**
  * Conferme e avvisi dell'app, al posto di confirm() e alert() del browser.
@@ -29,6 +37,9 @@ const ConfirmContext = createContext<ConfirmFn | undefined>(undefined)
 export function ConfirmProvider({ children }: { children: ReactNode }) {
   const [options, setOptions] = useState<ConfirmOptions | null>(null)
   const resolver = useRef<((value: boolean) => void) | null>(null)
+  const panelRef = useRef<HTMLDivElement | null>(null)
+  const confirmRef = useRef<HTMLButtonElement | null>(null)
+  const cancelRef = useRef<HTMLButtonElement | null>(null)
 
   const confirm = useCallback<ConfirmFn>((opts) => {
     setOptions(typeof opts === 'string' ? { message: opts } : opts)
@@ -43,6 +54,44 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
     resolver.current = null
   }
 
+  // Il focus iniziale va sul pulsante di conferma, TRANNE per le azioni
+  // distruttive: lì parte da "Annulla", altrimenti un Invio subito dopo
+  // l'apertura cancellerebbe senza che l'utente abbia letto niente.
+  useEffect(() => {
+    if (!options) return
+    const target = options.destructive ? cancelRef.current : confirmRef.current
+    target?.focus()
+  }, [options])
+
+  // Esc chiude annullando e il focus resta confinato nel dialogo: sono le due
+  // cose che i dialoghi nativi del browser facevano da soli.
+  useEffect(() => {
+    if (!options) return
+
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        close(false)
+        return
+      }
+      if (e.key !== 'Tab') return
+      const focusable = panelRef.current?.querySelectorAll<HTMLElement>('button')
+      if (!focusable || focusable.length === 0) return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault()
+        first.focus()
+      }
+    }
+
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [options])
+
   return (
     <ConfirmContext.Provider value={confirm}>
       {children}
@@ -55,6 +104,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
           onClick={() => close(false)}
         >
           <div
+            ref={panelRef}
             className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
@@ -65,6 +115,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
             <div className="mt-5 flex justify-end gap-2">
               {!options.alertOnly && (
                 <button
+                  ref={cancelRef}
                   onClick={() => close(false)}
                   className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
                 >
@@ -72,7 +123,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                 </button>
               )}
               <button
-                autoFocus
+                ref={confirmRef}
                 onClick={() => close(true)}
                 className={`rounded-lg px-4 py-2 text-sm font-medium text-white ${
                   options.destructive

@@ -183,10 +183,11 @@ export function useMatchVoting(matchId: string | undefined) {
       voted_id,
       vote,
     }))
-    await supabase
+    const { error: voteError } = await supabase
       .from('player_votes')
       .upsert(rows, { onConflict: 'match_id,voter_id,voted_id' })
     await load()
+    if (voteError) throw new Error(voteError.message)
   }
 
   return {

@@ -102,10 +102,13 @@ export async function logActivity(
     .eq('id', user.id)
     .single()
 
-  await supabase.from('admin_activity_log').insert({
+  // Il log non deve mai bloccare l'azione dell'utente: un errore qui si
+  // annota in console e basta.
+  const { error: logError } = await supabase.from('admin_activity_log').insert({
     admin_id:   user.id,
     admin_name: player?.name ?? 'Admin',
     action,
     details,
   })
+  if (logError) console.error('admin_activity_log:', logError.message)
 }
