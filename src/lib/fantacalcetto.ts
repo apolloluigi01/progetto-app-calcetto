@@ -164,6 +164,20 @@ export function computeLineupScore(
   return { players, total }
 }
 
+/**
+ * Punteggio d'ufficio per chi non ha schierato la formazione in una giornata
+ * calcolata: il più basso tra i punteggi di chi invece l'ha schierata.
+ * Restituisce null se nessuno ha schierato (non c'è nulla da assegnare).
+ *
+ * Non viene persistito: si ricava dai punteggi salvati dal "Calcola giornata",
+ * così resta sempre allineato anche se la giornata viene ricalcolata.
+ */
+export function defaultScoreForMissingLineup(lineupScores: (number | null)[]): number | null {
+  const scores = lineupScores.filter((s): s is number => s !== null)
+  if (scores.length === 0) return null
+  return Math.min(...scores)
+}
+
 export function formatFantaPoints(v: number): string {
   return (Math.round(v * 100) / 100).toLocaleString('it-IT', {
     minimumFractionDigits: 0,

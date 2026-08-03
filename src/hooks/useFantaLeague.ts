@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { defaultScoreForMissingLineup } from '../lib/fantacalcetto'
 import type { Match } from '../types/database'
 
 export interface FantaStanding {
@@ -9,6 +10,8 @@ export interface FantaStanding {
   nickname: string | null
   total: number
   matchesScored: number
+  /** Giornate calcolate in cui non ha schierato e ha preso il punteggio d'ufficio. */
+  matchesNotPlayed: number
 }
 
 export interface FantaLineupInfo {
@@ -29,6 +32,8 @@ export interface FantaMatchRow {
   isCalculated: boolean
   myLineup: FantaLineupInfo | null
   myScore: number | null
+  /** True se myScore è il punteggio d'ufficio (formazione non schierata). */
+  myScoreIsDefault: boolean
 }
 
 export interface FantaLeagueData {
@@ -66,7 +71,7 @@ export function useFantaLeague(leagueId: string | undefined, myPlayerId: string 
     const [membersRes, matchesRes, lineupsRes, calcsRes] = await Promise.all([
       supabase
         .from('fanta_league_members')
-        .select('player_id, players(name, surname, nickname)')
+        .select('player_id, joined_at, players(name, surname, nickname)')
         .eq('league_id', leagueId),
       supabase
         .from('matches')
@@ -95,7 +100,11 @@ export function useFantaLeague(leagueId: string | undefined, myPlayerId: string 
         : Promise.resolve({ data: [] as { match_id: string; player_id: string }[] }),
     ])
 
-    type MemberRow = { player_id: string; players: { name: string; surname: string | null; nickname: string | null } | null }
+    type MemberRow = {
+      player_id: string
+      joined_at: string
+      players: { name: string; surname: string | null; nickname: string | null } | null
+    }
     type LineupRow = {
       id: string
       match_id: string
@@ -117,26 +126,65 @@ export function useFantaLeague(leagueId: string | undefined, myPlayerId: string 
     }
     const publishedMatchIds = new Set(pagelle.map((p) => p.match_id))
 
-    // Classifica: somma dei punteggi persistiti dal "Calcola giornata" dell'admin.
-    const totals = new Map<string, { total: number; matchesScored: number }>()
-    for (const lineup of lineups) {
-      if (lineup.score === null || !calculatedMatchIds.has(lineup.match_id)) continue
-      const prev = totals.get(lineup.member_id) ?? { total: 0, matchesScored: 0 }
-      totals.set(lineup.member_id, {
-        total: Math.round((prev.total + Number(lineup.score)) * 100) / 100,
-        matchesScored: prev.matchesScored + 1,
-      })
+    const matchDateById = new Map((matchesRes.data ?? []).map((m) => [m.id, m.match_date as string]))
+
+    // Punteggio d'ufficio per giornata calcolata: il più basso tra chi ha
+    // schierato. Va a chi non ha schierato affatto (vedi sotto).
+    const defaultScoreByMatch = new Map<string, number | null>()
+    for (const matchId of calculatedMatchIds) {
+      defaultScoreByMatch.set(
+        matchId,
+        defaultScoreForMissingLineup(
+          lineups.filter((l) => l.match_id === matchId).map((l) => l.score),
+        ),
+      )
     }
 
+    /**
+     * Punteggio di un partecipante in una giornata calcolata: quello della sua
+     * formazione, oppure — se non ha schierato — il punteggio d'ufficio (il più
+     * basso della giornata). Chi si è iscritto alla lega dopo quella giornata
+     * non viene conteggiato: non poteva schierare.
+     */
+    function scoreForMember(
+      matchId: string,
+      memberId: string,
+      joinedAt: string,
+    ): { score: number; isDefault: boolean } | null {
+      if (!calculatedMatchIds.has(matchId)) return null
+      const lineup = lineups.find((l) => l.match_id === matchId && l.member_id === memberId)
+      if (lineup && lineup.score !== null) return { score: Number(lineup.score), isDefault: false }
+      const matchDate = matchDateById.get(matchId)
+      // joined_at è un timestamp, match_date una data: confronto a fine giornata.
+      if (matchDate && new Date(joinedAt) > new Date(`${matchDate}T23:59:59`)) return null
+      const fallback = defaultScoreByMatch.get(matchId) ?? null
+      return fallback === null ? null : { score: fallback, isDefault: true }
+    }
+
+    // Classifica: somma dei punteggi persistiti dal "Calcola giornata" dell'admin,
+    // più i punteggi d'ufficio delle giornate non schierate.
     const standings: FantaStanding[] = members
-      .map((m) => ({
-        playerId: m.player_id,
-        name: m.players?.name ?? '',
-        surname: m.players?.surname ?? null,
-        nickname: m.players?.nickname ?? null,
-        total: totals.get(m.player_id)?.total ?? 0,
-        matchesScored: totals.get(m.player_id)?.matchesScored ?? 0,
-      }))
+      .map((m) => {
+        let total = 0
+        let matchesScored = 0
+        let matchesNotPlayed = 0
+        for (const matchId of calculatedMatchIds) {
+          const res = scoreForMember(matchId, m.player_id, m.joined_at)
+          if (!res) continue
+          total = Math.round((total + res.score) * 100) / 100
+          matchesScored += 1
+          if (res.isDefault) matchesNotPlayed += 1
+        }
+        return {
+          playerId: m.player_id,
+          name: m.players?.name ?? '',
+          surname: m.players?.surname ?? null,
+          nickname: m.players?.nickname ?? null,
+          total,
+          matchesScored,
+          matchesNotPlayed,
+        }
+      })
       .sort((a, b) => b.total - a.total)
 
     type MatchWithResult = Match & { result: { id: string }[] | { id: string } | null }
@@ -146,9 +194,13 @@ export function useFantaLeague(leagueId: string | undefined, myPlayerId: string 
     const nextMatchId =
       matchRows.find((m) => !(Array.isArray(m.result) ? m.result[0] ?? null : m.result))?.id ?? null
 
+    const myMember = members.find((mem) => mem.player_id === myPlayerId) ?? null
+
     const matches: FantaMatchRow[] = matchRows.map((m) => {
       const result = Array.isArray(m.result) ? m.result[0] ?? null : m.result
       const myLineupRow = lineups.find((l) => l.match_id === m.id && l.member_id === myPlayerId) ?? null
+      const myScoreRes =
+        myMember && myPlayerId ? scoreForMember(m.id, myPlayerId, myMember.joined_at) : null
       return {
         match: m as unknown as Match,
         hasTeams: (teamsCountByMatch.get(m.id) ?? 0) > 0,
@@ -163,10 +215,8 @@ export function useFantaLeague(leagueId: string | undefined, myPlayerId: string 
               captainId: myLineupRow.captain_id,
             }
           : null,
-        myScore:
-          myLineupRow && calculatedMatchIds.has(m.id) && myLineupRow.score !== null
-            ? Number(myLineupRow.score)
-            : null,
+        myScore: myScoreRes?.score ?? null,
+        myScoreIsDefault: myScoreRes?.isDefault ?? false,
       }
     })
 

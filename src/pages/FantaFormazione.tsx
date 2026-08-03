@@ -11,6 +11,7 @@ import {
   computeFantaBudget,
   computeLineupScore,
   creditCost,
+  defaultScoreForMissingLineup,
   formatFantaPoints,
   lineupDeadline,
 } from '../lib/fantacalcetto'
@@ -38,6 +39,13 @@ interface OtherLineup {
   hidden: boolean
 }
 
+/** Partecipante alla lega (serve per capire chi non ha schierato). */
+interface LeagueMember {
+  playerId: string
+  name: string
+  joinedAt: string
+}
+
 export default function FantaFormazione() {
   const { leagueId, matchId } = useParams<{ leagueId: string; matchId: string }>()
   const { player, isAdmin } = useAuth()
@@ -62,6 +70,11 @@ export default function FantaFormazione() {
   const [isCalculated, setIsCalculated] = useState(false)
   // Formazioni schierate dagli altri partecipanti alla lega.
   const [others, setOthers] = useState<OtherLineup[]>([])
+  // Tutti i partecipanti alla lega: da qui si ricava chi non ha schierato.
+  const [members, setMembers] = useState<LeagueMember[]>([])
+  // Punteggio d'ufficio della giornata (il più basso tra chi ha schierato):
+  // va a chi non ha schierato la formazione.
+  const [defaultScore, setDefaultScore] = useState<number | null>(null)
   // Reminder mail "schiera la formazione" (solo admin): quanti già inviati.
   const [reminderCount, setReminderCount] = useState<number | null>(null)
   const [reminderSending, setReminderSending] = useState(false)
@@ -105,30 +118,43 @@ export default function FantaFormazione() {
     }
   }, [leagueId, matchId, player])
 
-  // Formazioni degli altri partecipanti alla lega per questa partita.
+  // Formazioni degli altri partecipanti alla lega per questa partita, elenco
+  // dei partecipanti e punteggio d'ufficio della giornata.
   useEffect(() => {
     if (!leagueId || !matchId || !player) return
     let cancelled = false
-    supabase
-      .from('fanta_lineups')
-      // Due foreign key verso players (member e capitano): serve il
-      // riferimento esplicito per disambiguare l'embed.
-      .select('member_id, captain_id, score, hidden, fanta_lineup_players(player_id), member:players!fanta_lineups_member_id_fkey(name, surname, nickname)')
-      .eq('league_id', leagueId)
-      .eq('match_id', matchId)
-      .neq('member_id', player.id)
-      .then(({ data: rows }) => {
-        if (cancelled) return
-        type Row = {
-          member_id: string
-          captain_id: string
-          score: number | null
-          hidden: boolean
-          fanta_lineup_players: { player_id: string }[]
-          member: { name: string; surname: string | null; nickname: string | null } | null
-        }
-        setOthers(
-          ((rows ?? []) as unknown as Row[]).map((r) => ({
+    Promise.all([
+      supabase
+        .from('fanta_lineups')
+        // Due foreign key verso players (member e capitano): serve il
+        // riferimento esplicito per disambiguare l'embed.
+        .select('member_id, captain_id, score, hidden, fanta_lineup_players(player_id), member:players!fanta_lineups_member_id_fkey(name, surname, nickname)')
+        .eq('league_id', leagueId)
+        .eq('match_id', matchId),
+      supabase
+        .from('fanta_league_members')
+        .select('player_id, joined_at, players(name, surname, nickname)')
+        .eq('league_id', leagueId),
+    ]).then(([lineupsRes, membersRes]) => {
+      if (cancelled) return
+      type Row = {
+        member_id: string
+        captain_id: string
+        score: number | null
+        hidden: boolean
+        fanta_lineup_players: { player_id: string }[]
+        member: { name: string; surname: string | null; nickname: string | null } | null
+      }
+      type MemberRow = {
+        player_id: string
+        joined_at: string
+        players: { name: string; surname: string | null; nickname: string | null } | null
+      }
+      const rows = (lineupsRes.data ?? []) as unknown as Row[]
+      setOthers(
+        rows
+          .filter((r) => r.member_id !== player.id)
+          .map((r) => ({
             memberId: r.member_id,
             memberName: r.member ? fullName(r.member) : '?',
             captainId: r.captain_id,
@@ -136,8 +162,16 @@ export default function FantaFormazione() {
             score: r.score !== null ? Number(r.score) : null,
             hidden: r.hidden,
           })),
-        )
-      })
+      )
+      setDefaultScore(defaultScoreForMissingLineup(rows.map((r) => r.score)))
+      setMembers(
+        ((membersRes.data ?? []) as unknown as MemberRow[]).map((m) => ({
+          playerId: m.player_id,
+          name: m.players ? fullName(m.players) : '?',
+          joinedAt: m.joined_at,
+        })),
+      )
+    })
     return () => {
       cancelled = true
     }
@@ -343,6 +377,24 @@ export default function FantaFormazione() {
     const mp = matchPlayers.find((p) => p.player_id === playerId)
     return mp ? fullName(mp) : '?'
   }
+
+  // Chi non ha schierato la formazione prende il punteggio d'ufficio della
+  // giornata (il più basso tra chi l'ha schierata). Chi si è iscritto alla
+  // lega dopo la partita non è coinvolto: non poteva schierare.
+  const membersWithLineup = new Set([
+    ...others.map((o) => o.memberId),
+    ...(savedLineup && player ? [player.id] : []),
+  ])
+  const missingMembers = members.filter(
+    (m) =>
+      !membersWithLineup.has(m.playerId) &&
+      new Date(m.joinedAt) <= new Date(`${match.match_date}T23:59:59`),
+  )
+  const iMissedLineup = !!player && missingMembers.some((m) => m.playerId === player.id)
+  // Gli altri "non schierati" si mostrano solo a formazioni bloccate: prima
+  // della deadline non si deve sapere chi ha già schierato e chi no.
+  const otherMissingMembers =
+    result || pastDeadline ? missingMembers.filter((m) => m.playerId !== player?.id) : []
 
   function renderTeam(team: MatchPlayerWithName[], label: string, count: number) {
     return (
@@ -601,6 +653,22 @@ export default function FantaFormazione() {
         </div>
       )}
 
+      {/* Formazione non schierata: punteggio d'ufficio */}
+      {isCalculated && iMissedLineup && defaultScore !== null && (
+        <div className="mt-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+          <div className="flex items-center justify-between">
+            <h3 className="font-medium text-gray-700">Formazione non schierata</h3>
+            <span className="shrink-0 rounded-full bg-gray-100 px-3 py-1 text-base font-bold text-gray-500">
+              {formatFantaPoints(defaultScore)} pt
+            </span>
+          </div>
+          <p className="mt-1 text-xs text-gray-500">
+            Non hai schierato la formazione: ti viene assegnato il punteggio più basso tra quelli di
+            chi ha schierato in questa giornata.
+          </p>
+        </div>
+      )}
+
       {/* Punteggio dettagliato */}
       {score && (
         <div className="mt-4 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -635,7 +703,7 @@ export default function FantaFormazione() {
       )}
 
       {/* Formazioni degli altri partecipanti */}
-      {others.length > 0 && (
+      {(others.length > 0 || otherMissingMembers.length > 0) && (
         <div className="mt-6">
           <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-500">
             Formazioni degli altri partecipanti
@@ -672,6 +740,25 @@ export default function FantaFormazione() {
                     ))}
                   </div>
                 )}
+              </div>
+            ))}
+
+            {/* Chi non ha schierato: punteggio d'ufficio della giornata */}
+            {otherMissingMembers.map((m) => (
+              <div key={m.playerId} className="rounded-xl bg-white p-3 opacity-75 shadow">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-gray-600">{m.name}</p>
+                  {isCalculated && defaultScore !== null && (
+                    <span className="shrink-0 rounded-full bg-gray-100 px-2.5 py-0.5 text-sm font-bold text-gray-500">
+                      {formatFantaPoints(defaultScore)} pt
+                    </span>
+                  )}
+                </div>
+                <p className="mt-2 text-xs italic text-gray-500">
+                  {isCalculated && defaultScore !== null
+                    ? "Formazione non schierata — punteggio d'ufficio (il più basso della giornata)"
+                    : 'Formazione non schierata'}
+                </p>
               </div>
             ))}
           </div>

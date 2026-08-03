@@ -207,7 +207,17 @@ export default function FantaLega() {
                       {s.playerId === player?.id && <span className="shrink-0 text-xs text-field-green">(tu)</span>}
                     </span>
                   </td>
-                  <td className="px-2 py-2.5 text-right text-gray-500">{s.matchesScored}</td>
+                  <td className="px-2 py-2.5 text-right text-gray-500">
+                    {s.matchesScored}
+                    {s.matchesNotPlayed > 0 && (
+                      <span
+                        className="ml-1 text-xs text-gray-400"
+                        title={`${s.matchesNotPlayed} giornate senza formazione: punteggio d'ufficio`}
+                      >
+                        ({s.matchesNotPlayed} n.s.)
+                      </span>
+                    )}
+                  </td>
                   <td className="px-4 py-2.5 text-right">
                     <span className="inline-flex items-center rounded-full bg-field-yellow/20 px-2.5 py-1 text-sm font-bold text-field-orange">
                       {formatFantaPoints(s.total)}
@@ -219,6 +229,12 @@ export default function FantaLega() {
           </table>
         )}
       </div>
+      )}
+      {tab === 'classifica' && standings.some((s) => s.matchesNotPlayed > 0) && (
+        <p className="mt-2 text-xs text-gray-400">
+          n.s. = giornate non schierate: valgono il punteggio più basso tra chi ha schierato in
+          quella giornata.
+        </p>
       )}
 
       {/* ===== GIORNATE (da schierare + concluse) ===== */}
@@ -303,11 +319,19 @@ export default function FantaLega() {
                         ? 'In attesa del calcolo della giornata'
                         : m.myLineup
                           ? 'Giornata calcolata'
-                          : 'Giornata calcolata — nessuna tua formazione'}
+                          : m.myScoreIsDefault
+                            ? "Formazione non schierata — punteggio d'ufficio (il più basso della giornata)"
+                            : 'Giornata calcolata — nessuna tua formazione'}
                   </p>
                 </div>
                 {m.myScore !== null && (
-                  <span className="rounded-full bg-field-yellow/20 px-2.5 py-1 text-sm font-bold text-field-orange">
+                  <span
+                    className={`shrink-0 rounded-full px-2.5 py-1 text-sm font-bold ${
+                      m.myScoreIsDefault
+                        ? 'bg-gray-100 text-gray-500'
+                        : 'bg-field-yellow/20 text-field-orange'
+                    }`}
+                  >
                     {formatFantaPoints(m.myScore)} pt
                   </span>
                 )}

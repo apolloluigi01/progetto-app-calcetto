@@ -9,11 +9,14 @@ const navItems: NavItem[] = [
   { to: '/', label: 'Home', end: true },
   { to: '/giocatori', label: 'Giocatori' },
   { to: '/partite', label: 'Partite' },
+  { to: '/calendario', label: 'Calendario' },
   { to: '/statistiche', label: 'Statistiche' },
   { to: '/albo-oro', label: "Albo d'oro" },
   { to: '/ufficio-stampa', label: 'Ufficio Stampa' },
-  { to: '/fantacalcetto', label: 'Fantacalcetto', fanta: true },
 ]
+
+/** Voce a sé stante, staccata dal resto del menu (in fondo, dopo un divisore). */
+const fantaItem: NavItem = { to: '/fantacalcetto', label: 'Fantacalcetto', fanta: true }
 
 function NavLabel({ item, isActive }: { item: NavItem; isActive: boolean }) {
   if (item.fanta) {
@@ -33,10 +36,7 @@ export default function Layout() {
   const navigate = useNavigate()
   const isHome = location.pathname === '/'
 
-  const tailItems: NavItem[] = [
-    { to: '/impostazioni', label: 'Impostazioni' },
-    { to: '/calendario', label: 'Calendario' },
-  ]
+  const tailItems: NavItem[] = [{ to: '/impostazioni', label: 'Impostazioni' }]
 
   const items = isAdmin
     ? [...navItems, { to: '/admin', label: 'CDA' }, ...tailItems]
@@ -93,9 +93,17 @@ export default function Layout() {
           ))}
         </nav>
 
+        {/* Fantacalcetto: zona a sé, staccata dalle altre voci */}
+        <div className="mt-auto px-4 pt-6">
+          <div className="mb-3 h-px bg-white/10" />
+          <NavLink to={fantaItem.to} className="block px-3 py-2.5">
+            {({ isActive }) => <NavLabel item={fantaItem} isActive={isActive} />}
+          </NavLink>
+        </div>
+
         <button
           onClick={handleLogout}
-          className="mt-auto mx-4 mb-5 px-3 py-2.5 text-left text-sm uppercase tracking-widest font-semibold text-white/40 hover:text-white/70 transition-colors duration-150"
+          className="mx-4 mb-5 mt-2 px-3 py-2.5 text-left text-sm uppercase tracking-widest font-semibold text-white/40 hover:text-white/70 transition-colors duration-150"
         >
           Logout
         </button>
@@ -169,6 +177,18 @@ export default function Layout() {
               }
             </NavLink>
           ))}
+
+          {/* Fantacalcetto: zona a sé, staccata dalle altre voci */}
+          <div className="my-2 mx-6 h-px bg-white/10" />
+          <NavLink
+            to={fantaItem.to}
+            onClick={() => setMenuOpen(false)}
+            className="px-6 py-3"
+          >
+            {({ isActive }) => <NavLabel item={fantaItem} isActive={isActive} />}
+          </NavLink>
+          <div className="my-2 mx-6 h-px bg-white/10" />
+
           <button
             onClick={() => {
               setMenuOpen(false)
