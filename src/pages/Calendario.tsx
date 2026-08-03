@@ -16,6 +16,16 @@ function formatDate(d: string) {
   })
 }
 
+/** Data compatta per il telefono: "sab 12 lug 26" sta su una riga sola. */
+function formatDateShort(d: string) {
+  return new Date(d).toLocaleDateString('it-IT', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    year: '2-digit',
+  })
+}
+
 function formatSeasonRange(s: Season) {
   const short = (d: string) => new Date(d).toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric' })
   return `${short(s.start_date)}${s.end_date ? ` → ${short(s.end_date)}` : ' → In corso'}`
@@ -30,17 +40,23 @@ function MatchRow({ match }: { match: MatchWithResult }) {
   return (
     <Link
       to={`/partite/${match.id}`}
-      className="flex items-center justify-between gap-3 rounded-xl bg-white p-3 shadow-sm hover:bg-gray-50"
+      className="flex items-center justify-between gap-2 rounded-xl bg-white p-2.5 shadow-sm hover:bg-gray-50 sm:gap-3 sm:p-3"
     >
-      <div className="min-w-0">
-        <p className="text-sm font-medium text-gray-800">
-          {formatDate(match.match_date)}
+      {/* min-w-0 + break-words: su telefono la riga deve poter rimpicciolirsi,
+          altrimenti la pagina sfora lo schermo (effetto "zoomata"). */}
+      <div className="min-w-0 flex-1">
+        <p className="break-words text-sm font-medium text-gray-800">
+          {/* Data compatta sul telefono, per esteso da tablet in su. */}
+          <span className="sm:hidden">{formatDateShort(match.match_date)}</span>
+          <span className="hidden sm:inline">{formatDate(match.match_date)}</span>
           {time && <span className="text-gray-500"> · {time}</span>}
         </p>
-        {match.field && <p className="truncate text-xs text-gray-500">{match.field}</p>}
+        {/* line-clamp invece di truncate: "truncate" impone white-space:nowrap,
+            quindi il nome del campo allarga la pagina oltre lo schermo. */}
+        {match.field && <p className="line-clamp-1 text-xs text-gray-500">{match.field}</p>}
       </div>
       {match.result ? (
-        <span className="shrink-0 rounded-lg bg-field-green/10 px-2.5 py-1 text-sm font-bold text-field-green-dark">
+        <span className="shrink-0 rounded-lg bg-field-green/10 px-2 py-1 text-sm font-bold text-field-green-dark sm:px-2.5">
           {match.result.score_a} - {match.result.score_b}
         </span>
       ) : (
@@ -164,11 +180,11 @@ export default function Calendario() {
               <div key={s.id} className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
                 <button
                   onClick={() => setOpenSeasons((prev) => ({ ...prev, [s.id]: !isOpen }))}
-                  className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-gray-50"
+                  className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left hover:bg-gray-50 sm:gap-3 sm:px-4 sm:py-3"
                 >
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-semibold text-gray-800">{s.name}</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <span className="break-words font-semibold text-gray-800">{s.name}</span>
                       {status === 'corrente' && (
                         <span className="rounded-full bg-field-green/10 px-2 py-0.5 text-[11px] font-semibold text-field-green-dark">
                           Corrente
@@ -180,8 +196,8 @@ export default function Calendario() {
                         </span>
                       )}
                     </div>
-                    <p className="mt-0.5 text-xs text-gray-500">{formatSeasonRange(s)}</p>
-                    <p className="mt-0.5 text-xs text-gray-400">
+                    <p className="mt-0.5 break-words text-xs text-gray-500">{formatSeasonRange(s)}</p>
+                    <p className="mt-0.5 break-words text-xs text-gray-400">
                       {total} {total === 1 ? 'partita' : 'partite'} · {played.length} giocate ·{' '}
                       {upcoming.length} in programma
                     </p>
@@ -192,7 +208,7 @@ export default function Calendario() {
                 </button>
 
                 {isOpen && (
-                  <div className="border-t border-gray-100 bg-gray-50 px-4 py-3">
+                  <div className="border-t border-gray-100 bg-gray-50 px-2.5 py-3 sm:px-4">
                     {total === 0 && <p className="text-sm text-gray-500">Nessuna partita in questa stagione.</p>}
 
                     {upcoming.length > 0 && (
