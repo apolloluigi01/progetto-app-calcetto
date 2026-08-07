@@ -1,10 +1,17 @@
 import { useState, type FormEvent } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { validatePassword } from '../lib/passwordPolicy'
 
+// La lunghezza del codice non e' decisa dall'app ma dalle impostazioni Auth del
+// progetto Supabase (oggi 8 cifre, in passato 6) e puo' cambiare senza toccare
+// il codice. Qui accettiamo l'intero intervallo previsto da Supabase invece di
+// fissare un numero: con maxLength=6 il campo troncava i codici da 8 cifre e il
+// reset falliva sempre con "codice non valido".
+const CODE_MIN_LENGTH = 6
+const CODE_MAX_LENGTH = 10
+
 export default function ResetPassword() {
-  const navigate = useNavigate()
   const location = useLocation()
   const prefillEmail = (location.state as { email?: string } | null)?.email ?? ''
 
@@ -15,6 +22,10 @@ export default function ResetPassword() {
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [done, setDone] = useState(false)
+  // Il codice si consuma alla prima verifica: se il salvataggio fallisce dopo
+  // (password rifiutata dal server, rete caduta) un secondo tentativo con lo
+  // stesso codice darebbe "codice non valido" pur essendo gia' autenticati.
+  const [verified, setVerified] = useState(false)
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -29,14 +40,25 @@ export default function ResetPassword() {
       setError('Le due password non coincidono.')
       return
     }
+    if (!verified && code.length < CODE_MIN_LENGTH) {
+      setError(`Il codice deve contenere almeno ${CODE_MIN_LENGTH} cifre.`)
+      return
+    }
 
     setSubmitting(true)
 
-    const { error: verifyError } = await supabase.auth.verifyOtp({ email, token: code, type: 'recovery' })
-    if (verifyError) {
-      setSubmitting(false)
-      setError('Codice non valido o scaduto. Richiedi un nuovo codice dalla pagina "Password dimenticata".')
-      return
+    if (!verified) {
+      const { error: verifyError } = await supabase.auth.verifyOtp({
+        email: email.trim().toLowerCase(),
+        token: code,
+        type: 'recovery',
+      })
+      if (verifyError) {
+        setSubmitting(false)
+        setError('Codice non valido o scaduto. Richiedi un nuovo codice dalla pagina "Password dimenticata".')
+        return
+      }
+      setVerified(true)
     }
 
     const { error: updateError } = await supabase.auth.updateUser({ password })
@@ -46,10 +68,19 @@ export default function ResetPassword() {
       return
     }
 
-    await supabase.rpc('clear_must_change_password')
+    const { error: rpcError } = await supabase.rpc('clear_must_change_password')
+    if (rpcError) {
+      setSubmitting(false)
+      setError(rpcError.message)
+      return
+    }
+
     setSubmitting(false)
     setDone(true)
-    setTimeout(() => navigate('/'), 1500)
+    // Ricarica completa invece di navigate(): il profilo in memoria e' quello
+    // letto appena verificato il codice e puo' avere ancora
+    // must_change_password a true, che rimanderebbe subito a /imposta-password.
+    setTimeout(() => window.location.assign('/'), 1500)
   }
 
   return (
@@ -72,10 +103,12 @@ export default function ResetPassword() {
               <input
                 id="email"
                 type="email"
+                autoComplete="email"
                 required
+                disabled={verified}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-field-green focus:outline-none"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-field-green focus:outline-none disabled:bg-gray-100"
               />
             </div>
             <div>
@@ -86,11 +119,16 @@ export default function ResetPassword() {
                 id="code"
                 type="text"
                 inputMode="numeric"
-                maxLength={6}
+                autoComplete="one-time-code"
+                pattern="[0-9]*"
+                maxLength={CODE_MAX_LENGTH}
                 required
+                disabled={verified}
                 value={code}
-                onChange={(e) => setCode(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 tracking-widest focus:border-field-green focus:outline-none"
+                // Il codice incollato dalla mail puo' portarsi dietro spazi o un
+                // a capo: teniamo solo le cifre.
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, CODE_MAX_LENGTH))}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 tracking-widest focus:border-field-green focus:outline-none disabled:bg-gray-100"
               />
             </div>
             <div>
@@ -100,6 +138,7 @@ export default function ResetPassword() {
               <input
                 id="password"
                 type="password"
+                autoComplete="new-password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -113,6 +152,7 @@ export default function ResetPassword() {
               <input
                 id="confirmPassword"
                 type="password"
+                autoComplete="new-password"
                 required
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
@@ -120,6 +160,9 @@ export default function ResetPassword() {
               />
             </div>
 
+            {verified && (
+              <p className="text-sm text-green-700">Codice verificato: scegli la nuova password e salva.</p>
+            )}
             {error && <p className="text-sm text-red-600">{error}</p>}
 
             <button
@@ -131,6 +174,10 @@ export default function ResetPassword() {
             </button>
           </form>
         )}
+
+        <Link to="/password-dimenticata" className="mt-4 block text-center text-sm text-gray-500 hover:underline">
+          Non hai ricevuto il codice? Richiedine uno nuovo
+        </Link>
       </div>
     </div>
   )

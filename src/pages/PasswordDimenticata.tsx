@@ -1,20 +1,36 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { getFunctionErrorMessage } from '../lib/functionErrors'
 
 export default function PasswordDimenticata() {
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [sent, setSent] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    setError(null)
     setSubmitting(true)
-    await supabase.functions.invoke('request-password-reset', { body: { email } })
+
+    const normalizedEmail = email.trim().toLowerCase()
+    // L'errore della funzione veniva ignorato: chi superava il limite di
+    // richieste (429) o restava senza rete vedeva comunque "riceverai una mail"
+    // e finiva ad aspettare un codice che non sarebbe mai arrivato.
+    const { error: invokeError } = await supabase.functions.invoke('request-password-reset', {
+      body: { email: normalizedEmail },
+    })
     setSubmitting(false)
+
+    if (invokeError) {
+      setError(await getFunctionErrorMessage(invokeError, 'Invio non riuscito. Controlla la connessione e riprova.'))
+      return
+    }
+
     setSent(true)
-    setTimeout(() => navigate('/reset-password', { state: { email } }), 1500)
+    setTimeout(() => navigate('/reset-password', { state: { email: normalizedEmail } }), 1500)
   }
 
   return (
@@ -45,6 +61,8 @@ export default function PasswordDimenticata() {
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-field-green focus:outline-none"
               />
             </div>
+
+            {error && <p className="text-sm text-red-600">{error}</p>}
 
             <button
               type="submit"

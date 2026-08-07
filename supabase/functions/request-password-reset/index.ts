@@ -80,8 +80,14 @@ Deno.serve(async (req: Request) => {
     return json(req, { error: "Method not allowed" }, 405);
   }
 
-  const { email } = (await req.json()) as { email?: string };
-  if (!email) {
+  // Un corpo non JSON faceva esplodere la funzione con un 500 senza header CORS.
+  let email: string | undefined;
+  try {
+    ({ email } = (await req.json()) as { email?: string });
+  } catch {
+    return json(req, { error: "Richiesta non valida" }, 400);
+  }
+  if (!email || !email.trim()) {
     return json(req, { error: "email obbligatoria" }, 400);
   }
 
@@ -124,13 +130,15 @@ Deno.serve(async (req: Request) => {
     .delete()
     .lt("requested_at", new Date(Date.now() - 24 * 60 * 60_000).toISOString());
 
-  // generateLink restituisce anche un codice OTP a 6 cifre (email_otp) abbinato allo
-  // stesso token: lo mandiamo via email invece di un link cliccabile, cosi' l'utente
-  // lo digita nell'app. Nessun link da rendere cliccabile, nessun rischio che uno
-  // scanner antispam lo consumi al posto dell'utente.
+  // generateLink restituisce anche un codice OTP (email_otp) abbinato allo stesso
+  // token: lo mandiamo via email invece di un link cliccabile, cosi' l'utente lo
+  // digita nell'app. Nessun link da rendere cliccabile, nessun rischio che uno
+  // scanner antispam lo consumi al posto dell'utente. La lunghezza del codice la
+  // decide l'impostazione "Email OTP Length" del progetto Supabase (oggi 8 cifre):
+  // non va data per scontata ne' qui ne' nel campo di input dell'app.
   const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
     type: "recovery",
-    email,
+    email: normalizedEmail,
   });
 
   if (linkError || !linkData.user || !linkData.properties?.email_otp) {
@@ -142,7 +150,7 @@ Deno.serve(async (req: Request) => {
 
   try {
     await sendEmail(
-      email,
+      normalizedEmail,
       "Codice per reimpostare la password - Pavone League",
       `
         <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
@@ -152,7 +160,7 @@ Deno.serve(async (req: Request) => {
             <span style="display:inline-block; background:#f3f4f6; color:#1a1a1a; padding:14px 28px; border-radius:8px; font-weight:bold; font-size:28px; letter-spacing:4px;">${code}</span>
           </p>
           <p style="color:#555; font-size:13px;">
-            Se il link non è cliccabile, copia questo indirizzo e incollalo nel browser per aprire la pagina di reset:<br>
+            Inserisci il codice per intero (${code.length} cifre) in questa pagina:<br>
             <a href="${appUrl}/reset-password" style="color:#2e7d32;word-break:break-all;">${appUrl}/reset-password</a>
           </p>
           <p style="color:#555; font-size:13px;">Il codice scade dopo pochi minuti. Se non hai richiesto tu questa operazione, ignora questa email: la tua password attuale resta valida.</p>
