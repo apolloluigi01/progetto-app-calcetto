@@ -3,6 +3,7 @@ import { SkeletonList } from '../components/Skeleton'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useOveralls } from '../hooks/useOveralls'
+import { filterPlayersBySearch } from '../lib/playerSearch'
 import ErrorNotice from '../components/ErrorNotice'
 import type { Player, PlayerRole } from '../types/database'
 
@@ -20,13 +21,7 @@ export default function Giocatori() {
   const [search, setSearch] = useState('')
   const { overalls } = useOveralls()
 
-  const query = search.trim().toLowerCase()
-  const filtered = query
-    ? players.filter((p) =>
-        [p.name, p.surname ?? '', p.nickname ?? '', `${p.name} ${p.surname ?? ''}`]
-          .some((v) => v.toLowerCase().includes(query))
-      )
-    : players
+  const filtered = filterPlayersBySearch(players, search)
 
   useEffect(() => {
     setLoading(true)

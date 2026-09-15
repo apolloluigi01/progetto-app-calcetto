@@ -178,6 +178,77 @@ export function defaultScoreForMissingLineup(lineupScores: (number | null)[]): n
   return Math.min(...scores)
 }
 
+/**
+ * Punti d'ingresso di chi si iscrive alla lega a giornate già giocate: il
+ * punteggio più basso della classifica generale in quel momento, cioè il minimo
+ * dei totali dei partecipanti già iscritti calcolati sulle sole giornate
+ * concluse prima dell'iscrizione (compresi i loro eventuali punti d'ingresso).
+ * Chi si iscrive prima di qualsiasi giornata calcolata entra con 0.
+ *
+ * Come il punteggio d'ufficio non viene persistito: si ricava ogni volta dai
+ * punteggi salvati, così segue anche i ricalcoli delle giornate.
+ *
+ * @param members partecipanti con la data d'iscrizione
+ * @param matches giornate calcolate con la loro data
+ * @param scoreFor punteggio (reale o d'ufficio) di un partecipante in una giornata,
+ *   null se non gli spetta (iscritto dopo quella giornata)
+ */
+export function computeEntryPoints(
+  members: { playerId: string; joinedAt: string }[],
+  matches: { matchId: string; matchDate: string }[],
+  scoreFor: (matchId: string, playerId: string) => number | null,
+): Map<string, number> {
+  const entry = new Map<string, number>()
+  const sorted = [...members].sort(
+    (a, b) => new Date(a.joinedAt).getTime() - new Date(b.joinedAt).getTime(),
+  )
+  sorted.forEach((m, i) => {
+    const joined = new Date(m.joinedAt)
+    // Stesso criterio di "iscritto dopo la giornata": confronto a fine giornata.
+    const playedBefore = matches.filter((x) => joined > new Date(`${x.matchDate}T23:59:59`))
+    const earlier = sorted.slice(0, i).filter((e) => new Date(e.joinedAt) < joined)
+    if (playedBefore.length === 0 || earlier.length === 0) {
+      entry.set(m.playerId, 0)
+      return
+    }
+    const totals = earlier.map((e) =>
+      playedBefore.reduce((sum, x) => sum + (scoreFor(x.matchId, e.playerId) ?? 0), entry.get(e.playerId) ?? 0),
+    )
+    entry.set(m.playerId, Math.round(Math.min(...totals) * 100) / 100)
+  })
+  return entry
+}
+
+/** Mesi dall'inizio della stagione entro cui ci si può iscrivere a una lega. */
+export const JOIN_WINDOW_MONTHS = 1
+
+/**
+ * Primo giorno (YYYY-MM-DD) in cui l'iscrizione alla lega è chiusa: inizio
+ * stagione + 1 mese (stagione dal 1 settembre → chiusa dal 1 ottobre). Se il
+ * mese successivo è più corto, si ferma all'ultimo giorno, come fa Postgres.
+ * Il database applica la stessa regola (fanta_league_join_open).
+ */
+export function joinClosedFrom(seasonStartDate: string): string {
+  const [y, m, d] = seasonStartDate.split('-').map(Number)
+  const target = new Date(Date.UTC(y, m - 1 + JOIN_WINDOW_MONTHS, 1))
+  const lastDay = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate()
+  target.setUTCDate(Math.min(d, lastDay))
+  return target.toISOString().slice(0, 10)
+}
+
+/** True se oggi (ora italiana) ci si può ancora iscrivere alla lega. */
+export function isJoinOpen(seasonStartDate: string): boolean {
+  const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' })
+  return today < joinClosedFrom(seasonStartDate)
+}
+
+/** Ultimo giorno utile per iscriversi, formattato per l'interfaccia. */
+export function formatJoinDeadline(seasonStartDate: string): string {
+  const last = new Date(`${joinClosedFrom(seasonStartDate)}T12:00:00Z`)
+  last.setUTCDate(last.getUTCDate() - 1)
+  return last.toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
+}
+
 export function formatFantaPoints(v: number): string {
   return (Math.round(v * 100) / 100).toLocaleString('it-IT', {
     minimumFractionDigits: 0,

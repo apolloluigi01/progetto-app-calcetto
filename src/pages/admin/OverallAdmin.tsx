@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { logActivity } from '../../lib/activityLog'
 import { useFasce } from '../../hooks/useFasce'
+import { filterPlayersBySearch } from '../../lib/playerSearch'
 import { fasciaForOverall, fasciaLabel, rangeForOverall } from '../../lib/fasce'
 
 interface Row {
@@ -28,6 +29,7 @@ export default function OverallAdmin() {
   const [savedId, setSavedId] = useState<string | null>(null)
   // Ordinamento: per nome (default) o per overall crescente/decrescente.
   const [sortMode, setSortMode] = useState<'name' | 'overall_desc' | 'overall_asc'>('name')
+  const [search, setSearch] = useState('')
 
   useEffect(() => {
     async function load() {
@@ -93,7 +95,7 @@ export default function OverallAdmin() {
   // Ordino su savedOverall (valore persistito) così le righe non si riordinano
   // mentre si sta digitando un nuovo overall non ancora salvato.
   const fullName = (r: Row) => `${r.name}${r.surname ? ` ${r.surname}` : ''}`
-  const sortedRows = [...rows].sort((a, b) => {
+  const sortedRows = [...filterPlayersBySearch(rows, search)].sort((a, b) => {
     if (sortMode === 'name') return fullName(a).localeCompare(fullName(b), 'it')
     const diff = sortMode === 'overall_desc' ? b.savedOverall - a.savedOverall : a.savedOverall - b.savedOverall
     return diff !== 0 ? diff : fullName(a).localeCompare(fullName(b), 'it')
@@ -122,7 +124,16 @@ export default function OverallAdmin() {
 
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
 
-      <div className="mt-4 flex flex-wrap items-center gap-2">
+      <input
+        type="search"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="🔍 Cerca giocatore..."
+        aria-label="Cerca giocatore per nome, cognome o nickname"
+        className="mt-4 w-full rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm focus:border-field-green focus:outline-none"
+      />
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
         <span className="text-xs font-medium text-gray-500">Ordina:</span>
         {sortButton('name', 'Nome')}
         {sortButton('overall_desc', 'Overall ↓')}
@@ -130,6 +141,9 @@ export default function OverallAdmin() {
       </div>
 
       <div className="mt-3 space-y-2">
+        {rows.length > 0 && sortedRows.length === 0 && (
+          <p className="text-sm text-gray-500">Nessun giocatore corrisponde alla ricerca "{search}".</p>
+        )}
         {sortedRows.map((row) => {
           const dirty = Math.round(row.overall) !== row.savedOverall
           return (

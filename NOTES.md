@@ -1,6 +1,17 @@
 # Note di progetto — App Calcetto
 
-Ultimo aggiornamento: 2026-08-03
+Ultimo aggiornamento: 2026-09-15
+
+## Fantacalcetto: iscrizioni (2026-09-15)
+
+- **Scadenza iscrizioni**: a una lega ci si iscrive solo entro il primo mese dall'inizio
+  della stagione collegata (inizio 1 settembre → ultimo giorno 30 settembre, ora italiana).
+  La applica il database (policy `fanta_members_insert_self` + funzione
+  `fanta_league_join_open`); il frontend (`isJoinOpen` in `lib/fantacalcetto.ts`) nasconde
+  solo il pulsante. Vale anche per gli admin.
+- **Punti d'ingresso**: chi si iscrive a giornate già calcolate parte dal punteggio più basso
+  della classifica generale in quel momento (`computeEntryPoints`). Non è persistito: si
+  ricalcola dai punteggi salvati, come il punteggio d'ufficio.
 
 ## Audit tecnico del 2026-08-03 — cosa è cambiato
 

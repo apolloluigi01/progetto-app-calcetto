@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { logActivity } from '../lib/activityLog'
+import { formatJoinDeadline, isJoinOpen } from '../lib/fantacalcetto'
 import type { Season } from '../types/database'
 
 export interface FantaLeague {
@@ -11,6 +12,7 @@ export interface FantaLeague {
   season_id: string
   name: string
   season_name: string
+  season_start_date: string
 }
 
 export default function Fantacalcetto() {
@@ -39,7 +41,7 @@ export default function Fantacalcetto() {
     setError(null)
 
     const [leaguesRes, membersRes] = await Promise.all([
-      supabase.from('fanta_leagues').select('id, season_id, name, seasons(name)').order('created_at', { ascending: false }),
+      supabase.from('fanta_leagues').select('id, season_id, name, seasons(name, start_date)').order('created_at', { ascending: false }),
       supabase.from('fanta_league_members').select('league_id').eq('player_id', player.id),
     ])
 
@@ -49,13 +51,19 @@ export default function Fantacalcetto() {
       return
     }
 
-    type Row = { id: string; season_id: string; name: string; seasons: { name: string } | null }
+    type Row = {
+      id: string
+      season_id: string
+      name: string
+      seasons: { name: string; start_date: string } | null
+    }
     setLeagues(
       ((leaguesRes.data ?? []) as unknown as Row[]).map((l) => ({
         id: l.id,
         season_id: l.season_id,
         name: l.name,
         season_name: l.seasons?.name ?? '',
+        season_start_date: l.seasons?.start_date ?? '',
       })),
     )
     setMyLeagueIds(new Set((membersRes.data ?? []).map((m) => m.league_id)))
@@ -108,7 +116,11 @@ export default function Fantacalcetto() {
       .insert({ league_id: leagueId, player_id: player.id })
     setJoining(null)
     if (joinError && joinError.code !== '23505') {
-      setError(joinError.message)
+      setError(
+        joinError.code === '42501'
+          ? 'Iscrizione non riuscita: le iscrizioni a questa lega sono chiuse.'
+          : joinError.message,
+      )
       return
     }
     setShowJoin(false)
@@ -116,7 +128,10 @@ export default function Fantacalcetto() {
   }
 
   const myLeagues = leagues.filter((l) => myLeagueIds.has(l.id))
-  const joinableLeagues = leagues.filter((l) => !myLeagueIds.has(l.id))
+  // Ci si può iscrivere solo entro il primo mese dall'inizio della stagione.
+  const joinableLeagues = leagues.filter(
+    (l) => !myLeagueIds.has(l.id) && !!l.season_start_date && isJoinOpen(l.season_start_date),
+  )
 
   return (
     <div className="p-4 pb-12">
@@ -215,7 +230,8 @@ export default function Fantacalcetto() {
                 <div className="mt-3 space-y-2">
                   {joinableLeagues.length === 0 && (
                     <p className="text-sm text-gray-600">
-                      Al momento non ci sono leghe attive a cui unirsi. Chiedi a un admin di crearne una!
+                      Al momento non ci sono leghe con iscrizioni aperte. Ci si può iscrivere entro il
+                      primo mese dall'inizio della stagione.
                     </p>
                   )}
                   {joinableLeagues.map((l) => (
@@ -223,6 +239,9 @@ export default function Fantacalcetto() {
                       <div>
                         <p className="text-sm font-medium">{l.name}</p>
                         <p className="text-xs text-gray-500">Stagione {l.season_name}</p>
+                        <p className="text-xs text-gray-400">
+                          Iscrizioni entro il {formatJoinDeadline(l.season_start_date)}
+                        </p>
                       </div>
                       <button
                         onClick={() => handleJoin(l.id)}

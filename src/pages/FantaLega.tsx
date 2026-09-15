@@ -2,7 +2,13 @@ import { Link, useParams } from 'react-router-dom'
 import { useConfirm } from '../components/ConfirmDialog'
 import { useAuth } from '../contexts/AuthContext'
 import { useFantaLeague } from '../hooks/useFantaLeague'
-import { computeLineupScore, formatFantaPoints, getFantaSettings } from '../lib/fantacalcetto'
+import {
+  computeLineupScore,
+  formatFantaPoints,
+  formatJoinDeadline,
+  getFantaSettings,
+  isJoinOpen,
+} from '../lib/fantacalcetto'
 import { logActivity } from '../lib/activityLog'
 import { supabase } from '../lib/supabase'
 import { useState } from 'react'
@@ -26,6 +32,7 @@ export default function FantaLega() {
   if (error || !data) return <div className="p-4 text-sm text-red-600">{error ?? 'Lega non trovata'}</div>
 
   const { league, isMember, standings, matches } = data
+  const joinOpen = !!league.season_start_date && isJoinOpen(league.season_start_date)
 
   async function handleJoin() {
     if (!player || !leagueId) return
@@ -36,7 +43,11 @@ export default function FantaLega() {
       .insert({ league_id: leagueId, player_id: player.id })
     setJoining(false)
     if (joinError) {
-      setCalcError(`Iscrizione non riuscita: ${joinError.message}`)
+      setCalcError(
+        joinError.code === '42501'
+          ? 'Iscrizione non riuscita: le iscrizioni a questa lega sono chiuse.'
+          : `Iscrizione non riuscita: ${joinError.message}`,
+      )
       return
     }
     refetch()
@@ -147,9 +158,15 @@ export default function FantaLega() {
         </div>
       </div>
 
-      {!isMember && (
+      {!isMember && joinOpen && (
         <div className="mt-4 rounded-xl border border-field-green/30 bg-field-green/5 p-4">
           <p className="text-sm text-gray-700">Non sei ancora iscritto a questa lega.</p>
+          <p className="mt-1 text-xs text-gray-500">
+            Iscrizioni aperte fino al {formatJoinDeadline(league.season_start_date)}.
+            {standings.some((s) => s.matchesScored > 0) &&
+              ' Ci sono già giornate giocate: entrerai con il punteggio più basso della classifica.'}
+          </p>
+          {calcError && <p className="mt-2 text-sm text-red-600">{calcError}</p>}
           <button
             onClick={handleJoin}
             disabled={joining}
@@ -157,6 +174,14 @@ export default function FantaLega() {
           >
             {joining ? 'Iscrizione...' : 'Partecipa alla lega'}
           </button>
+        </div>
+      )}
+      {!isMember && !joinOpen && (
+        <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-4">
+          <p className="text-sm text-gray-600">
+            Iscrizioni chiuse: ci si poteva iscrivere entro il{' '}
+            {league.season_start_date ? formatJoinDeadline(league.season_start_date) : 'primo mese della stagione'}.
+          </p>
         </div>
       )}
 
@@ -218,6 +243,14 @@ export default function FantaLega() {
                   </td>
                   <td className="px-2 py-2.5 text-right text-gray-500">
                     {s.matchesScored}
+                    {s.entryPoints > 0 && (
+                      <span
+                        className="ml-1 text-xs text-gray-400"
+                        title={`Iscritto a giornate già giocate: è entrato con ${formatFantaPoints(s.entryPoints)} punti`}
+                      >
+                        (+{formatFantaPoints(s.entryPoints)} ingr.)
+                      </span>
+                    )}
                     {s.matchesNotPlayed > 0 && (
                       <span
                         className="ml-1 text-xs text-gray-400"
@@ -243,6 +276,12 @@ export default function FantaLega() {
         <p className="mt-2 text-xs text-gray-400">
           n.s. = giornate non schierate: valgono il punteggio più basso tra chi ha schierato in
           quella giornata.
+        </p>
+      )}
+      {tab === 'classifica' && standings.some((s) => s.entryPoints > 0) && (
+        <p className="mt-1 text-xs text-gray-400">
+          ingr. = punti d'ingresso: chi si iscrive a giornate già giocate parte dal punteggio più
+          basso della classifica in quel momento.
         </p>
       )}
 

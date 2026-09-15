@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { getFunctionErrorMessage } from '../../lib/functionErrors'
 import { logActivity } from '../../lib/activityLog'
+import { filterPlayersBySearch } from '../../lib/playerSearch'
 import type { Player, PlayerRole } from '../../types/database'
 
 type PlayerWithStatus = Player & { email?: string | null; email_confirmed?: boolean }
@@ -29,6 +30,8 @@ export default function GiocatoriAdmin() {
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
+  const [search, setSearch] = useState('')
+  const filtered = filterPlayersBySearch(players, search)
 
   async function loadPlayers() {
     setLoading(true)
@@ -161,9 +164,21 @@ export default function GiocatoriAdmin() {
         </form>
       )}
 
-      <div className="mt-4 space-y-2">
+      <input
+        type="search"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="🔍 Cerca giocatore..."
+        aria-label="Cerca giocatore per nome, cognome o nickname"
+        className="mt-4 w-full rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm focus:border-field-green focus:outline-none"
+      />
+
+      <div className="mt-3 space-y-2">
         {loading && <p className="text-sm text-gray-500">Caricamento...</p>}
-        {players.map((p) => (
+        {!loading && players.length > 0 && filtered.length === 0 && (
+          <p className="text-sm text-gray-500">Nessun giocatore corrisponde alla ricerca "{search}".</p>
+        )}
+        {filtered.map((p) => (
           <Link
             key={p.id}
             to={`/admin/giocatori/${p.id}`}

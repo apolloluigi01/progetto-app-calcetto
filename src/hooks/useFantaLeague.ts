@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { defaultScoreForMissingLineup } from '../lib/fantacalcetto'
+import { computeEntryPoints, defaultScoreForMissingLineup } from '../lib/fantacalcetto'
 import type { Match } from '../types/database'
 
 export interface FantaStanding {
@@ -12,6 +12,8 @@ export interface FantaStanding {
   matchesScored: number
   /** Giornate calcolate in cui non ha schierato e ha preso il punteggio d'ufficio. */
   matchesNotPlayed: number
+  /** Punti d'ingresso (già inclusi in total) per chi si è iscritto a giornate già giocate. */
+  entryPoints: number
 }
 
 export interface FantaLineupInfo {
@@ -37,7 +39,7 @@ export interface FantaMatchRow {
 }
 
 export interface FantaLeagueData {
-  league: { id: string; name: string; season_id: string; season_name: string }
+  league: { id: string; name: string; season_id: string; season_name: string; season_start_date: string }
   isMember: boolean
   standings: FantaStanding[]
   matches: FantaMatchRow[]
@@ -55,7 +57,7 @@ export function useFantaLeague(leagueId: string | undefined, myPlayerId: string 
 
     const leagueRes = await supabase
       .from('fanta_leagues')
-      .select('id, name, season_id, seasons(name)')
+      .select('id, name, season_id, seasons(name, start_date)')
       .eq('id', leagueId)
       .maybeSingle()
 
@@ -65,7 +67,7 @@ export function useFantaLeague(leagueId: string | undefined, myPlayerId: string 
       return
     }
 
-    type LeagueRow = { id: string; name: string; season_id: string; seasons: { name: string } | null }
+    type LeagueRow = { id: string; name: string; season_id: string; seasons: { name: string; start_date: string } | null }
     const leagueRow = leagueRes.data as unknown as LeagueRow
 
     const [membersRes, matchesRes, lineupsRes, calcsRes] = await Promise.all([
@@ -161,11 +163,24 @@ export function useFantaLeague(leagueId: string | undefined, myPlayerId: string 
       return fallback === null ? null : { score: fallback, isDefault: true }
     }
 
-    // Classifica: somma dei punteggi persistiti dal "Calcola giornata" dell'admin,
-    // più i punteggi d'ufficio delle giornate non schierate.
+    // Chi si iscrive a giornate già giocate entra con il punteggio più basso
+    // della classifica generale di quel momento.
+    const joinedAtById = new Map(members.map((m) => [m.player_id, m.joined_at]))
+    const entryPoints = computeEntryPoints(
+      members.map((m) => ({ playerId: m.player_id, joinedAt: m.joined_at })),
+      [...calculatedMatchIds].flatMap((id) => {
+        const matchDate = matchDateById.get(id)
+        return matchDate ? [{ matchId: id, matchDate }] : []
+      }),
+      (matchId, playerId) => scoreForMember(matchId, playerId, joinedAtById.get(playerId) ?? '')?.score ?? null,
+    )
+
+    // Classifica: punti d'ingresso, più la somma dei punteggi persistiti dal
+    // "Calcola giornata" dell'admin e dei punteggi d'ufficio delle giornate non schierate.
     const standings: FantaStanding[] = members
       .map((m) => {
-        let total = 0
+        const entry = entryPoints.get(m.player_id) ?? 0
+        let total = entry
         let matchesScored = 0
         let matchesNotPlayed = 0
         for (const matchId of calculatedMatchIds) {
@@ -183,6 +198,7 @@ export function useFantaLeague(leagueId: string | undefined, myPlayerId: string 
           total,
           matchesScored,
           matchesNotPlayed,
+          entryPoints: entry,
         }
       })
       .sort((a, b) => b.total - a.total)
@@ -226,6 +242,7 @@ export function useFantaLeague(leagueId: string | undefined, myPlayerId: string 
         name: leagueRow.name,
         season_id: leagueRow.season_id,
         season_name: leagueRow.seasons?.name ?? '',
+        season_start_date: leagueRow.seasons?.start_date ?? '',
       },
       isMember: members.some((m) => m.player_id === myPlayerId),
       standings,
