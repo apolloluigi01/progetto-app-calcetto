@@ -54,6 +54,10 @@ export default function MatchVoting() {
 
   // --- Gestione admin ---
   const [openingVoting, setOpeningVoting] = useState(false)
+  // Chi puo' votare, scelto dall'admin prima di aprire le votazioni. Finche'
+  // non tocca la scelta vale l'ultima salvata sulla partita (utile se si riaprono).
+  const [adminsOnlyChoice, setAdminsOnly] = useState<boolean | null>(null)
+  const adminsOnly = adminsOnlyChoice ?? data?.match.voting_admins_only ?? false
   const [closingVoting, setClosingVoting] = useState(false)
   const [showVoteDetail, setShowVoteDetail] = useState(false)
   const [drafts, setDrafts] = useState<Record<string, PagellaDraft>>({})
@@ -115,13 +119,13 @@ export default function MatchVoting() {
     if (!id) return
     setOpeningVoting(true)
     setVotingActionError(null)
-    const { error: openError } = await supabase.from('matches').update({ voting_open: true }).eq('id', id)
+    const { error: openError } = await supabase.from('matches').update({ voting_open: true, voting_admins_only: adminsOnly }).eq('id', id)
     if (openError) {
       setOpeningVoting(false)
       setVotingActionError(`Votazioni non aperte: ${openError.message}`)
       return
     }
-    logActivity('votazioni_aperte', { matchId: id })
+    logActivity('votazioni_aperte', { matchId: id, soloAdmin: adminsOnly })
     supabase.functions
       .invoke('notify-voting-opened', { body: { matchId: id } })
       .catch((e) => console.error('notify-voting-opened:', e))
@@ -323,7 +327,10 @@ export default function MatchVoting() {
 
   const adminVoters = participants.filter((p) => p.role === 'admin' || p.role === 'superadmin')
   const isParticipant = !!player && participants.some((p) => p.player_id === player.id)
-  const canVote = isParticipant || (isSuperAdmin && adminVoters.length === 0)
+  // In modalita' "solo admin" i partecipanti senza ruolo admin non votano
+  // (lo impone anche la RLS su player_votes).
+  const canVote =
+    (isParticipant && (!match.voting_admins_only || isManager)) || (isSuperAdmin && adminVoters.length === 0)
   const isAdminVoter = !!player && adminVoterIds.includes(player.id)
   const alreadyVotedAll = player ? hasVotedAll(player.id) : false
 
@@ -398,7 +405,9 @@ export default function MatchVoting() {
       ) : match.voting_open && !canVote ? (
         <div className="mt-4 rounded-xl border border-purple-100 bg-purple-50 p-3 text-center">
           <p className="text-sm text-purple-600">
-            🗳️ Le votazioni sono aperte, ma riservate a chi ha partecipato alla partita.
+            {match.voting_admins_only
+              ? '🛡️ Le votazioni sono aperte, ma questa volta votano solo gli admin che hanno giocato.'
+              : '🗳️ Le votazioni sono aperte, ma riservate a chi ha partecipato alla partita.'}
           </p>
         </div>
       ) : !match.voting_open && canVote && !isPublished ? (
@@ -466,6 +475,45 @@ export default function MatchVoting() {
               {votingActionError && (
                 <p role="alert" className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
                   {votingActionError}
+                </p>
+              )}
+
+              {/* Chi vota: si sceglie prima di aprire, a votazioni aperte resta visibile. */}
+              {!isPublished && !match.voting_open && (
+                <div className="mt-3">
+                  <p className="mb-1.5 text-xs font-medium text-purple-700">Chi può votare?</p>
+                  <div role="radiogroup" className="grid grid-cols-2 gap-2">
+                    {[
+                      { value: false, icon: '👥', label: 'Tutti i partecipanti', hint: 'Chi ha giocato la partita' },
+                      { value: true, icon: '🛡️', label: 'Solo admin', hint: 'Gli admin che hanno giocato' },
+                    ].map((opt) => {
+                      const selected = adminsOnly === opt.value
+                      return (
+                        <button
+                          key={opt.label}
+                          type="button"
+                          role="radio"
+                          aria-checked={selected}
+                          onClick={() => setAdminsOnly(opt.value)}
+                          className={`rounded-lg border-2 px-3 py-2 text-left transition ${
+                            selected
+                              ? 'border-purple-600 bg-white shadow-sm'
+                              : 'border-purple-200 bg-purple-50 opacity-70 hover:opacity-100'
+                          }`}
+                        >
+                          <span className="block text-sm font-semibold text-purple-800">
+                            {opt.icon} {opt.label}
+                          </span>
+                          <span className="block text-[11px] text-purple-500">{opt.hint}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+              {!isPublished && match.voting_open && (
+                <p className="mt-2 inline-block rounded-full bg-white px-2.5 py-0.5 text-xs font-medium text-purple-700">
+                  {match.voting_admins_only ? '🛡️ Votano solo gli admin' : '👥 Votano tutti i partecipanti'}
                 </p>
               )}
 

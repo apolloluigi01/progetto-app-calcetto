@@ -137,7 +137,7 @@ Deno.serve(async (req: Request) => {
 
   const matchRes = await adminClient
     .from("matches")
-    .select("match_date, match_time, field")
+    .select("match_date, match_time, field, voting_admins_only")
     .eq("id", matchId)
     .single();
 
@@ -150,15 +150,22 @@ Deno.serve(async (req: Request) => {
     .eq("match_id", matchId);
   const participants = (participantsData ?? []) as unknown as ParticipantRow[];
 
-  // Regola: votano solo gli admin che partecipano alla partita. Caso limite:
-  // se nessun admin/superadmin partecipa, votano i superadmin (anche esterni).
+  // Chi vota lo sceglie l'admin all'apertura (matches.voting_admins_only):
+  // - tutti i partecipanti: la mail va a tutti quelli che hanno giocato;
+  // - solo admin: la mail va agli admin che hanno giocato. Caso limite: se
+  //   nessun admin/superadmin partecipa, votano i superadmin (anche esterni).
+  const adminsOnly = !!matchRes.data.voting_admins_only;
   const adminParticipants = participants.filter(
     (p) => p.players?.role === "admin" || p.players?.role === "superadmin",
   );
 
   let recipientIds: string[];
   let fallbackSuperadmin = false;
-  if (adminParticipants.length > 0) {
+  if (!adminsOnly && participants.length > 0) {
+    recipientIds = participants
+      .map((p) => p.player_id)
+      .filter((id) => id !== callerData.user.id);
+  } else if (adminParticipants.length > 0) {
     recipientIds = adminParticipants
       .map((p) => p.player_id)
       .filter((id) => id !== callerData.user.id);
@@ -192,7 +199,9 @@ Deno.serve(async (req: Request) => {
         <p style="font-size:14px;color:#374151;margin:0 0 12px;">
           ${fallbackSuperadmin
             ? "Nessun admin ha partecipato a questa partita: in qualità di superadmin sei chiamato tu a votare i giocatori."
-            : "Le votazioni della partita a cui hai partecipato sono aperte: sei chiamato a votare i giocatori."}
+            : adminsOnly
+              ? "Le votazioni della partita a cui hai partecipato sono aperte e riservate agli admin: sei chiamato a votare i giocatori."
+              : "Le votazioni della partita a cui hai partecipato sono aperte: puoi votare i giocatori."}
         </p>
         <p style="font-size:14px;color:#374151;margin:0 0 12px;">
           Apri l'app Pavone League, entra nel dettaglio della partita e assegna un voto da 1 a 10 a

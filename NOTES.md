@@ -1,6 +1,15 @@
 # Note di progetto — App Calcetto
 
-Ultimo aggiornamento: 2026-09-15
+Ultimo aggiornamento: 2026-09-16
+
+## Votazioni: tutti o solo admin (2026-09-16)
+
+- Prima di aprire le votazioni l'admin sceglie **chi può votare**: tutti i partecipanti
+  oppure solo gli admin che hanno giocato (`matches.voting_admins_only`).
+- La applica il database (policy `player_votes_insert`/`_update`); il frontend nasconde il
+  box di voto. Resta il bypass del superadmin se nessun admin ha giocato.
+- La mail `notify-voting-opened` va a tutti i partecipanti o solo agli admin, secondo la scelta.
+- Se si riaprono le votazioni cambiando modalità, i voti già dati restano nelle medie.
 
 ## Fantacalcetto: iscrizioni (2026-09-15)
 

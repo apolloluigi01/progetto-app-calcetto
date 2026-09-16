@@ -46,6 +46,9 @@ export interface Match {
   status: MatchStatus
   booking_open: boolean
   voting_open: boolean
+  /** Scelto dall'admin all'apertura delle votazioni: true = votano solo gli
+   *  admin che hanno giocato, false = tutti i partecipanti. Lo applica la RLS. */
+  voting_admins_only: boolean
   /** Quando l'admin ha ufficializzato le squadre: da lì non si toccano più
    *  e si apre lo schieramento delle formazioni fantacalcetto. */
   teams_official_at: string | null
