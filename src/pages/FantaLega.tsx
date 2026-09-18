@@ -104,6 +104,22 @@ export default function FantaLega() {
       }
     }
 
+    // A giornata calcolata non ha più senso tenere segreta una formazione:
+    // il flag "invisibile" serve solo prima del blocco, per non far copiare le
+    // scelte. Lo azzeriamo in modo permanente così la formazione resta leggibile
+    // a tutti (anche dalle RLS, che sul flag si basano) nello storico.
+    const { error: revealError } = await supabase
+      .from('fanta_lineups')
+      .update({ hidden: false })
+      .eq('league_id', leagueId)
+      .eq('match_id', matchId)
+      .eq('hidden', true)
+    if (revealError) {
+      setCalcBusy(null)
+      setCalcError(`Formazioni non rese visibili: ${revealError.message}`)
+      return
+    }
+
     const { error: calcInsError } = await supabase
       .from('fanta_calculations')
       .upsert(
