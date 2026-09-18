@@ -66,6 +66,12 @@ export default function MatchEdit() {
   // Assist censiti in modo indipendente dai gol.
   const [newAssistPlayer, setNewAssistPlayer] = useState<Record<Team, string>>({ A: '', B: '' })
 
+  // Correzione eccezionale: a pagelle pubblicate la partita e' bloccata, ma un
+  // errore di censimento (un gol/assist di troppo o mancante) deve poter essere
+  // corretto. Questo flag sblocca SOLO risultato e statistiche, mai squadre,
+  // data/ora/luogo o pagelle.
+  const [correctionMode, setCorrectionMode] = useState(false)
+
   const [deleting, setDeleting] = useState(false)
   // Errore dell'ultima operazione di scrittura: prima gli errori venivano
   // ignorati e l'interfaccia proseguiva come se tutto fosse andato bene.
@@ -249,6 +255,9 @@ export default function MatchEdit() {
   // Partita "chiusa": pagelle pubblicate. Non più modificabile da nessuno,
   // resta possibile solo eliminarla.
   const locked = isPublished
+  // Blocco delle sole statistiche (risultato, gol, assist): cade quando l'admin
+  // attiva esplicitamente la correzione eccezionale.
+  const statsLocked = locked && !correctionMode
   // Squadre ufficializzate almeno una volta.
   const teamsOfficial = !!match.teams_official_at
   // Le squadre si possono ancora toccare finché non è stato salvato il risultato.
@@ -303,9 +312,26 @@ export default function MatchEdit() {
     )
   }
 
+  // --- Correzione eccezionale (partita già chiusa) ---
+  // Le pagelle pubblicate bloccano la partita, ma un errore di censimento
+  // (assist o gol attribuiti per sbaglio) deve restare correggibile: qui si
+  // sblocca, dietro conferma esplicita, solo il risultato e le statistiche.
+  async function handleEnableCorrection() {
+    const ok = await askConfirm({
+      title: 'Correzione eccezionale',
+      message:
+        'Le pagelle sono già pubblicate. Sbloccare risultato, gol e assist per correggere un errore di censimento?\n\nDopo le modifiche dovrai risalvare le statistiche. Data/ora/luogo, squadre e pagelle restano bloccate.',
+      confirmLabel: 'Sblocca',
+    })
+    if (!ok) return
+    setCorrectionMode(true)
+    setActionError(null)
+    logActivity('correzione_statistiche_sbloccata', { matchId: id, data: match.match_date })
+  }
+
   // --- Info partita ---
   async function handleSaveResult() {
-    if (!id || !infoComplete || locked) return
+    if (!id || !infoComplete || statsLocked) return
     setSavingResult(true)
     setActionError(null)
     // Punteggio, stato partita e invalidazione delle statistiche confermate
@@ -328,7 +354,7 @@ export default function MatchEdit() {
 
   // --- Salva statistiche (gol/assist): le fissa e sblocca le votazioni ---
   async function handleSaveStats() {
-    if (!id || locked) return
+    if (!id || statsLocked) return
     if (!goalsCoherent) {
       await askConfirm({ message: 'I gol registrati non coincidono con il risultato: correggi i marcatori o il risultato prima di salvare le statistiche.', alertOnly: true })
       return
@@ -380,7 +406,7 @@ export default function MatchEdit() {
   }
 
   async function handleAddGoal(team: Team) {
-    if (!id || !newGoalPlayer[team] || locked) return
+    if (!id || !newGoalPlayer[team] || statsLocked) return
     setActionError(null)
     const ok = await run('Gol non aggiunto', supabase
       .from('goals')
@@ -400,7 +426,7 @@ export default function MatchEdit() {
   }
 
   async function handleRemoveGoal(goalId: string) {
-    if (locked) return
+    if (statsLocked) return
     const goal = goals.find((g) => g.id === goalId)
     setActionError(null)
     if (!(await run('Gol non rimosso', supabase.from('goals').delete().eq('id', goalId)))) return
@@ -410,7 +436,7 @@ export default function MatchEdit() {
   }
 
   async function handleAddAssist(team: Team) {
-    if (!id || !newAssistPlayer[team] || locked) return
+    if (!id || !newAssistPlayer[team] || statsLocked) return
     setActionError(null)
     if (!(await run('Assist non aggiunto', supabase.from('assists').insert({ match_id: id, player_id: newAssistPlayer[team], team })))) return
     const playerName = matchPlayers.find((p) => p.player_id === newAssistPlayer[team])?.name
@@ -421,7 +447,7 @@ export default function MatchEdit() {
   }
 
   async function handleRemoveAssist(assistId: string) {
-    if (locked) return
+    if (statsLocked) return
     const assist = assists.find((a) => a.id === assistId)
     setActionError(null)
     if (!(await run('Assist non rimosso', supabase.from('assists').delete().eq('id', assistId)))) return
@@ -785,10 +811,40 @@ export default function MatchEdit() {
         </div>
       </div>
 
-      {locked && (
-        <p className="mt-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-center text-sm font-medium text-gray-600">
-          🔒 Partita completata e pagelle pubblicate: non è più modificabile. È possibile solo eliminarla.
-        </p>
+      {locked && !correctionMode && (
+        <div className="mt-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-center text-sm font-medium text-gray-600">
+          <p>🔒 Partita completata e pagelle pubblicate: non è più modificabile. È possibile solo eliminarla.</p>
+          <button
+            onClick={handleEnableCorrection}
+            className="mt-2 rounded-lg border border-field-orange/60 px-3 py-1.5 text-xs font-medium text-field-orange hover:bg-field-orange/5"
+          >
+            🔧 Correggi statistiche (eccezionale)
+          </button>
+        </div>
+      )}
+
+      {correctionMode && (
+        <div className="mt-2 rounded-xl border border-field-orange/50 bg-field-orange/5 px-3 py-2 text-sm text-field-orange">
+          <p className="font-medium">
+            🔧 Correzione eccezionale attiva: puoi modificare risultato, gol e assist. Data/ora/luogo e squadre restano
+            bloccate.
+          </p>
+          <p className="mt-1 text-xs">
+            Dopo le correzioni risalva le statistiche: le pagelle già pubblicate restano valide. Se la giornata
+            fantacalcetto è già stata calcolata, ricalcolala per aggiornare i punteggi.
+          </p>
+          <button
+            onClick={() => {
+              setCorrectionMode(false)
+              setEditingResult(false)
+              setScoreA(result ? String(result.score_a) : '')
+              setScoreB(result ? String(result.score_b) : '')
+            }}
+            className="mt-2 rounded-lg border border-field-orange/60 px-3 py-1.5 text-xs font-medium text-field-orange hover:bg-field-orange/10"
+          >
+            🔒 Chiudi correzione
+          </button>
+        </div>
       )}
 
       {/* Esito dell'ultima operazione fallita: resta visibile finché non se ne
@@ -1437,12 +1493,12 @@ export default function MatchEdit() {
           col tasto "✏️ Modifica risultato". */}
       {teamsOfficial ? (
         (() => {
-          const resultReadOnly = locked || (!!result && !editingResult)
+          const resultReadOnly = statsLocked || (!!result && !editingResult)
           return (
             <div className="mt-4 rounded-xl bg-white p-4 shadow">
               <div className="flex items-center justify-between">
                 <h2 className="font-medium">Risultato</h2>
-                {result && !locked && !editingResult && (
+                {result && !statsLocked && !editingResult && (
                   <EditButton onClick={() => setEditingResult(true)}>Modifica risultato</EditButton>
                 )}
               </div>
@@ -1464,7 +1520,7 @@ export default function MatchEdit() {
                   onChange={(e) => setScoreB(e.target.value)}
                   className="w-20 rounded-lg border border-gray-300 px-3 py-2 text-center disabled:bg-gray-100 disabled:text-gray-500"
                 />
-                {!locked && (!result || editingResult) && (
+                {!statsLocked && (!result || editingResult) && (
                   <div className="flex w-full gap-2 sm:ml-auto sm:w-auto">
                     {editingResult && (
                       <button
@@ -1499,7 +1555,7 @@ export default function MatchEdit() {
                 Gol registrati: {goalsByTeam('A').length} - {goalsByTeam('B').length}
                 {result && !goalsCoherent ? ' (non coincide con il risultato inserito)' : ''}
               </p>
-              {!infoComplete && !locked && (
+              {!infoComplete && !statsLocked && (
                 <p className="mt-1 text-xs text-red-500">
                   ⚠️ Completa data, ora e campo prima di poter salvare il risultato.
                 </p>
@@ -1533,7 +1589,7 @@ export default function MatchEdit() {
                           <PlayerName name={e.name} surname={e.surname} nickname={e.nickname} />
                           <ScorerBadges entry={e} />
                         </span>
-                        {!locked && (
+                        {!statsLocked && (
                           <span className="flex shrink-0 items-center gap-1.5">
                             {e.goals + e.ownGoals > 0 && (
                               <button
@@ -1560,7 +1616,7 @@ export default function MatchEdit() {
                   </ul>
                 )}
 
-                {!locked && (
+                {!statsLocked && (
                   <div className="mt-3 space-y-2 border-t border-gray-100 pt-3">
                     <p className="text-xs font-medium text-gray-500">Aggiungi gol</p>
                     <select
@@ -1636,7 +1692,7 @@ export default function MatchEdit() {
               <p className="text-sm text-gray-600">
                 Gol e assist coincidono con il risultato. Salva le statistiche per fissarle e sbloccare le votazioni.
               </p>
-              {!locked && (
+              {!statsLocked && (
                 <button
                   onClick={handleSaveStats}
                   disabled={savingStats}
@@ -1648,7 +1704,7 @@ export default function MatchEdit() {
             </div>
           ) : (
             <p className="rounded-xl bg-field-green/10 px-3 py-2 text-center text-sm font-medium text-field-green-dark">
-              ✓ Statistiche salvate.{!locked && ' Modificare gol o assist richiederà di risalvarle.'}
+              ✓ Statistiche salvate.{!statsLocked && ' Modificare gol o assist richiederà di risalvarle.'}
             </p>
           )}
         </div>

@@ -21,6 +21,7 @@ export type ActivityAction =
   | 'assist_aggiunto'
   | 'assist_rimosso'
   | 'statistiche_salvate'
+  | 'correzione_statistiche_sbloccata'
   | 'pagelle_bozza'
   | 'pagelle_pubblicate'
   | 'partita_eliminata'
@@ -62,6 +63,7 @@ export const actionLabels: Record<ActivityAction, string> = {
   assist_aggiunto:       'Assist aggiunto',
   assist_rimosso:        'Assist rimosso',
   statistiche_salvate:   'Statistiche salvate',
+  correzione_statistiche_sbloccata: 'Correzione statistiche sbloccata (partita chiusa)',
   pagelle_bozza:         'Pagelle salvate in bozza',
   pagelle_pubblicate:    'Pagelle pubblicate',
   partita_eliminata:     'Partita eliminata',
