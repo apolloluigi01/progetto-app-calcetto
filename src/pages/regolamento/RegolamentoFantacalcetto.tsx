@@ -122,6 +122,24 @@ export default function RegolamentoFantacalcetto() {
         />
       </Section>
 
+      <Section icon="ℹ️" title="Statistiche durante lo schieramento">
+        <p>
+          Mentre scegli la formazione, accanto al nome di ogni giocatore c'è l'icona <strong>ⓘ</strong>: toccala per
+          vedere in un piccolo riquadro le sue statistiche della stagione, senza lasciare la pagina.
+        </p>
+        <List
+          items={[
+            'Media voto – la media delle pagelle;',
+            <>
+              <strong>Media fantavoto</strong> – la media di voto più bonus e malus del fantacalcetto, partita per
+              partita, senza il moltiplicatore del capitano (dipende da chi lo schiera);
+            </>,
+            'Gol e Assist.',
+          ]}
+        />
+        <p>Il riquadro si chiude con la ×, toccando fuori o con il tasto Esc. Toccando il nome, invece, scegli il giocatore.</p>
+      </Section>
+
       <Section icon="💰" title="Crediti e budget della giornata">
         <p>
           Ogni giocatore ha un <strong>costo in crediti</strong> che dipende dalla fascia della sua carta, cioè dal

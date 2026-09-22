@@ -181,6 +181,72 @@ export function computeLineupScore(
 }
 
 /**
+ * Dati fanta di tutte le partite di una stagione con pagelle pubblicate,
+ * raggruppati per partita: servono a calcolare la media fantavoto.
+ */
+export async function fetchSeasonFantaInputs(seasonId: string): Promise<Map<string, FantaMatchInput>> {
+  const [pagelleRes, goalsRes, assistsRes] = await Promise.all([
+    supabase
+      .from('pagelle')
+      .select('match_id, player_id, voto, is_mvp, matches!inner(season_id)')
+      .eq('matches.season_id', seasonId)
+      .not('published_at', 'is', null),
+    supabase
+      .from('goals')
+      .select('match_id, player_id, is_own_goal, matches!inner(season_id)')
+      .eq('matches.season_id', seasonId),
+    supabase
+      .from('assists')
+      .select('match_id, player_id, matches!inner(season_id)')
+      .eq('matches.season_id', seasonId),
+  ])
+  if (pagelleRes.error) throw pagelleRes.error
+
+  // Contano solo le partite con pagelle pubblicate: senza voti non c'è fantavoto.
+  const byMatch = new Map<string, FantaMatchInput>()
+  for (const p of pagelleRes.data ?? []) {
+    const input = byMatch.get(p.match_id) ?? { pagelle: [], goals: [], assists: [] }
+    input.pagelle.push({ player_id: p.player_id, voto: p.voto, is_mvp: p.is_mvp })
+    byMatch.set(p.match_id, input)
+  }
+  for (const g of goalsRes.data ?? []) {
+    byMatch.get(g.match_id)?.goals.push({ player_id: g.player_id, is_own_goal: g.is_own_goal })
+  }
+  for (const a of assistsRes.data ?? []) {
+    byMatch.get(a.match_id)?.assists.push({ player_id: a.player_id })
+  }
+  return byMatch
+}
+
+/**
+ * Media fantavoto di stagione per giocatore: per ogni partita, voto in pagella
+ * più bonus e malus del fantacalcetto (senza moltiplicatore del capitano, che
+ * dipende da chi schiera), mediato sulle partite in cui il giocatore ha un voto.
+ */
+export function fantavotoAverages(
+  inputs: Map<string, FantaMatchInput>,
+  settings: FantaSettings,
+): Map<string, number> {
+  const sums = new Map<string, { total: number; count: number }>()
+  for (const input of inputs.values()) {
+    const { players } = computeLineupScore(
+      input.pagelle.map((p) => p.player_id),
+      '',
+      input,
+      settings,
+    )
+    for (const p of players) {
+      if (p.voto === null) continue
+      const acc = sums.get(p.playerId) ?? { total: 0, count: 0 }
+      acc.total += p.total
+      acc.count += 1
+      sums.set(p.playerId, acc)
+    }
+  }
+  return new Map([...sums].map(([id, { total, count }]) => [id, Math.round((total / count) * 100) / 100]))
+}
+
+/**
  * Punteggio d'ufficio per chi non ha schierato la formazione in una giornata
  * calcolata: il più basso tra i punteggi di chi invece l'ha schierata.
  * Restituisce null se nessuno ha schierato (non c'è nulla da assegnare).

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -6,20 +6,25 @@ import { useMatchDetail } from '../hooks/useMatchDetail'
 import { usePlayerRatings } from '../hooks/usePlayerRatings'
 import { useFantaSettings } from '../hooks/useFantaSettings'
 import { useFasce } from '../hooks/useFasce'
+import { useStatistiche } from '../hooks/useStatistiche'
 import {
   FANTA_TEAM_SIZE,
   computeFantaBudget,
   computeLineupScore,
   creditCost,
   defaultScoreForMissingLineup,
+  fantavotoAverages,
+  fetchSeasonFantaInputs,
   formatFantaPoints,
   formatLockMinutes,
   lineupDeadline,
+  type FantaMatchInput,
   type FantaPlayerScore,
 } from '../lib/fantacalcetto'
 import { getFunctionErrorMessage } from '../lib/functionErrors'
 import { logActivity } from '../lib/activityLog'
 import FantaPitch from '../components/FantaPitch'
+import PlayerInfoPopover, { InfoButton } from '../components/PlayerInfoPopover'
 import PlayerName, { fullName } from '../components/PlayerName'
 import type { MatchPlayerWithName } from '../hooks/useMatchDetail'
 import type { Player } from '../types/database'
@@ -90,6 +95,35 @@ export default function FantaFormazione() {
     const t = setInterval(() => setNow(Date.now()), 30_000)
     return () => clearInterval(t)
   }, [])
+
+  // Anteprima statistiche (icona "i" accanto ai nomi): statistiche e dati
+  // fanta della stagione della partita, caricati una volta sola.
+  const seasonId = data?.match.season_id
+  const { stats: seasonStats, loading: seasonStatsLoading } = useStatistiche(seasonId, !!seasonId)
+  const [fantaInputs, setFantaInputs] = useState<Map<string, FantaMatchInput> | null>(null)
+  const [infoPlayerId, setInfoPlayerId] = useState<string | null>(null)
+  const closeInfo = useCallback(() => setInfoPlayerId(null), [])
+
+  useEffect(() => {
+    if (!seasonId) return
+    let cancelled = false
+    fetchSeasonFantaInputs(seasonId)
+      .then((inputs) => {
+        if (!cancelled) setFantaInputs(inputs)
+      })
+      .catch(() => {
+        // Senza dati il fantavoto resta "-": l'anteprima non deve bloccare lo schieramento.
+        if (!cancelled) setFantaInputs(new Map())
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [seasonId])
+
+  const fantavoti = useMemo(
+    () => (fantaInputs ? fantavotoAverages(fantaInputs, settings) : new Map<string, number>()),
+    [fantaInputs, settings],
+  )
 
   // Carica l'eventuale formazione già schierata.
   useEffect(() => {
@@ -419,27 +453,55 @@ export default function FantaFormazione() {
             const cost = costOf(p.player_id)
             const disabled =
               locked || (!isSelected && (selected.size >= FANTA_TEAM_SIZE || budgetUsed + cost > budget))
+            const infoOpen = infoPlayerId === p.player_id
+            // La riga intera seleziona il giocatore (pulsante steso sotto il
+            // contenuto); l'icona "i" sta sopra e apre solo l'anteprima. Un
+            // pulsante non può contenerne un altro, da qui la sovrapposizione.
             return (
-              <li key={p.player_id}>
-                <button
-                  type="button"
-                  onClick={() => togglePlayer(p.player_id)}
-                  disabled={disabled}
-                  className={`flex w-full items-center justify-between rounded-lg border px-2.5 py-2 text-left text-sm transition ${
+              <li key={p.player_id} className="relative">
+                <div
+                  className={`relative flex items-center justify-between rounded-lg border px-2.5 py-2 text-sm transition ${
                     isSelected
                       ? 'border-field-green bg-field-green/10 font-medium text-field-green-dark'
-                      : 'border-gray-200 text-gray-700 hover:bg-gray-50 disabled:opacity-40'
+                      : `border-gray-200 text-gray-700 ${disabled ? 'opacity-40' : 'hover:bg-gray-50'}`
                   }`}
                 >
-                  <PlayerName name={p.name} surname={p.surname} nickname={p.nickname} />
+                  <button
+                    type="button"
+                    onClick={() => togglePlayer(p.player_id)}
+                    disabled={disabled}
+                    aria-pressed={isSelected}
+                    aria-label={`${isSelected ? 'Togli' : 'Scegli'} ${fullName(p)}`}
+                    className="absolute inset-0 rounded-lg disabled:cursor-not-allowed"
+                  />
+                  <span className="pointer-events-none relative flex min-w-0 items-center gap-1.5">
+                    <PlayerName name={p.name} surname={p.surname} nickname={p.nickname} />
+                    <span className="pointer-events-auto">
+                      <InfoButton
+                        label={fullName(p)}
+                        open={infoOpen}
+                        onClick={() => setInfoPlayerId(infoOpen ? null : p.player_id)}
+                      />
+                    </span>
+                  </span>
                   <span
-                    className={`ml-2 shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${
+                    className={`pointer-events-none relative ml-2 shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${
                       isSelected ? 'bg-field-green text-white' : 'bg-field-yellow/20 text-field-orange'
                     }`}
                   >
                     {cost} cr
                   </span>
-                </button>
+                </div>
+                {infoOpen && (
+                  <PlayerInfoPopover
+                    name={fullName(p)}
+                    stats={seasonStats.find((s) => s.player.id === p.player_id) ?? null}
+                    fantavoto={fantavoti.get(p.player_id) ?? null}
+                    isGuest={!!p.player?.is_guest}
+                    loading={seasonStatsLoading || fantaInputs === null}
+                    onClose={closeInfo}
+                  />
+                )}
               </li>
             )
           })}
@@ -492,7 +554,7 @@ export default function FantaFormazione() {
             <p className="mt-2 rounded-lg bg-field-yellow/15 px-3 py-2 text-xs font-medium text-field-orange">
               ⏳ Puoi inserire o modificare la formazione fino alle{' '}
               {deadline.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })} del{' '}
-              {deadline.toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })} ({lockLabel}
+              {deadline.toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })} ({lockLabel}{' '}
               prima del calcio d'inizio): dopo sarà bloccata.
             </p>
           )}

@@ -18,6 +18,13 @@ Ultimo aggiornamento: 2026-09-22
   Bonus, fasce, crediti e minuti di blocco sono letti dal database, non scritti nel testo:
   cambiando un parametro il regolamento si aggiorna da solo. Le sezioni di partita sono in
   comune tra Format e Amichevoli (`src/pages/regolamento/SezioniPartita.tsx`).
+- **Ricerca nel regolamento**: cerca in tutti e tre i regolamenti, titoli e testo, senza
+  distinguere maiuscole e accenti. Lavora sul DOM già disegnato (`regolamento/search.ts`):
+  nasconde/apre le sezioni ed evidenzia con la CSS Custom Highlight API, che non tocca il DOM
+  di React (sui browser che non la supportano la ricerca funziona, senza evidenziazione).
+- **Anteprima statistiche nello schieramento** (icona ⓘ, `PlayerInfoPopover`): media voto,
+  gol e assist da `useStatistiche`; la **media fantavoto** (voto + bonus/malus, senza
+  capitano, sulle partite con voto) si calcola al volo con `fantavotoAverages`, non è salvata.
 
 ## Votazioni: tutti o solo admin (2026-09-16)
 

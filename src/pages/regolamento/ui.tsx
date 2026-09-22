@@ -7,7 +7,7 @@ import type { ReactNode } from 'react'
  */
 export function Section({ icon, title, children }: { icon: string; title: string; children: ReactNode }) {
   return (
-    <details className="group overflow-hidden rounded-xl bg-white shadow">
+    <details data-rule-section className="group overflow-hidden rounded-xl bg-white shadow">
       <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3 hover:bg-gray-50 [&::-webkit-details-marker]:hidden">
         <span className="text-lg" aria-hidden="true">
           {icon}
