@@ -9,12 +9,12 @@ interface FantaPitchProps {
 
 const POSITION_ORDER = ['POR', 'DIF', 'CEN', 'ATT'] as const
 
-// Righe di al massimo 3 carte. Se tutti hanno un ruolo, lo schieramento segue
-// i reparti con il portiere in basso (vicino alla propria porta); altrimenti
-// due righe generiche.
+// Lo schieramento segue i reparti con il portiere in basso (vicino alla
+// propria porta); chi non ha un ruolo va a centrocampo. Solo se nessuno ha un
+// ruolo si ripiega su due righe generiche.
 function buildRows(entries: PitchEntry[]): PitchEntry[][] {
-  if (entries.length > 0 && entries.every((e) => e.player.position)) {
-    return POSITION_ORDER.map((pos) => entries.filter((e) => e.player.position === pos))
+  if (entries.some((e) => e.player.position)) {
+    return POSITION_ORDER.map((pos) => entries.filter((e) => (e.player.position ?? 'CEN') === pos))
       .filter((row) => row.length > 0)
       .reverse() // attacco in alto, portiere in basso
   }

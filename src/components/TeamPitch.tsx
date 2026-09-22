@@ -18,15 +18,16 @@ interface TeamPitchProps {
 
 const POSITION_ORDER = ['POR', 'DIF', 'CEN', 'ATT'] as const
 
-// Righe di al massimo 3 giocatori, per non sforare mai la larghezza del campetto.
-// Se tutti i giocatori hanno un ruolo assegnato le righe seguono il ruolo
-// (portiere -> difesa -> centrocampo -> attacco), altrimenti si limita a uno
-// schieramento fisso a due righe, sempre leggibile.
+// Righe per reparto, dalla propria porta verso la metà campo
+// (portiere -> difesa -> centrocampo -> attacco). Chi non ha un ruolo
+// assegnato finisce a centrocampo, così basta un ospite senza ruolo per non
+// perdere lo schieramento. Solo se nessuno ha un ruolo si ripiega su due
+// righe generiche.
 function buildRows(entries: PitchEntry[]): PitchEntry[][] {
-  if (entries.length > 0 && entries.every((e) => e.player.position)) {
-    return POSITION_ORDER.map((pos) => entries.filter((e) => e.player.position === pos)).filter(
-      (row) => row.length > 0
-    )
+  if (entries.some((e) => e.player.position)) {
+    return POSITION_ORDER.map((pos) =>
+      entries.filter((e) => (e.player.position ?? 'CEN') === pos)
+    ).filter((row) => row.length > 0)
   }
   const mid = Math.ceil(entries.length / 2)
   return [entries.slice(0, mid), entries.slice(mid)].filter((row) => row.length > 0)

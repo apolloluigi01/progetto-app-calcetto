@@ -14,6 +14,7 @@ import {
   defaultScoreForMissingLineup,
   formatFantaPoints,
   lineupDeadline,
+  type FantaPlayerScore,
 } from '../lib/fantacalcetto'
 import { getFunctionErrorMessage } from '../lib/functionErrors'
 import { logActivity } from '../lib/activityLog'
@@ -363,20 +364,19 @@ export default function FantaFormazione() {
     logActivity('fanta_reminder_inviato', { leagueId, matchId })
   }
 
-  // Punteggio (solo dopo che l'admin ha calcolato la giornata)
+  // Punteggi (solo dopo che l'admin ha calcolato la giornata): il dettaglio
+  // giocatore per giocatore si ricalcola qui, sia per la propria formazione
+  // sia per quelle degli altri partecipanti.
+  const canScore = locked && isPublished && isCalculated
+  const matchInput = {
+    pagelle: pagelle.map((p) => ({ player_id: p.player_id, voto: p.voto, is_mvp: p.is_mvp })),
+    goals: goals.map((g) => ({ player_id: g.player_id, is_own_goal: g.is_own_goal })),
+    assists: assists.map((a) => ({ player_id: a.player_id })),
+  }
   const score =
-    locked && isPublished && isCalculated && selected.size > 0
-      ? computeLineupScore(
-          [...selected],
-          captainId,
-          {
-            pagelle: pagelle.map((p) => ({ player_id: p.player_id, voto: p.voto, is_mvp: p.is_mvp })),
-            goals: goals.map((g) => ({ player_id: g.player_id, is_own_goal: g.is_own_goal })),
-            assists: assists.map((a) => ({ player_id: a.player_id })),
-          },
-          settings,
-        )
-      : null
+    canScore && selected.size > 0 ? computeLineupScore([...selected], captainId, matchInput, settings) : null
+  const scoreOf = (o: OtherLineup) =>
+    canScore && o.playerIds.length > 0 ? computeLineupScore(o.playerIds, o.captainId, matchInput, settings) : null
 
   const nameOf = (playerId: string) => {
     const mp = matchPlayers.find((p) => p.player_id === playerId)
@@ -683,27 +683,7 @@ export default function FantaFormazione() {
               {formatFantaPoints(score.total)} pt
             </span>
           </div>
-          <ul>
-            {score.players.map((p) => (
-              <li key={p.playerId} className="flex items-center justify-between border-t border-gray-100 px-4 py-2.5 first:border-t-0">
-                <span className="text-sm font-medium text-gray-700">
-                  {p.isCaptain && <span className="mr-1 text-field-orange">Ⓒ</span>}
-                  {nameOf(p.playerId)}
-                </span>
-                <span className="text-xs text-gray-500">
-                  voto {p.voto ?? '-'}
-                  {p.bonus > 0 && (
-                    <span className="text-field-green-dark">
-                      {' '}+{p.bonus}
-                      {p.isCaptain && `×${settings.captainMultiplier}`}
-                    </span>
-                  )}
-                  {p.malus < 0 && <span className="text-red-500"> {p.malus}</span>}
-                  <span className="ml-2 font-bold text-gray-800">{formatFantaPoints(p.total)}</span>
-                </span>
-              </li>
-            ))}
-          </ul>
+          <ScoreBreakdown players={score.players} nameOf={nameOf} captainMultiplier={settings.captainMultiplier} />
         </div>
       )}
 
@@ -714,8 +694,10 @@ export default function FantaFormazione() {
             Formazioni degli altri partecipanti
           </h3>
           <div className="space-y-2">
-            {others.map((o) => (
-              <div key={o.memberId} className="rounded-xl bg-white p-3 shadow">
+            {others.map((o) => {
+              const otherScore = scoreOf(o)
+              return (
+              <div key={o.memberId} className="overflow-hidden rounded-xl bg-white p-3 shadow">
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-semibold text-field-green-dark">{o.memberName}</p>
                   {isCalculated && o.score !== null && (
@@ -724,9 +706,18 @@ export default function FantaFormazione() {
                     </span>
                   )}
                 </div>
-                {/* Formazione nascosta: si vede che è schierata, non chi c'è dentro.
+                {/* Giornata calcolata: dettaglio punti giocatore per giocatore.
+                    Formazione nascosta: si vede che è schierata, non chi c'è dentro.
                     Torna visibile quando le formazioni si bloccano (deadline o partita giocata). */}
-                {o.hidden && !result && !pastDeadline ? (
+                {otherScore ? (
+                  <div className="-mx-3 -mb-3 mt-2 border-t border-gray-100">
+                    <ScoreBreakdown
+                      players={otherScore.players}
+                      nameOf={nameOf}
+                      captainMultiplier={settings.captainMultiplier}
+                    />
+                  </div>
+                ) : o.hidden && !result && !pastDeadline ? (
                   <p className="mt-2 text-xs italic text-gray-500">🙈 Formazione schierata, invisibile</p>
                 ) : (
                   <div className="mt-2 flex flex-wrap gap-1.5">
@@ -746,7 +737,8 @@ export default function FantaFormazione() {
                   </div>
                 )}
               </div>
-            ))}
+              )
+            })}
 
             {/* Chi non ha schierato: punteggio d'ufficio della giornata */}
             {otherMissingMembers.map((m) => (
@@ -770,5 +762,40 @@ export default function FantaFormazione() {
         </div>
       )}
     </div>
+  )
+}
+
+/** Dettaglio del punteggio giocatore per giocatore: voto, bonus, malus e totale. */
+function ScoreBreakdown({
+  players,
+  nameOf,
+  captainMultiplier,
+}: {
+  players: FantaPlayerScore[]
+  nameOf: (playerId: string) => string
+  captainMultiplier: number
+}) {
+  return (
+    <ul>
+      {players.map((p) => (
+        <li key={p.playerId} className="flex items-center justify-between border-t border-gray-100 px-4 py-2.5 first:border-t-0">
+          <span className="text-sm font-medium text-gray-700">
+            {p.isCaptain && <span className="mr-1 text-field-orange">Ⓒ</span>}
+            {nameOf(p.playerId)}
+          </span>
+          <span className="text-xs text-gray-500">
+            voto {p.voto ?? '-'}
+            {p.bonus > 0 && (
+              <span className="text-field-green-dark">
+                {' '}+{p.bonus}
+                {p.isCaptain && `×${captainMultiplier}`}
+              </span>
+            )}
+            {p.malus < 0 && <span className="text-red-500"> {p.malus}</span>}
+            <span className="ml-2 font-bold text-gray-800">{formatFantaPoints(p.total)}</span>
+          </span>
+        </li>
+      ))}
+    </ul>
   )
 }
