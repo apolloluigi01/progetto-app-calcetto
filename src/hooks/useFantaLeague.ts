@@ -39,7 +39,15 @@ export interface FantaMatchRow {
 }
 
 export interface FantaLeagueData {
-  league: { id: string; name: string; season_id: string; season_name: string; season_start_date: string }
+  league: {
+    id: string
+    name: string
+    season_id: string
+    season_name: string
+    season_start_date: string
+    /** Ultimo giorno utile per iscriversi (YYYY-MM-DD), scelto dall'admin. */
+    join_deadline: string
+  }
   isMember: boolean
   standings: FantaStanding[]
   matches: FantaMatchRow[]
@@ -57,7 +65,7 @@ export function useFantaLeague(leagueId: string | undefined, myPlayerId: string 
 
     const leagueRes = await supabase
       .from('fanta_leagues')
-      .select('id, name, season_id, seasons(name, start_date)')
+      .select('id, name, season_id, join_deadline, seasons(name, start_date)')
       .eq('id', leagueId)
       .maybeSingle()
 
@@ -67,7 +75,13 @@ export function useFantaLeague(leagueId: string | undefined, myPlayerId: string 
       return
     }
 
-    type LeagueRow = { id: string; name: string; season_id: string; seasons: { name: string; start_date: string } | null }
+    type LeagueRow = {
+      id: string
+      name: string
+      season_id: string
+      join_deadline: string
+      seasons: { name: string; start_date: string } | null
+    }
     const leagueRow = leagueRes.data as unknown as LeagueRow
 
     const [membersRes, matchesRes, lineupsRes, calcsRes] = await Promise.all([
@@ -243,6 +257,7 @@ export function useFantaLeague(leagueId: string | undefined, myPlayerId: string 
         season_id: leagueRow.season_id,
         season_name: leagueRow.seasons?.name ?? '',
         season_start_date: leagueRow.seasons?.start_date ?? '',
+        join_deadline: leagueRow.join_deadline,
       },
       isMember: members.some((m) => m.player_id === myPlayerId),
       standings,

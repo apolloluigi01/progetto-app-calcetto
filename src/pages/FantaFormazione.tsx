@@ -13,6 +13,7 @@ import {
   creditCost,
   defaultScoreForMissingLineup,
   formatFantaPoints,
+  formatLockMinutes,
   lineupDeadline,
   type FantaPlayerScore,
 } from '../lib/fantacalcetto'
@@ -81,7 +82,7 @@ export default function FantaFormazione() {
   const [reminderSending, setReminderSending] = useState(false)
   const [reminderError, setReminderError] = useState<string | null>(null)
   const [reminderSent, setReminderSent] = useState(false)
-  // Orologio per il blocco formazioni (15' prima del calcio d'inizio):
+  // Orologio per il blocco formazioni (termine impostato dagli admin):
   // si aggiorna ogni 30 secondi così la pagina si blocca da sola allo scadere.
   const [now, setNow] = useState(() => Date.now())
 
@@ -246,16 +247,18 @@ export default function FantaFormazione() {
   const teamA = matchPlayers.filter((p) => p.team === 'A')
   const teamB = matchPlayers.filter((p) => p.team === 'B')
   const isPublished = pagelle.length > 0 && pagelle.every((p) => p.published_at)
-  // Termine ultimo: 15 minuti prima del calcio d'inizio (se la partita ha un orario).
-  const deadline = lineupDeadline(match.match_date, match.match_time)
+  // Termine ultimo: i minuti di blocco impostati dagli admin prima del calcio
+  // d'inizio (se la partita ha un orario).
+  const deadline = lineupDeadline(match.match_date, match.match_time, settings.lineupLockMinutes)
+  const lockLabel = formatLockMinutes(settings.lineupLockMinutes)
   const pastDeadline = deadline !== null && now >= deadline.getTime()
   // Senza squadre formate non c'è nulla da schierare.
   const teamsFormed = teamA.length > 0 && teamB.length > 0
   // Lo schieramento si apre solo dopo l'ufficializzazione delle squadre.
   const teamsOfficial = !!match.teams_official_at
   // Bloccata se le squadre non sono formate o non ufficializzate, se la
-  // partita è conclusa, se non è la prossima in programma o se manca meno
-  // di un quarto d'ora al calcio d'inizio.
+  // partita è conclusa, se non è la prossima in programma o se è scaduto il
+  // termine per schierare.
   const locked = !teamsFormed || !teamsOfficial || !!result || !isNextMatch || pastDeadline
 
   const costOf = (playerId: string) => creditCost(ratings.get(playerId) ?? null, fasce)
@@ -469,7 +472,7 @@ export default function FantaFormazione() {
               ? "🔒 Le squadre non sono ancora state ufficializzate dagli admin: la formazione si potrà schierare dopo l'ufficializzazione."
               : !result
               ? pastDeadline && isNextMatch
-                ? '🔒 Formazioni bloccate: mancano meno di 15 minuti al calcio d’inizio (o la partita è già iniziata). Non è più possibile inserire o modificare la formazione.'
+                ? `🔒 Formazioni bloccate: mancano meno di ${lockLabel} al calcio d’inizio (o la partita è già iniziata). Non è più possibile inserire o modificare la formazione.`
                 : '🔒 Puoi schierare la formazione solo per la prossima partita in programma: questa si sbloccherà dopo quella precedente.'
               : isCalculated
                 ? 'Giornata calcolata: ecco il punteggio della tua squadra.'
@@ -489,7 +492,7 @@ export default function FantaFormazione() {
             <p className="mt-2 rounded-lg bg-field-yellow/15 px-3 py-2 text-xs font-medium text-field-orange">
               ⏳ Puoi inserire o modificare la formazione fino alle{' '}
               {deadline.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })} del{' '}
-              {deadline.toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })} (15 minuti
+              {deadline.toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })} ({lockLabel}
               prima del calcio d'inizio): dopo sarà bloccata.
             </p>
           )}

@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { logActivity } from '../lib/activityLog'
-import { formatJoinDeadline, isJoinOpen } from '../lib/fantacalcetto'
+import { formatJoinDeadline, isJoinOpen, suggestedJoinDeadline } from '../lib/fantacalcetto'
 import type { Season } from '../types/database'
 
 export interface FantaLeague {
@@ -13,6 +13,8 @@ export interface FantaLeague {
   name: string
   season_name: string
   season_start_date: string
+  /** Ultimo giorno utile per iscriversi (YYYY-MM-DD), scelto dall'admin. */
+  join_deadline: string
 }
 
 export default function Fantacalcetto() {
@@ -28,6 +30,7 @@ export default function Fantacalcetto() {
   const [seasons, setSeasons] = useState<Season[]>([])
   const [newName, setNewName] = useState('')
   const [newSeasonId, setNewSeasonId] = useState('')
+  const [newJoinDeadline, setNewJoinDeadline] = useState('')
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
 
@@ -41,7 +44,7 @@ export default function Fantacalcetto() {
     setError(null)
 
     const [leaguesRes, membersRes] = await Promise.all([
-      supabase.from('fanta_leagues').select('id, season_id, name, seasons(name, start_date)').order('created_at', { ascending: false }),
+      supabase.from('fanta_leagues').select('id, season_id, name, join_deadline, seasons(name, start_date)').order('created_at', { ascending: false }),
       supabase.from('fanta_league_members').select('league_id').eq('player_id', player.id),
     ])
 
@@ -55,6 +58,7 @@ export default function Fantacalcetto() {
       id: string
       season_id: string
       name: string
+      join_deadline: string
       seasons: { name: string; start_date: string } | null
     }
     setLeagues(
@@ -64,6 +68,7 @@ export default function Fantacalcetto() {
         name: l.name,
         season_name: l.seasons?.name ?? '',
         season_start_date: l.seasons?.start_date ?? '',
+        join_deadline: l.join_deadline,
       })),
     )
     setMyLeagueIds(new Set((membersRes.data ?? []).map((m) => m.league_id)))
@@ -83,13 +88,13 @@ export default function Fantacalcetto() {
 
   async function handleCreate(e: FormEvent) {
     e.preventDefault()
-    if (!player || !newName.trim() || !newSeasonId) return
+    if (!player || !newName.trim() || !newSeasonId || !newJoinDeadline) return
     setCreating(true)
     setCreateError(null)
 
     const { error: insertError } = await supabase
       .from('fanta_leagues')
-      .insert({ season_id: newSeasonId, name: newName.trim(), created_by: player.id })
+      .insert({ season_id: newSeasonId, name: newName.trim(), join_deadline: newJoinDeadline, created_by: player.id })
     setCreating(false)
 
     if (insertError) {
@@ -101,9 +106,10 @@ export default function Fantacalcetto() {
       return
     }
 
-    logActivity('fanta_lega_creata', { nome: newName.trim() })
+    logActivity('fanta_lega_creata', { nome: newName.trim(), scadenzaIscrizioni: newJoinDeadline })
     setNewName('')
     setNewSeasonId('')
+    setNewJoinDeadline('')
     setShowCreate(false)
     load()
   }
@@ -128,9 +134,9 @@ export default function Fantacalcetto() {
   }
 
   const myLeagues = leagues.filter((l) => myLeagueIds.has(l.id))
-  // Ci si può iscrivere solo entro il primo mese dall'inizio della stagione.
+  // Ci si può iscrivere solo entro la scadenza scelta dall'admin per la lega.
   const joinableLeagues = leagues.filter(
-    (l) => !myLeagueIds.has(l.id) && !!l.season_start_date && isJoinOpen(l.season_start_date),
+    (l) => !myLeagueIds.has(l.id) && isJoinOpen(l.join_deadline),
   )
 
   return (
@@ -148,7 +154,10 @@ export default function Fantacalcetto() {
       </h1>
       <p className="mt-1 text-sm text-gray-500">
         Schiera la tua formazione a ogni partita e scala la classifica: tutti contro tutti, vince chi
-        totalizza più punti.
+        totalizza più punti.{' '}
+        <Link to="/regolamento/fantacalcetto" className="text-field-green underline">
+          Leggi il regolamento
+        </Link>
       </p>
 
       {loading && <SkeletonList rows={2} className="mt-4" />}
@@ -169,8 +178,8 @@ export default function Fantacalcetto() {
                 >
                   <span className="text-lg">🎮</span>
                   <div>
-                    <p className="font-semibold text-field-green-dark">Gestione bonus Fantacalcetto</p>
-                    <p className="text-xs text-gray-500">Parametri bonus e malus del fantacalcetto</p>
+                    <p className="font-semibold text-field-green-dark">Gestione parametri Fantacalcetto</p>
+                    <p className="text-xs text-gray-500">Bonus, malus e blocco delle formazioni</p>
                   </div>
                 </Link>
                 <Link
@@ -230,8 +239,8 @@ export default function Fantacalcetto() {
                 <div className="mt-3 space-y-2">
                   {joinableLeagues.length === 0 && (
                     <p className="text-sm text-gray-600">
-                      Al momento non ci sono leghe con iscrizioni aperte. Ci si può iscrivere entro il
-                      primo mese dall'inizio della stagione.
+                      Al momento non ci sono leghe con iscrizioni aperte: ogni lega ha una scadenza per le
+                      iscrizioni, decisa dagli admin.
                     </p>
                   )}
                   {joinableLeagues.map((l) => (
@@ -240,7 +249,7 @@ export default function Fantacalcetto() {
                         <p className="text-sm font-medium">{l.name}</p>
                         <p className="text-xs text-gray-500">Stagione {l.season_name}</p>
                         <p className="text-xs text-gray-400">
-                          Iscrizioni entro il {formatJoinDeadline(l.season_start_date)}
+                          Iscrizioni entro il {formatJoinDeadline(l.join_deadline)}
                         </p>
                       </div>
                       <button
@@ -292,7 +301,12 @@ export default function Fantacalcetto() {
                     <select
                       required
                       value={newSeasonId}
-                      onChange={(e) => setNewSeasonId(e.target.value)}
+                      onChange={(e) => {
+                        setNewSeasonId(e.target.value)
+                        // Proposta: ultimo giorno del primo mese di stagione (modificabile).
+                        const season = seasons.find((s) => s.id === e.target.value)
+                        setNewJoinDeadline(season ? suggestedJoinDeadline(season.start_date) : '')
+                      }}
                       className="w-full rounded-lg border border-gray-300 px-3 py-2"
                     >
                       <option value="">Seleziona la stagione...</option>
@@ -303,10 +317,26 @@ export default function Fantacalcetto() {
                       ))}
                     </select>
                   </div>
-                  {createError && <p className="text-sm text-red-600">{createError}</p>}
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">
+                      Iscrizioni aperte fino al (compreso)
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      value={newJoinDeadline}
+                      onChange={(e) => setNewJoinDeadline(e.target.value)}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                      Proposta: fine del primo mese di stagione. Si può cambiare in qualsiasi momento dalla
+                      pagina della lega.
+                    </p>
+                  </div>
+                  {createError &&<p className="text-sm text-red-600">{createError}</p>}
                   <button
                     type="submit"
-                    disabled={creating || !newName.trim() || !newSeasonId}
+                    disabled={creating || !newName.trim() || !newSeasonId || !newJoinDeadline}
                     className="w-full rounded-lg bg-field-orange px-4 py-2 text-sm font-medium text-white hover:bg-field-orange/90 disabled:opacity-60"
                   >
                     {creating ? 'Creazione...' : 'Crea lega'}

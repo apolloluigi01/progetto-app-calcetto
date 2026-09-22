@@ -13,6 +13,7 @@ import { logActivity } from '../lib/activityLog'
 import { supabase } from '../lib/supabase'
 import { useState } from 'react'
 import PlayerName from '../components/PlayerName'
+import EditButton from '../components/EditButton'
 
 function formatDate(d: string) {
   return new Date(d).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })
@@ -27,12 +28,16 @@ export default function FantaLega() {
   const [calcBusy, setCalcBusy] = useState<string | null>(null)
   const [calcError, setCalcError] = useState<string | null>(null)
   const [tab, setTab] = useState<'classifica' | 'giornate'>('classifica')
+  // Modifica della scadenza iscrizioni (solo admin): null = non in modifica.
+  const [deadlineDraft, setDeadlineDraft] = useState<string | null>(null)
+  const [deadlineSaving, setDeadlineSaving] = useState(false)
+  const [deadlineError, setDeadlineError] = useState<string | null>(null)
 
   if (loading) return <div className="p-4 text-sm text-gray-500">Caricamento...</div>
   if (error || !data) return <div className="p-4 text-sm text-red-600">{error ?? 'Lega non trovata'}</div>
 
   const { league, isMember, standings, matches } = data
-  const joinOpen = !!league.season_start_date && isJoinOpen(league.season_start_date)
+  const joinOpen = isJoinOpen(league.join_deadline)
 
   async function handleJoin() {
     if (!player || !leagueId) return
@@ -50,6 +55,29 @@ export default function FantaLega() {
       )
       return
     }
+    refetch()
+  }
+
+  // Cambia la scadenza delle iscrizioni: vale subito, anche per riaprire
+  // iscrizioni già chiuse (il database applica la stessa data).
+  async function saveJoinDeadline() {
+    if (!leagueId || !deadlineDraft) return
+    setDeadlineSaving(true)
+    setDeadlineError(null)
+    const { error: updError } = await supabase
+      .from('fanta_leagues')
+      .update({ join_deadline: deadlineDraft })
+      .eq('id', leagueId)
+    setDeadlineSaving(false)
+    if (updError) {
+      setDeadlineError(updError.message)
+      return
+    }
+    logActivity('fanta_lega_modificata', {
+      nome: league.name,
+      modifiche: [{ campo: 'Scadenza iscrizioni', da: league.join_deadline, a: deadlineDraft }],
+    })
+    setDeadlineDraft(null)
     refetch()
   }
 
@@ -174,11 +202,68 @@ export default function FantaLega() {
         </div>
       </div>
 
+      {/* Scadenza iscrizioni (solo admin): modificabile in qualsiasi momento */}
+      {isAdmin && (
+        <div className="mt-4 rounded-xl border border-field-orange/30 bg-field-orange/5 p-4">
+          {deadlineDraft === null ? (
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-field-orange">Iscrizioni</p>
+                <p className="text-sm text-gray-700">
+                  {joinOpen ? 'Aperte fino al ' : 'Chiuse — ultimo giorno utile: '}
+                  {formatJoinDeadline(league.join_deadline)}
+                </p>
+              </div>
+              <EditButton
+                onClick={() => {
+                  setDeadlineError(null)
+                  setDeadlineDraft(league.join_deadline)
+                }}
+              >
+                Modifica
+              </EditButton>
+            </div>
+          ) : (
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Iscrizioni aperte fino al (compreso)</label>
+              <input
+                type="date"
+                value={deadlineDraft}
+                onChange={(e) => setDeadlineDraft(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Vale subito: con una data futura si possono anche riaprire iscrizioni già chiuse.
+              </p>
+              {deadlineError && <p className="mt-2 text-sm text-red-600">{deadlineError}</p>}
+              <div className="mt-3 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDeadlineDraft(null)}
+                  disabled={deadlineSaving}
+                  className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Annulla
+                </button>
+                <button
+                  type="button"
+                  onClick={saveJoinDeadline}
+                  disabled={deadlineSaving || !deadlineDraft}
+                  className="flex-1 rounded-lg bg-field-orange px-3 py-1.5 text-sm font-medium text-white hover:bg-field-orange/90 disabled:opacity-50"
+                >
+                  {deadlineSaving ? 'Salvataggio...' : 'Salva'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {!isMember && joinOpen && (
         <div className="mt-4 rounded-xl border border-field-green/30 bg-field-green/5 p-4">
           <p className="text-sm text-gray-700">Non sei ancora iscritto a questa lega.</p>
           <p className="mt-1 text-xs text-gray-500">
-            Iscrizioni aperte fino al {formatJoinDeadline(league.season_start_date)}.
+            Iscrizioni aperte fino al {formatJoinDeadline(league.join_deadline)}.
             {standings.some((s) => s.matchesScored > 0) &&
               ' Ci sono già giornate giocate: entrerai con il punteggio più basso della classifica.'}
           </p>
@@ -196,7 +281,7 @@ export default function FantaLega() {
         <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-4">
           <p className="text-sm text-gray-600">
             Iscrizioni chiuse: ci si poteva iscrivere entro il{' '}
-            {league.season_start_date ? formatJoinDeadline(league.season_start_date) : 'primo mese della stagione'}.
+            {formatJoinDeadline(league.join_deadline)}.
           </p>
         </div>
       )}

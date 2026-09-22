@@ -35,6 +35,7 @@ export type ActivityAction =
   | 'votazioni_aperte'
   | 'votazioni_chiuse'
   | 'fanta_lega_creata'
+  | 'fanta_lega_modificata'
   | 'fanta_giornata_calcolata'
   | 'fanta_calcolo_annullato'
   | 'fanta_parametri_modificati'
@@ -77,6 +78,7 @@ export const actionLabels: Record<ActivityAction, string> = {
   votazioni_aperte:      'Votazioni aperte',
   votazioni_chiuse:      'Votazioni chiuse',
   fanta_lega_creata:     'Lega fantacalcetto creata',
+  fanta_lega_modificata: 'Lega fantacalcetto modificata',
   fanta_giornata_calcolata: 'Giornata fantacalcetto calcolata',
   fanta_calcolo_annullato:  'Calcolo giornata fantacalcetto annullato',
   fanta_parametri_modificati: 'Parametri fantacalcetto modificati',

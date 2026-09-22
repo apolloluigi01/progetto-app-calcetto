@@ -13,8 +13,6 @@ const gmailPassword  = Deno.env.get("GMAIL_APP_PASSWORD")!;
 
 /** Stesso limite lato client: oltre il terzo reminder non si può andare. */
 const MAX_REMINDERS = 3;
-/** Stesso blocco delle formazioni: 15 minuti prima del calcio d'inizio. */
-const LINEUP_LOCK_MINUTES = 15;
 
 const appUrl = Deno.env.get("APP_URL") ?? "https://progetto-app-calcetto.vercel.app";
 
@@ -107,6 +105,16 @@ async function sendBulk(
   return { sent, failed };
 }
 
+/** "15 minuti", "1 ora", "1 ora e 30 minuti" (stesso testo dell'app). */
+function formatLockMinutes(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  const hours = h === 0 ? "" : h === 1 ? "1 ora" : `${h} ore`;
+  const mins = m === 0 ? "" : m === 1 ? "1 minuto" : `${m} minuti`;
+  if (hours && mins) return `${hours} e ${mins}`;
+  return hours || mins || "0 minuti";
+}
+
 /** Client Supabase, ridotto alla sola parte che serve qui. */
 interface RpcClient {
   rpc(fn: string, params: Record<string, unknown>): Promise<{ data: unknown; error: { message: string } | null }>;
@@ -151,30 +159,30 @@ Deno.serve(async (req: Request) => {
   const { leagueId, matchId } = (await req.json()) as { leagueId?: string; matchId?: string };
   if (!leagueId || !matchId) return json(req, { error: "leagueId e matchId obbligatori" }, 400);
 
-  const [leagueRes, matchRes] = await Promise.all([
+  const [leagueRes, matchRes, lockedRes, settingsRes] = await Promise.all([
     adminClient.from("fanta_leagues").select("name").eq("id", leagueId).single(),
     adminClient
       .from("matches")
       .select("match_date, match_time, result:match_results(id)")
       .eq("id", matchId)
       .single(),
+    // Stesso blocco delle formazioni, calcolato dal database: ora italiana e
+    // minuti di blocco impostati dagli admin.
+    adminClient.rpc("fanta_lineups_locked", { p_match_id: matchId }),
+    adminClient.from("fanta_settings").select("lineup_lock_minutes").eq("id", 1).maybeSingle(),
   ]);
   if (leagueRes.error || !leagueRes.data) return json(req, { error: "Lega non trovata" }, 404);
   if (matchRes.error || !matchRes.data) return json(req, { error: "Partita non trovata" }, 404);
 
   // Il reminder ha senso solo finché le formazioni sono ancora schierabili:
-  // stesso blocco delle lineup (partita conclusa o meno di 15' al calcio d'inizio).
+  // stesso blocco delle lineup (partita conclusa o termine per schierare scaduto).
   const result = Array.isArray(matchRes.data.result) ? matchRes.data.result[0] : matchRes.data.result;
   if (result) return json(req, { error: "Partita già conclusa: le formazioni non sono più schierabili" }, 409);
-  if (matchRes.data.match_time) {
-    const kickoff = new Date(`${matchRes.data.match_date}T${matchRes.data.match_time}`);
-    if (!isNaN(kickoff.getTime())) {
-      const deadline = kickoff.getTime() - LINEUP_LOCK_MINUTES * 60 * 1000;
-      if (Date.now() >= deadline) {
-        return json(req, { error: "Formazioni bloccate: non è più possibile inviare reminder" }, 409);
-      }
-    }
+  if (lockedRes.error) return json(req, { error: lockedRes.error.message }, 500);
+  if (lockedRes.data === true) {
+    return json(req, { error: "Formazioni bloccate: non è più possibile inviare reminder" }, 409);
   }
+  const lockLabel = formatLockMinutes(Number(settingsRes.data?.lineup_lock_minutes ?? 15));
 
   const { count } = await adminClient
     .from("fanta_lineup_reminders")
@@ -216,7 +224,7 @@ Deno.serve(async (req: Request) => {
         </p>
         <p style="font-size:15px;color:#374151;margin:0 0 12px;">
           Apri l'app Pavone League, entra nella tua lega e schiera la tua squadra prima che le
-          formazioni vengano bloccate (15 minuti prima del calcio d'inizio).
+          formazioni vengano bloccate (${lockLabel} prima del calcio d'inizio).
         </p>
         <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0;">
         <p style="color:#9ca3af;font-size:12px;text-align:center;margin:0;">

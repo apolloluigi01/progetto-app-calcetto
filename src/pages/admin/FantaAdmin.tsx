@@ -2,12 +2,12 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { logActivity, type FieldChange } from '../../lib/activityLog'
-import { DEFAULT_FANTA_SETTINGS, type FantaSettings } from '../../lib/fantacalcetto'
+import { DEFAULT_FANTA_SETTINGS, fantaSettingsFromRow, type FantaSettings } from '../../lib/fantacalcetto'
 import EditButton from '../../components/EditButton'
 
-// Questa pagina gestisce solo bonus/malus: i costi in crediti delle fasce si
-// manutengono dalla Gestione crediti Fantacalcetto, mentre il budget è
-// dinamico e non si imposta più a mano.
+// Questa pagina gestisce bonus/malus e i minuti di blocco delle formazioni:
+// i costi in crediti delle fasce si manutengono dalla Gestione crediti
+// Fantacalcetto, mentre il budget è dinamico e non si imposta più a mano.
 type BonusKey = keyof FantaSettings
 
 interface ParamDef {
@@ -24,6 +24,7 @@ const PARAMS: ParamDef[] = [
   { key: 'malusAutogol', label: 'Malus autogol', hint: 'Punti (negativi) per ogni autogol', step: '0.5' },
   { key: 'malusPeggiore', label: 'Malus peggior voto', hint: 'Punti (negativi) per il peggior voto in campo', step: '0.5' },
   { key: 'captainMultiplier', label: 'Moltiplicatore capitano', hint: 'I soli bonus del capitano vengono moltiplicati per questo valore (voto base e malus restano invariati)', step: '0.1' },
+  { key: 'lineupLockMinutes', label: 'Blocco formazioni (minuti)', hint: "Minuti prima del calcio d'inizio oltre i quali non si può più schierare o modificare la formazione (da 0 a 1440)", step: '1' },
 ]
 
 function toValues(s: FantaSettings): Record<BonusKey, string> {
@@ -34,6 +35,7 @@ function toValues(s: FantaSettings): Record<BonusKey, string> {
     malusAutogol: String(s.malusAutogol),
     malusPeggiore: String(s.malusPeggiore),
     captainMultiplier: String(s.captainMultiplier),
+    lineupLockMinutes: String(s.lineupLockMinutes),
   }
 }
 
@@ -41,6 +43,7 @@ export default function FantaAdmin() {
   const { player } = useAuth()
   const [values, setValues] = useState<Record<BonusKey, string>>({
     bonusMvp: '', bonusGol: '', bonusAssist: '', malusAutogol: '', malusPeggiore: '', captainMultiplier: '',
+    lineupLockMinutes: '',
   })
   const [initial, setInitial] = useState<FantaSettings>(DEFAULT_FANTA_SETTINGS)
   const [loading, setLoading] = useState(true)
@@ -58,16 +61,7 @@ export default function FantaAdmin() {
       .maybeSingle()
       .then(({ data, error: loadError }) => {
         if (loadError) setError(loadError.message)
-        const s: FantaSettings = data
-          ? {
-              bonusMvp: Number(data.bonus_mvp),
-              bonusGol: Number(data.bonus_gol),
-              bonusAssist: Number(data.bonus_assist),
-              malusAutogol: Number(data.malus_autogol),
-              malusPeggiore: Number(data.malus_peggiore),
-              captainMultiplier: Number(data.captain_multiplier),
-            }
-          : DEFAULT_FANTA_SETTINGS
+        const s: FantaSettings = data ? fantaSettingsFromRow(data) : DEFAULT_FANTA_SETTINGS
         setInitial(s)
         setValues(toValues(s))
         setLoading(false)
@@ -85,6 +79,8 @@ export default function FantaAdmin() {
     }
   }
   if (parsed.captainMultiplier !== undefined && parsed.captainMultiplier <= 0) allValid = false
+  const lock = parsed.lineupLockMinutes
+  if (lock !== undefined && (!Number.isInteger(lock) || lock < 0 || lock > 1440)) allValid = false
 
   async function handleSave() {
     if (!allValid) return
@@ -102,6 +98,7 @@ export default function FantaAdmin() {
         malus_autogol: next.malusAutogol,
         malus_peggiore: next.malusPeggiore,
         captain_multiplier: next.captainMultiplier,
+        lineup_lock_minutes: next.lineupLockMinutes,
         updated_at: new Date().toISOString(),
         updated_by: player?.id ?? null,
       })
@@ -137,10 +134,11 @@ export default function FantaAdmin() {
 
   return (
     <div className="p-4 pb-12">
-      <h1 className="text-xl font-semibold text-field-green-dark">Gestione bonus Fantacalcetto</h1>
+      <h1 className="text-xl font-semibold text-field-green-dark">Gestione parametri Fantacalcetto</h1>
       <p className="mt-1 text-sm text-gray-500">
-        Parametri bonus/malus usati per il calcolo dei punteggi delle giornate. Le modifiche valgono
-        per i prossimi calcoli (e per gli eventuali ricalcoli) delle giornate.
+        Bonus e malus del calcolo delle giornate e termine per schierare le formazioni. Bonus e malus valgono
+        per i prossimi calcoli (e per gli eventuali ricalcoli) delle giornate; il blocco formazioni vale
+        subito, anche per la partita in programma.
       </p>
 
       <div className="mt-4 space-y-3 rounded-xl bg-white p-4 shadow">
@@ -172,7 +170,8 @@ export default function FantaAdmin() {
 
         {editing && !allValid && (
           <p className="text-xs text-red-500">
-            Inserisci un valore numerico per ogni parametro (il moltiplicatore capitano deve essere maggiore di 0).
+            Inserisci un valore numerico per ogni parametro (il moltiplicatore capitano deve essere maggiore di 0,
+            il blocco formazioni un numero intero di minuti da 0 a 1440).
           </p>
         )}
         {error && <p className="text-sm text-red-600">{error}</p>}

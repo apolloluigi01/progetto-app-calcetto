@@ -8,7 +8,7 @@ export const FANTA_TEAM_SIZE = 5
 /**
  * Parametri del fantacalcetto. Non sono più hardcodati: vivono nella
  * tabella fanta_settings (riga singola) e sono manutenuti dagli admin
- * dalla sezione CDA → Gestione bonus Fantacalcetto (bonus/malus).
+ * dalla sezione Fantacalcetto → Gestione parametri Fantacalcetto.
  * Il budget non fa più parte di questi parametri: è dinamico e si
  * ricalcola a ogni giornata (vedi computeFantaBudget).
  */
@@ -19,6 +19,8 @@ export interface FantaSettings {
   malusAutogol: number
   malusPeggiore: number
   captainMultiplier: number
+  /** Minuti prima del calcio d'inizio oltre i quali le formazioni sono bloccate. */
+  lineupLockMinutes: number
 }
 
 /** Valori di fallback se la riga di configurazione non è raggiungibile. */
@@ -29,11 +31,11 @@ export const DEFAULT_FANTA_SETTINGS: FantaSettings = {
   malusAutogol: -1,
   malusPeggiore: -2,
   captainMultiplier: 1.2,
+  lineupLockMinutes: 15,
 }
 
-export async function getFantaSettings(): Promise<FantaSettings> {
-  const { data } = await supabase.from('fanta_settings').select('*').eq('id', 1).maybeSingle()
-  if (!data) return DEFAULT_FANTA_SETTINGS
+/** Riga di fanta_settings convertita nei parametri usati dall'app. */
+export function fantaSettingsFromRow(data: Record<string, unknown>): FantaSettings {
   return {
     bonusMvp: Number(data.bonus_mvp),
     bonusGol: Number(data.bonus_gol),
@@ -41,7 +43,13 @@ export async function getFantaSettings(): Promise<FantaSettings> {
     malusAutogol: Number(data.malus_autogol),
     malusPeggiore: Number(data.malus_peggiore),
     captainMultiplier: Number(data.captain_multiplier),
+    lineupLockMinutes: Number(data.lineup_lock_minutes ?? DEFAULT_FANTA_SETTINGS.lineupLockMinutes),
   }
+}
+
+export async function getFantaSettings(): Promise<FantaSettings> {
+  const { data } = await supabase.from('fanta_settings').select('*').eq('id', 1).maybeSingle()
+  return data ? fantaSettingsFromRow(data) : DEFAULT_FANTA_SETTINGS
 }
 
 /**
@@ -66,18 +74,26 @@ export function computeFantaBudget(fieldCosts: number[]): number {
   return allEqual ? base : base - 1
 }
 
-/** Minuti prima del calcio d'inizio oltre i quali le formazioni sono bloccate. */
-export const LINEUP_LOCK_MINUTES = 15
-
 /**
- * Termine ultimo per inserire/modificare la formazione: 15 minuti prima
- * del calcio d'inizio. Se la partita non ha un orario, nessun termine.
+ * Termine ultimo per inserire/modificare la formazione: tanti minuti prima
+ * del calcio d'inizio quanti ne impostano gli admin (lineupLockMinutes, il
+ * database applica lo stesso valore). Se la partita non ha un orario, nessun termine.
  */
-export function lineupDeadline(matchDate: string, matchTime: string | null): Date | null {
+export function lineupDeadline(matchDate: string, matchTime: string | null, lockMinutes: number): Date | null {
   if (!matchTime) return null
   const kickoff = new Date(`${matchDate}T${matchTime}`)
   if (isNaN(kickoff.getTime())) return null
-  return new Date(kickoff.getTime() - LINEUP_LOCK_MINUTES * 60 * 1000)
+  return new Date(kickoff.getTime() - lockMinutes * 60 * 1000)
+}
+
+/** "15 minuti", "1 ora", "1 ora e 30 minuti": per i testi sul blocco formazioni. */
+export function formatLockMinutes(minutes: number): string {
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  const hours = h === 0 ? '' : h === 1 ? '1 ora' : `${h} ore`
+  const mins = m === 0 ? '' : m === 1 ? '1 minuto' : `${m} minuti`
+  if (hours && mins) return `${hours} e ${mins}`
+  return hours || mins || '0 minuti'
 }
 
 /**
@@ -219,34 +235,38 @@ export function computeEntryPoints(
   return entry
 }
 
-/** Mesi dall'inizio della stagione entro cui ci si può iscrivere a una lega. */
-export const JOIN_WINDOW_MONTHS = 1
-
 /**
- * Primo giorno (YYYY-MM-DD) in cui l'iscrizione alla lega è chiusa: inizio
- * stagione + 1 mese (stagione dal 1 settembre → chiusa dal 1 ottobre). Se il
- * mese successivo è più corto, si ferma all'ultimo giorno, come fa Postgres.
- * Il database applica la stessa regola (fanta_league_join_open).
+ * Scadenza iscrizioni proposta alla creazione di una lega: l'ultimo giorno del
+ * primo mese di stagione (inizio 1 settembre → 30 settembre). Se il mese
+ * successivo è più corto, si ferma all'ultimo giorno, come fa Postgres.
+ * L'admin può poi scegliere qualsiasi altra data.
  */
-export function joinClosedFrom(seasonStartDate: string): string {
+export function suggestedJoinDeadline(seasonStartDate: string): string {
   const [y, m, d] = seasonStartDate.split('-').map(Number)
-  const target = new Date(Date.UTC(y, m - 1 + JOIN_WINDOW_MONTHS, 1))
+  const target = new Date(Date.UTC(y, m, 1))
   const lastDay = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate()
-  target.setUTCDate(Math.min(d, lastDay))
+  target.setUTCDate(Math.min(d, lastDay) - 1)
   return target.toISOString().slice(0, 10)
 }
 
-/** True se oggi (ora italiana) ci si può ancora iscrivere alla lega. */
-export function isJoinOpen(seasonStartDate: string): boolean {
+/**
+ * True se oggi (ora italiana) ci si può ancora iscrivere alla lega:
+ * joinDeadline (YYYY-MM-DD) è l'ultimo giorno utile, compreso. Il database
+ * applica la stessa regola (fanta_league_join_open).
+ */
+export function isJoinOpen(joinDeadline: string): boolean {
   const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' })
-  return today < joinClosedFrom(seasonStartDate)
+  return today <= joinDeadline
 }
 
 /** Ultimo giorno utile per iscriversi, formattato per l'interfaccia. */
-export function formatJoinDeadline(seasonStartDate: string): string {
-  const last = new Date(`${joinClosedFrom(seasonStartDate)}T12:00:00Z`)
-  last.setUTCDate(last.getUTCDate() - 1)
-  return last.toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
+export function formatJoinDeadline(joinDeadline: string): string {
+  return new Date(`${joinDeadline}T12:00:00Z`).toLocaleDateString('it-IT', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  })
 }
 
 export function formatFantaPoints(v: number): string {

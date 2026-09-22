@@ -1,6 +1,23 @@
 # Note di progetto — App Calcetto
 
-Ultimo aggiornamento: 2026-09-16
+Ultimo aggiornamento: 2026-09-22
+
+## Scadenze fanta configurabili e Regolamento (2026-09-22)
+
+- **Scadenza iscrizioni per lega** (`fanta_leagues.join_deadline`, ultimo giorno utile compreso):
+  la sceglie l'admin alla creazione (proposta: fine del primo mese di stagione) e la cambia dalla
+  pagina della lega. Sostituisce la regola fissa "primo mese" del 2026-09-15; le leghe esistenti
+  hanno ereditato quella data. Nuova policy `fanta_leagues_update_admin`: prima una lega non si
+  poteva modificare.
+- **Blocco formazioni** (`fanta_settings.lineup_lock_minutes`, default 15): si imposta da Gestione
+  parametri Fantacalcetto. Lo leggono `fanta_lineup_deadline` (quindi trigger di blocco e
+  visibilità delle formazioni nascoste), la pagina formazione e la edge function dei reminder.
+  La edge function ora usa `fanta_lineups_locked` del database: prima calcolava il calcio
+  d'inizio in UTC e sbagliava di 1-2 ore.
+- **Regolamento** (`/regolamento/format|amichevoli|fantacalcetto`): documentazione per tutti.
+  Bonus, fasce, crediti e minuti di blocco sono letti dal database, non scritti nel testo:
+  cambiando un parametro il regolamento si aggiorna da solo. Le sezioni di partita sono in
+  comune tra Format e Amichevoli (`src/pages/regolamento/SezioniPartita.tsx`).
 
 ## Votazioni: tutti o solo admin (2026-09-16)
 

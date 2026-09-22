@@ -15,6 +15,7 @@ const navItems: NavItem[] = [
   { to: '/statistiche', label: 'Statistiche' },
   { to: '/albo-oro', label: "Albo d'oro" },
   { to: '/ufficio-stampa', label: 'Ufficio Stampa' },
+  { to: '/regolamento', label: 'Regolamento' },
 ]
 
 /** Voce a sé stante, staccata dal resto del menu (in fondo, dopo un divisore). */

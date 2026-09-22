@@ -35,6 +35,7 @@ const FantaLega = lazy(() => import('./pages/FantaLega'))
 const FantaFormazione = lazy(() => import('./pages/FantaFormazione'))
 const RegistroAttivita = lazy(() => import('./pages/RegistroAttivita'))
 const UfficioStampa = lazy(() => import('./pages/UfficioStampa'))
+const Regolamento = lazy(() => import('./pages/Regolamento'))
 
 const AdminHome = lazy(() => import('./pages/admin/AdminHome'))
 const GiocatoriAdmin = lazy(() => import('./pages/admin/GiocatoriAdmin'))
@@ -80,6 +81,8 @@ function App() {
                 <Route path="/impostazioni" element={<Impostazioni />} />
                 <Route path="/calendario" element={<Calendario />} />
                 <Route path="/ufficio-stampa" element={<UfficioStampa />} />
+                <Route path="/regolamento" element={<Navigate to="/regolamento/format" replace />} />
+                <Route path="/regolamento/:tipo" element={<Regolamento />} />
                 <Route path="/fantacalcetto" element={<Fantacalcetto />} />
                 <Route path="/fantacalcetto/:leagueId" element={<FantaLega />} />
                 <Route path="/fantacalcetto/:leagueId/partite/:matchId" element={<FantaFormazione />} />

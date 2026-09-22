@@ -357,7 +357,7 @@ export function compareFormat(a: PlayerStats, b: PlayerStats): number {
 export const STAT_CONFIG: Record<StatKey, StatConfig> = {
   overall: {
     title: 'Overall',
-    description: 'Valutazione complessiva 1-100 (stile FIFA), calcolata da % vittorie, gol fatti e media voto',
+    description: 'Valutazione complessiva 1-100 (stile FIFA), assegnata e aggiornata dagli admin',
     color: 'green',
     sortDir: 'desc',
     unit: '',
